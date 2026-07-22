@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { ALL_TAGS } from "@/lib/data";
 import { getPhotos } from "@/lib/photos";
+import type { MediaType } from "@/lib/types";
 import { SearchForm } from "@/components/SearchForm";
 import { InfiniteGallery } from "@/components/InfiniteGallery";
+import { MediaTypeTabs } from "@/components/MediaTypeTabs";
 
 export const metadata: Metadata = { title: "Recherche" };
 
@@ -19,12 +21,15 @@ export default async function SearchPage({
   const sp = await searchParams;
   const q = first(sp.q);
   const tag = first(sp.tag);
+  const typeRaw = first(sp.type);
+  const type: MediaType | undefined =
+    typeRaw === "photo" || typeRaw === "video" ? typeRaw : undefined;
   const hasQuery = Boolean((q && q.trim()) || tag);
 
   const label = q ? q : tag ? `#${tag}` : null;
   const page = hasQuery
-    ? getPhotos({ q, tag, sort: "popular" })
-    : getPhotos({ sort: "trending" });
+    ? getPhotos({ q, tag, type, sort: "popular" })
+    : getPhotos({ type, sort: "trending" });
 
   return (
     <div className="px-3 py-5 sm:px-5">
@@ -41,30 +46,26 @@ export default async function SearchPage({
         </Suspense>
       </div>
 
-      {hasQuery ? (
-        <>
-          <p className="mb-3 text-sm text-[var(--color-ink-muted)]">
-            {page.total.toLocaleString("fr-FR")} résultat
-            {page.total > 1 ? "s" : ""}
-          </p>
-          <InfiniteGallery
-            key={`${q ?? ""}|${tag ?? ""}`}
-            initial={page}
-            params={{ sort: "popular", q, tag }}
-          />
-        </>
-      ) : (
-        <>
-          <p className="mb-3 text-sm text-[var(--color-ink-muted)]">
-            Tape ta recherche, ou explore les tendances du moment.
-          </p>
-          <InfiniteGallery
-            key="discover"
-            initial={page}
-            params={{ sort: "trending" }}
-          />
-        </>
-      )}
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <p className="text-sm text-[var(--color-ink-muted)]">
+          {hasQuery
+            ? `${page.total.toLocaleString("fr-FR")} résultat${page.total > 1 ? "s" : ""}`
+            : "Tendances du moment"}
+        </p>
+        <Suspense fallback={<div className="h-9 w-52" />}>
+          <MediaTypeTabs basePath="/recherche" />
+        </Suspense>
+      </div>
+
+      <InfiniteGallery
+        key={`${q ?? ""}|${tag ?? ""}|${type ?? ""}|${hasQuery}`}
+        initial={page}
+        params={
+          hasQuery
+            ? { sort: "popular", q, tag, type }
+            : { sort: "trending", type }
+        }
+      />
     </div>
   );
 }

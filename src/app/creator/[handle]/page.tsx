@@ -5,6 +5,7 @@ import { getCreator, getCreatorStats, getPhotos } from "@/lib/photos";
 import { formatCount } from "@/lib/format";
 import { InfiniteGallery } from "@/components/InfiniteGallery";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
+import { FollowButton } from "@/components/Interactions";
 
 export async function generateMetadata({
   params,
@@ -76,9 +77,10 @@ export default async function CreatorPage({
             </div>
           </div>
 
-          <button className="shrink-0 self-start rounded-full bg-[var(--color-accent)] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[var(--color-accent-600)] sm:self-auto">
-            Suivre
-          </button>
+          <FollowButton
+            handle={creator.handle}
+            className="self-start px-6 py-2.5 sm:self-auto"
+          />
         </div>
 
         {/* Stats */}

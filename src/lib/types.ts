@@ -62,6 +62,7 @@ export interface PhotoQuery {
   tag?: string;
   q?: string;
   creator?: string;
+  type?: MediaType;
   cursor?: number;
   limit?: number;
 }

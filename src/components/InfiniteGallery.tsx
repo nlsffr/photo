@@ -2,11 +2,17 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PhotoCard } from "./PhotoCard";
-import type { PhotoPage, PhotoView, SortKey } from "@/lib/types";
+import type { MediaType, PhotoPage, PhotoView, SortKey } from "@/lib/types";
 
 interface Props {
   initial: PhotoPage;
-  params: { sort: SortKey; tag?: string; q?: string; creator?: string };
+  params: {
+    sort: SortKey;
+    tag?: string;
+    q?: string;
+    creator?: string;
+    type?: MediaType;
+  };
 }
 
 export function InfiniteGallery({ initial, params }: Props) {
@@ -22,10 +28,11 @@ export function InfiniteGallery({ initial, params }: Props) {
       if (params.tag) sp.set("tag", params.tag);
       if (params.q) sp.set("q", params.q);
       if (params.creator) sp.set("creator", params.creator);
+      if (params.type) sp.set("type", params.type);
       sp.set("cursor", String(c));
       return `/api/photos?${sp.toString()}`;
     },
-    [params.sort, params.tag, params.q, params.creator],
+    [params.sort, params.tag, params.q, params.creator, params.type],
   );
 
   const loadMore = useCallback(async () => {

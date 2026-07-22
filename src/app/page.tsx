@@ -1,9 +1,11 @@
+import { Suspense } from "react";
 import { ALL_TAGS } from "@/lib/data";
 import { getPhotos } from "@/lib/photos";
-import type { SortKey } from "@/lib/types";
+import type { MediaType, SortKey } from "@/lib/types";
 import { InfiniteGallery } from "@/components/InfiniteGallery";
 import { FeaturedCreators } from "@/components/FeaturedCreators";
 import { TagChips } from "@/components/TagChips";
+import { MediaTypeTabs } from "@/components/MediaTypeTabs";
 
 const VALID_SORTS: SortKey[] = ["recent", "trending", "popular", "liked", "random"];
 
@@ -30,9 +32,12 @@ export default async function Home({
     ? (sortRaw as SortKey)
     : "recent";
   const tag = first(sp.tag);
+  const typeRaw = first(sp.type);
+  const type: MediaType | undefined =
+    typeRaw === "photo" || typeRaw === "video" ? typeRaw : undefined;
 
-  const page = getPhotos({ sort, tag });
-  const queryKey = `${sort}|${tag ?? ""}`;
+  const page = getPhotos({ sort, tag, type });
+  const queryKey = `${sort}|${tag ?? ""}|${type ?? ""}`;
 
   const heading = tag ? `#${tag}` : SORT_LABEL[sort];
 
@@ -42,16 +47,25 @@ export default async function Home({
 
       <TagChips tags={ALL_TAGS} activeTag={tag} />
 
-      <div className="mb-3 flex items-baseline justify-between gap-3">
-        <h1 className="text-xl font-bold capitalize tracking-tight sm:text-2xl">
-          {heading}
-        </h1>
-        <span className="shrink-0 text-sm text-[var(--color-ink-faint)]">
-          {page.total.toLocaleString("fr-FR")} publications
-        </span>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-bold capitalize tracking-tight sm:text-2xl">
+            {heading}
+          </h1>
+          <span className="text-sm text-[var(--color-ink-faint)]">
+            {page.total.toLocaleString("fr-FR")} publications
+          </span>
+        </div>
+        <Suspense fallback={<div className="h-9 w-52" />}>
+          <MediaTypeTabs basePath="/" />
+        </Suspense>
       </div>
 
-      <InfiniteGallery key={queryKey} initial={page} params={{ sort, tag }} />
+      <InfiniteGallery
+        key={queryKey}
+        initial={page}
+        params={{ sort, tag, type }}
+      />
     </div>
   );
 }

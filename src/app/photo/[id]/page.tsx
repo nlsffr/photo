@@ -11,6 +11,7 @@ import {
 import { formatAge, formatCount } from "@/lib/format";
 import { PhotoCard } from "@/components/PhotoCard";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
+import { FollowButton, PostActions } from "@/components/Interactions";
 
 export async function generateMetadata({
   params,
@@ -86,32 +87,32 @@ export default async function PhotoPage({
           </div>
 
           {/* Creator */}
-          <Link
-            href={`/creator/${photo.creatorHandle}`}
-            className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 transition-colors hover:border-[var(--color-accent)]/50"
-          >
-            <Image
-              src={photo.creator.avatarUrl}
-              alt={photo.creator.name}
-              width={48}
-              height={48}
-              className="h-12 w-12 rounded-full object-cover"
-            />
-            <div className="min-w-0">
-              <p className="flex items-center gap-1 font-semibold">
-                {photo.creator.name}
-                {photo.creator.verified && <VerifiedBadge size={14} />}
-              </p>
-              {creator && (
-                <p className="truncate text-sm text-[var(--color-ink-muted)]">
-                  {formatCount(creator.followers)} abonnés · {creator.location}
+          <div className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+            <Link
+              href={`/creator/${photo.creatorHandle}`}
+              className="flex min-w-0 flex-1 items-center gap-3"
+            >
+              <Image
+                src={photo.creator.avatarUrl}
+                alt={photo.creator.name}
+                width={48}
+                height={48}
+                className="h-12 w-12 rounded-full object-cover"
+              />
+              <div className="min-w-0">
+                <p className="flex items-center gap-1 font-semibold">
+                  {photo.creator.name}
+                  {photo.creator.verified && <VerifiedBadge size={14} />}
                 </p>
-              )}
-            </div>
-            <span className="ml-auto shrink-0 rounded-full bg-[var(--color-accent)] px-3 py-1.5 text-sm font-semibold text-white">
-              Suivre
-            </span>
-          </Link>
+                {creator && (
+                  <p className="truncate text-sm text-[var(--color-ink-muted)]">
+                    {formatCount(creator.followers)} abonnés · {creator.location}
+                  </p>
+                )}
+              </div>
+            </Link>
+            <FollowButton handle={photo.creatorHandle} className="ml-auto" />
+          </div>
 
           {/* Stats */}
           <div className="grid grid-cols-3 gap-2">
@@ -144,20 +145,7 @@ export default async function PhotoPage({
           </div>
 
           {/* Actions */}
-          <div className="flex gap-2">
-            <button className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--color-surface-2)] py-2.5 text-sm font-semibold hover:bg-[var(--color-surface-3)]">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 1 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z" />
-              </svg>
-              J’aime
-            </button>
-            <button className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--color-surface-2)] py-2.5 text-sm font-semibold hover:bg-[var(--color-surface-3)]">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                <path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16l-7-4-7 4Z" />
-              </svg>
-              Enregistrer
-            </button>
-          </div>
+          <PostActions id={photo.id} baseLikes={photo.likes} />
         </aside>
       </div>
 

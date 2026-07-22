@@ -59,6 +59,7 @@ export function getPhotos(query: PhotoQuery = {}): PhotoPage {
     tag,
     q,
     creator,
+    type,
     cursor = 0,
     limit = DEFAULT_LIMIT,
   } = query;
@@ -67,6 +68,7 @@ export function getPhotos(query: PhotoQuery = {}): PhotoPage {
 
   if (creator) list = list.filter((p) => p.creatorHandle === creator);
   if (tag) list = list.filter((p) => p.tags.includes(tag));
+  if (type) list = list.filter((p) => p.type === type);
 
   if (q && q.trim()) {
     const needle = q.trim().toLowerCase();
@@ -90,6 +92,11 @@ export function getPhotos(query: PhotoQuery = {}): PhotoPage {
 
 export function getPhotoById(id: string): Photo | undefined {
   return PHOTOS.find((p) => p.id === id);
+}
+
+/** All photos as views (creator embedded). Used by the client-side favorites page. */
+export function getAllPhotoViews(): PhotoView[] {
+  return PHOTOS.map(withCreator);
 }
 
 export function getCreator(handle: string): Creator | undefined {

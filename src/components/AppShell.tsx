@@ -30,6 +30,7 @@ const SECTIONS: NavSection[] = [
       { href: "/feed", label: "Feed", icon: I("M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM10 8l6 4-6 4z"), active: (p) => p.startsWith("/feed") },
       { href: "/?sort=random", label: "Découvrir", icon: I("M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM16 8l-2 6-6 2 2-6 6-2z") },
       { href: "/models", label: "Publications", icon: I("M3 5h18v14H3zM3 15l5-5 4 4 3-3 6 6"), active: (p) => p.startsWith("/models") },
+      { href: "/favoris", label: "Enregistrés", icon: I("M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16l-7-4-7 4Z"), active: (p) => p.startsWith("/favoris") },
     ],
   },
   {
