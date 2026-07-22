@@ -1,26 +1,78 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ------------------------------------------------------------------ */
+/*  Design tokens (Tailwind v4 — CSS-based theme)                      */
+/*  Dark, dense, red/"fire" accent — matching the reference layout.    */
+/* ------------------------------------------------------------------ */
+@theme {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  /* Surfaces */
+  --color-bg: #0d0d0f;
+  --color-surface: #161618;
+  --color-surface-2: #1e1e21;
+  --color-surface-3: #2a2a2f;
+  --color-border: #2c2c31;
+
+  /* Text */
+  --color-ink: #f3f3f5;
+  --color-ink-muted: #a6a6b0;
+  --color-ink-faint: #6c6c76;
+
+  /* Brand accent — hot pink / magenta */
+  --color-accent: #ec3f8f;
+  --color-accent-600: #d81f77;
+  --color-accent-soft: #ec3f8f22;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ------------------------------------------------------------------ */
+/*  Base                                                               */
+/* ------------------------------------------------------------------ */
+html {
+  color-scheme: dark;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Thin dark scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-surface-3) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-surface-3);
+  border-radius: 9999px;
+  border: 3px solid var(--color-bg);
+}
+
+/* Fade-in for lazily loaded media */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.animate-fade-in {
+  animation: fade-in 0.4s ease both;
+}
+
+/* Hide scrollbars on chip / horizontal rows */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

@@ -1,65 +1,57 @@
-import Image from "next/image";
+import { ALL_TAGS } from "@/lib/data";
+import { getPhotos } from "@/lib/photos";
+import type { SortKey } from "@/lib/types";
+import { InfiniteGallery } from "@/components/InfiniteGallery";
+import { FeaturedCreators } from "@/components/FeaturedCreators";
+import { TagChips } from "@/components/TagChips";
 
-export default function Home() {
+const VALID_SORTS: SortKey[] = ["recent", "trending", "popular", "liked", "random"];
+
+const SORT_LABEL: Record<SortKey, string> = {
+  recent: "Récents",
+  trending: "🔥 Tendances",
+  popular: "Populaires",
+  liked: "Plus aimés",
+  random: "Aléatoire",
+};
+
+function first(v?: string | string[]): string | undefined {
+  return Array.isArray(v) ? v[0] : v;
+}
+
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const sp = await searchParams;
+  const sortRaw = first(sp.sort);
+  const sort: SortKey = VALID_SORTS.includes(sortRaw as SortKey)
+    ? (sortRaw as SortKey)
+    : "recent";
+  const tag = first(sp.tag);
+
+  const page = getPhotos({ sort, tag });
+  const queryKey = `${sort}|${tag ?? ""}`;
+
+  const heading = tag ? `#${tag}` : SORT_LABEL[sort];
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+    <div className="px-3 py-4 sm:px-5">
+      <FeaturedCreators />
+
+      <TagChips tags={ALL_TAGS} activeTag={tag} />
+
+      <div className="mb-3 flex items-baseline justify-between gap-3">
+        <h1 className="text-xl font-bold capitalize tracking-tight sm:text-2xl">
+          {heading}
+        </h1>
+        <span className="shrink-0 text-sm text-[var(--color-ink-faint)]">
+          {page.total.toLocaleString("fr-FR")} publications
+        </span>
+      </div>
+
+      <InfiniteGallery key={queryKey} initial={page} params={{ sort, tag }} />
     </div>
   );
 }
