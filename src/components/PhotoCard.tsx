@@ -27,7 +27,7 @@ export function PhotoCard({ photo }: { photo: PhotoView }) {
           className="animate-fade-in object-cover transition-transform duration-500 group-hover:scale-105"
         />
         <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/60 to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/75 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
+        <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/75 to-transparent opacity-100 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100" />
 
         {photo.type === "video" && (
           <>
@@ -64,7 +64,7 @@ export function PhotoCard({ photo }: { photo: PhotoView }) {
       </Link>
 
       {/* Interactive action bar (bottom) */}
-      <div className="absolute inset-x-0 bottom-0 z-10 flex items-center gap-2 p-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+      <div className="absolute inset-x-0 bottom-0 z-10 flex items-center gap-2 p-2 opacity-100 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100">
         <button
           type="button"
           onClick={() => toggleLike(photo.id)}

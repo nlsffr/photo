@@ -31,6 +31,8 @@
 /* ------------------------------------------------------------------ */
 html {
   color-scheme: dark;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
@@ -38,6 +40,8 @@ body {
   color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  /* Never let a stray wide element scroll the whole page sideways on mobile. */
+  overflow-x: hidden;
 }
 
 /* Thin dark scrollbars */

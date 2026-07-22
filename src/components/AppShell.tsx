@@ -118,7 +118,7 @@ const TABS: { href: string; label: string; d: string; active: (p: string) => boo
 function BottomTabs() {
   const pathname = usePathname();
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 flex h-16 items-stretch border-t border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-bg)_92%,transparent)] backdrop-blur-xl lg:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-40 flex h-[calc(4rem+env(safe-area-inset-bottom))] items-stretch border-t border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-bg)_92%,transparent)] pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden">
       {TABS.map((t) => {
         const active = t.active(pathname);
         return (
@@ -156,7 +156,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col">
       {/* Top bar */}
-      <header className="sticky top-0 z-40 flex h-14 items-center gap-2 border-b border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-bg)_90%,transparent)] px-3 backdrop-blur-xl sm:gap-3 sm:px-4">
+      <header className="sticky top-0 z-40 flex min-h-14 items-center gap-2 border-b border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-bg)_90%,transparent)] px-3 pt-[env(safe-area-inset-top)] backdrop-blur-xl sm:gap-3 sm:px-4">
         <button
           type="button"
           onClick={() => setOpen(true)}
@@ -218,12 +218,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex flex-1">
         {/* Desktop left rail */}
         <aside className="hidden w-60 shrink-0 border-r border-[var(--color-border)] lg:block">
-          <div className="sticky top-14 max-h-[calc(100vh-3.5rem)] overflow-y-auto p-3">
+          <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] max-h-[calc(100dvh-3.5rem-env(safe-area-inset-top))] overflow-y-auto p-3">
             <NavContent />
           </div>
         </aside>
 
-        <main className="min-w-0 flex-1 pb-20 lg:pb-0">
+        <main className="min-w-0 flex-1 pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0">
           <div className="mx-auto w-full max-w-[1500px]">{children}</div>
         </main>
       </div>
@@ -260,7 +260,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <BottomTabs />
 
       {/* Footer */}
-      <footer className="border-t border-[var(--color-border)] bg-[var(--color-surface)] pb-16 lg:pb-0">
+      <footer className="border-t border-[var(--color-border)] bg-[var(--color-surface)] pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0">
         <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <span className="text-base font-black tracking-tight">

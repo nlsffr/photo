@@ -218,7 +218,7 @@ export function FeedViewer({ items }: { items: PhotoView[] }) {
   const [muted, setMuted] = useState(true);
 
   return (
-    <div className="fixed bottom-16 left-0 right-0 top-14 z-30 bg-black lg:bottom-0 lg:left-60">
+    <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 top-[calc(3.5rem+env(safe-area-inset-top))] z-30 bg-black lg:bottom-0 lg:left-60 lg:top-14">
       {/* Sound toggle */}
       <button
         type="button"

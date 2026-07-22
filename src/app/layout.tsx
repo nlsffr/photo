@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/AppShell";
@@ -21,6 +21,27 @@ export const metadata: Metadata = {
   },
   description:
     "LumenGallery — galerie de photographie communautaire : portraits, mode et éditorial.",
+  applicationName: "Lumengallery",
+  appleWebApp: {
+    capable: true,
+    title: "Lumengallery",
+    statusBarStyle: "black-translucent",
+  },
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/apple-touch-icon.png",
+  },
+  other: {
+    // Legacy iOS standalone flag (Next emits the modern mobile-web-app-capable).
+    "apple-mobile-web-app-capable": "yes",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0d0d0f",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
