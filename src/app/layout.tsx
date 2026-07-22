@@ -21,24 +21,11 @@ export const metadata: Metadata = {
   },
   description:
     "LumenGallery — galerie de photographie communautaire : portraits, mode et éditorial.",
-  applicationName: "Lumengallery",
-  appleWebApp: {
-    capable: true,
-    title: "Lumengallery",
-    statusBarStyle: "black-translucent",
-  },
-  icons: {
-    icon: "/icon-192.png",
-    apple: "/apple-touch-icon.png",
-  },
-  other: {
-    // Legacy iOS standalone flag (Next emits the modern mobile-web-app-capable).
-    "apple-mobile-web-app-capable": "yes",
-  },
 };
 
+// Plain website viewport. viewport-fit=cover just lets us respect the iPhone
+// notch/safe-areas in Safari — it does NOT make this an installable app.
 export const viewport: Viewport = {
-  themeColor: "#0d0d0f",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",

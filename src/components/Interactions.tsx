@@ -19,7 +19,9 @@ interface Ctx {
   toggleLike: (id: string) => void;
   toggleSave: (id: string) => void;
   toggleFollow: (handle: string) => void;
+  likedIds: string[];
   savedIds: string[];
+  followedHandles: string[];
 }
 
 const InteractionsContext = createContext<Ctx | null>(null);
@@ -80,7 +82,9 @@ export function InteractionsProvider({
     toggleLike: useCallback((id) => setLiked((s) => toggle(s, id)), []),
     toggleSave: useCallback((id) => setSaved((s) => toggle(s, id)), []),
     toggleFollow: useCallback((h) => setFollowed((s) => toggle(s, h)), []),
+    likedIds: [...liked],
     savedIds: [...saved],
+    followedHandles: [...followed],
   };
 
   return (
