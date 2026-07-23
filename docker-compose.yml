@@ -1,0 +1,115 @@
+# Local development stack — mirrors production topology at small scale.
+# Usage: docker compose up -d
+#
+# This is for LOCAL DEV ONLY. It has no bearing on prod topology, where
+# MariaDB/Redis/Elasticsearch/Minio live behind the VPN-only network and
+# the app itself sits behind the edge proxy + DDoS-Guard (see docs/DEPLOY.md).
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: mysql://lumen:lumen_dev_pw@mariadb:3306/lumengallery
+      REDIS_URL: redis://redis:6379
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_BUCKET: lumengallery-media
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - lumen-internal
+
+  mariadb:
+    image: mariadb:11.4
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: root_dev_pw
+      MARIADB_DATABASE: lumengallery
+      MARIADB_USER: lumen
+      MARIADB_PASSWORD: lumen_dev_pw
+    volumes:
+      - mariadb-data:/var/lib/mysql
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - lumen-internal
+    # No published port — only reachable from other containers on this
+    # network. Use `docker compose exec mariadb mysql ...` for local access.
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - lumen-internal
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - lumen-internal
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio-data:/data
+    ports:
+      # Console only exposed on localhost for dev convenience — never do
+      # this in prod (see docs/DEPLOY.md: Minio stays VPN-only).
+      - "127.0.0.1:9001:9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - lumen-internal
+
+networks:
+  lumen-internal:
+    driver: bridge
+
+volumes:
+  mariadb-data:
+  redis-data:
+  es-data:
+  minio-data:

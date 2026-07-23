@@ -1,0 +1,53 @@
+name: Deploy (manual, self-hosted runner only)
+
+# This workflow NEVER runs automatically and NEVER runs on GitHub-hosted
+# runners. It only runs when manually triggered, on a self-hosted runner
+# that lives inside the VPN-only network next to Harbor. This is what
+# keeps the registry from ever being reachable from the public internet:
+# the only thing that can push to it is a runner that is itself not
+# publicly reachable, and pushes only happen when a human clicks "Run".
+#
+# Setup required before this workflow is usable:
+#   1. Register a self-hosted GitHub Actions runner inside the VPN network
+#      (see docs/DEPLOY.md — "CI/CD runner placement").
+#   2. Set repository secrets: HARBOR_REGISTRY, HARBOR_USERNAME, HARBOR_PASSWORD.
+#   3. Runner label must be "self-hosted-vpn" (matches runs-on below).
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options: [staging, qa, prod]
+
+permissions:
+  contents: read
+
+jobs:
+  build-push-deploy:
+    runs-on: [self-hosted, self-hosted-vpn]
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to private Harbor registry
+        run: echo "${{ secrets.HARBOR_PASSWORD }}" | docker login "${{ secrets.HARBOR_REGISTRY }}" -u "${{ secrets.HARBOR_USERNAME }}" --password-stdin
+
+      - name: Build and tag image
+        run: |
+          TAG="${{ secrets.HARBOR_REGISTRY }}/lumengallery/web:${{ github.sha }}"
+          docker build -t "$TAG" -f Dockerfile .
+          echo "IMAGE_TAG=$TAG" >> "$GITHUB_ENV"
+
+      - name: Push to Harbor
+        run: docker push "$IMAGE_TAG"
+
+      - name: Deploy to ${{ inputs.environment }}
+        run: |
+          echo "Deploying $IMAGE_TAG to ${{ inputs.environment }}"
+          # Actual rollout command depends on your orchestrator
+          # (docker compose on the target host, or `kubectl set image`).
+          # Intentionally left as a placeholder — wire this to your
+          # orchestrator once the target hosts exist.
