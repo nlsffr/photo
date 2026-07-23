@@ -14,7 +14,7 @@ export function SavedGallery({ items }: { items: PhotoView[] }) {
         {Array.from({ length: 10 }).map((_, i) => (
           <div
             key={i}
-            className="aspect-[4/5] animate-pulse rounded-xl bg-[var(--color-surface-2)]"
+            className="aspect-[4/5] skeleton rounded-xl"
           />
         ))}
       </div>

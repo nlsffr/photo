@@ -83,9 +83,9 @@ export function InfiniteGallery({ initial, params }: Props) {
   return (
     <>
       {/* Masonry via CSS multi-columns: variable-height cards flow into columns. */}
-      <div className="columns-2 gap-3 sm:columns-3 lg:columns-4 xl:columns-5 [column-fill:_balance]">
+      <div className="columns-2 gap-2.5 sm:columns-3 sm:gap-3 lg:columns-4 xl:columns-5">
         {items.map((p) => (
-          <div key={p.id} className="mb-3 break-inside-avoid">
+          <div key={p.id} className="mb-2.5 break-inside-avoid sm:mb-3">
             <PhotoCard photo={p} />
           </div>
         ))}

@@ -81,28 +81,36 @@ export function PhotoCard({ photo }: { photo: PhotoView }) {
       </Link>
 
       {/* Interactive action bar (bottom) */}
-      <div className="absolute inset-x-0 bottom-0 z-10 flex items-center gap-2 p-2 opacity-100 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100">
+      <div className="absolute inset-x-0 bottom-0 z-10 flex items-center gap-2.5 p-2.5 opacity-100 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100">
         <button
           type="button"
           onClick={() => toggleLike(photo.id)}
           aria-pressed={liked}
           aria-label="J’aime"
-          className="flex items-center gap-1 text-xs font-semibold text-white"
+          className="flex items-center gap-1 text-xs font-semibold text-white transition-transform active:scale-90"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill={liked ? "var(--color-accent)" : "none"} stroke={liked ? "var(--color-accent)" : "currentColor"} strokeWidth="2" aria-hidden>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill={liked ? "var(--color-accent)" : "none"} stroke={liked ? "var(--color-accent)" : "currentColor"} strokeWidth="2" aria-hidden>
             <path d="M12 21s-7.5-4.6-10-9.3C.4 8.4 2 5 5.4 5c2 0 3.3 1.1 4.6 2.6C11.3 6.1 12.6 5 14.6 5 18 5 19.6 8.4 22 11.7 19.5 16.4 12 21 12 21Z" />
           </svg>
           {formatCount(likeCount)}
         </button>
+
+        <span className="flex items-center gap-1 text-xs font-medium text-white/85">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+          {formatCount(photo.views)}
+        </span>
 
         <button
           type="button"
           onClick={() => toggleSave(photo.id)}
           aria-pressed={saved}
           aria-label="Enregistrer"
-          className="ml-auto text-white"
+          className="ml-auto text-white transition-transform active:scale-90"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill={saved ? "var(--color-accent)" : "none"} stroke={saved ? "var(--color-accent)" : "currentColor"} strokeWidth="2" aria-hidden>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill={saved ? "var(--color-accent)" : "none"} stroke={saved ? "var(--color-accent)" : "currentColor"} strokeWidth="2" aria-hidden>
             <path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16l-7-4-7 4Z" />
           </svg>
         </button>

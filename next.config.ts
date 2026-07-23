@@ -21,7 +21,7 @@ const csp = [
   "object-src 'none'",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
-  `img-src 'self' data: blob:${cdnHostname ? ` https://${cdnHostname}` : ""}`,
+  `img-src 'self' data: blob:${cdnHostname ? ` https://${cdnHostname}` : ""}${process.env.DEMO_DATA === "1" ? " https://picsum.photos https://fastly.picsum.photos https://i.pravatar.cc" : ""}`,
   `media-src 'self' blob:${cdnHostname ? ` https://${cdnHostname}` : ""}`,
   "font-src 'self'",
   `connect-src 'self'${isDev ? " ws: http:" : ""}`,
@@ -77,9 +77,19 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   images: {
     // Real media is served from your own CDN — set CDN_HOSTNAME in env.
-    remotePatterns: cdnHostname
-      ? [{ protocol: "https", hostname: cdnHostname }]
-      : [],
+    // Demo hosts (picsum/pravatar) are allowed only when DEMO_DATA=1.
+    remotePatterns: [
+      ...(cdnHostname
+        ? [{ protocol: "https" as const, hostname: cdnHostname }]
+        : []),
+      ...(process.env.DEMO_DATA === "1"
+        ? [
+            { protocol: "https" as const, hostname: "picsum.photos" },
+            { protocol: "https" as const, hostname: "fastly.picsum.photos" },
+            { protocol: "https" as const, hostname: "i.pravatar.cc" },
+          ]
+        : []),
+    ],
   },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];

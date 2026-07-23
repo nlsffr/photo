@@ -6,9 +6,12 @@ export async function FeaturedCreators() {
   const models = await getModels("followers");
   const creators = models.slice(0, 16);
 
+  // Nothing to feature yet — don't render an empty section header.
+  if (creators.length === 0) return null;
+
   return (
     <section className="mb-5">
-      <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-[var(--color-ink-muted)]">
+      <h2 className="mb-2.5 text-xs font-bold uppercase tracking-wider text-[var(--color-ink-faint)]">
         Modèles en vedette
       </h2>
       <div className="no-scrollbar -mx-3 flex gap-4 overflow-x-auto px-3 sm:mx-0 sm:px-0">

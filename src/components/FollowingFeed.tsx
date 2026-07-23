@@ -12,7 +12,7 @@ export function FollowingFeed({ items }: { items: PhotoView[] }) {
     return (
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
         {Array.from({ length: 10 }).map((_, i) => (
-          <div key={i} className="aspect-[4/5] animate-pulse rounded-xl bg-[var(--color-surface-2)]" />
+          <div key={i} className="aspect-[4/5] skeleton rounded-xl" />
         ))}
       </div>
     );

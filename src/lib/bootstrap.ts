@@ -16,6 +16,13 @@ export async function ensureDataProvider() {
   if (initialised) return;
   initialised = true;
 
+  // Preview mode: in-memory demo data (rights-free placeholders) for design work.
+  if (process.env.DEMO_DATA === "1") {
+    const { DemoProvider } = await import("./providers/demo");
+    setDataProvider(new DemoProvider());
+    return;
+  }
+
   if (!process.env.DATABASE_URL) {
     // No DB configured — stay on the empty provider (clean empty states).
     return;
