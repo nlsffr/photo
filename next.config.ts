@@ -5,23 +5,29 @@ import { dirname } from "node:path";
 const projectRoot = dirname(fileURLToPath(import.meta.url));
 
 const cdnHostname = process.env.CDN_HOSTNAME;
+const isDev = process.env.NODE_ENV !== "production";
 
 // Content-Security-Policy — locks the page down to same-origin only (plus the
 // CDN host for media). No third-party scripts, frames, or connections can run.
+//
+// Dev-only exception: React's development mode uses eval() for debugging
+// features, so we allow 'unsafe-eval' in dev ONLY. Production React never uses
+// eval(), so the prod CSP stays strict (no unsafe-eval).
 const csp = [
   "default-src 'self'",
   "base-uri 'self'",
   "form-action 'self'",
   "frame-ancestors 'none'",
   "object-src 'none'",
-  // Next.js needs inline styles; scripts are same-origin only.
-  "script-src 'self' 'unsafe-inline'",
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: blob:${cdnHostname ? ` https://${cdnHostname}` : ""}`,
   `media-src 'self' blob:${cdnHostname ? ` https://${cdnHostname}` : ""}`,
   "font-src 'self'",
-  "connect-src 'self'",
-  "upgrade-insecure-requests",
+  `connect-src 'self'${isDev ? " ws: http:" : ""}`,
+  // Only force HTTPS in production. In dev the server is plain HTTP (and phones
+  // reach it over http://<lan-ip>), so upgrading would break CSS/JS loading.
+  ...(isDev ? [] : ["upgrade-insecure-requests"]),
 ].join("; ");
 
 const securityHeaders = [
@@ -30,11 +36,6 @@ const securityHeaders = [
   { key: "Content-Security-Policy", value: csp },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
-  // Force HTTPS for 2 years, including subdomains + preload list.
-  {
-    key: "Strict-Transport-Security",
-    value: "max-age=63072000; includeSubDomains; preload",
-  },
   // Deny access to sensitive browser features by default.
   {
     key: "Permissions-Policy",
@@ -44,12 +45,31 @@ const securityHeaders = [
   // Cross-origin isolation hardening.
   { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
   { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
+  // HSTS only in production (HTTPS). Setting it in dev would make the phone
+  // remember to force HTTPS on the LAN IP and break plain-HTTP access.
+  ...(isDev
+    ? []
+    : [
+        {
+          key: "Strict-Transport-Security",
+          value: "max-age=63072000; includeSubDomains; preload",
+        },
+      ]),
 ];
 
 const nextConfig: NextConfig = {
   // Pin the workspace root — the home dir contains an unrelated package-lock.json
   // that Next would otherwise infer as the root.
   turbopack: { root: projectRoot },
+  // Allow accessing the dev server (HMR/hydration resources) from phones on the
+  // same Wi-Fi via the machine's LAN IP. Dev-only convenience; has no effect in
+  // production. Covers the common 192.168.x.x / 10.x / 172.16-31.x ranges.
+  allowedDevOrigins: [
+    "192.168.1.192",
+    "192.168.0.0/16",
+    "10.0.0.0/8",
+    "172.16.0.0/12",
+  ],
   // Minimal, self-contained image for Docker (copies only the required
   // node_modules subset + build output — no full node_modules in the image).
   output: "standalone",

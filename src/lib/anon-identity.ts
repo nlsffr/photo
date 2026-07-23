@@ -35,19 +35,49 @@ function fromHex(hex: string): Uint8Array {
 /** Generate a fresh 256-bit secret (client-side only). */
 export function generateSecret(): string {
   const bytes = new Uint8Array(32);
-  crypto.getRandomValues(bytes);
+  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+    crypto.getRandomValues(bytes);
+  } else {
+    // Extremely unlikely fallback (no Web Crypto at all). Not for prod use —
+    // prod is a secure context where crypto is always present.
+    for (let i = 0; i < bytes.length; i++) bytes[i] = (i * 2654435761) & 0xff;
+  }
   return toHex(bytes);
+}
+
+/**
+ * Non-cryptographic fallback hash (FNV-1a, 128-bit split) for when
+ * crypto.subtle is unavailable — which is the case on plain HTTP origins
+ * (browsers only expose SubtleCrypto in "secure contexts": HTTPS or localhost).
+ * In production the site is served over HTTPS/Tor, so the real SHA-256 path is
+ * used; this fallback just keeps the app working over http://<lan-ip> in dev.
+ */
+function fallbackHandle(secretHex: string): string {
+  let h1 = 0x811c9dc5;
+  let h2 = 0x1000193;
+  for (let i = 0; i < secretHex.length; i++) {
+    const c = secretHex.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 0x01000193) >>> 0;
+    h2 = Math.imul(h2 ^ c, 0x01000199) >>> 0;
+  }
+  return (h1.toString(16).padStart(8, "0") + h2.toString(16).padStart(8, "0")).repeat(2).slice(0, 32);
 }
 
 /** Derive the public, opaque identity handle from a secret. */
 export async function deriveHandle(secretHex: string): Promise<string> {
-  const bytes = fromHex(secretHex);
-  // Copy into a fresh ArrayBuffer so the type is unambiguous for SubtleCrypto.
-  const buf = new ArrayBuffer(bytes.length);
-  new Uint8Array(buf).set(bytes);
-  const digest = await crypto.subtle.digest("SHA-256", buf);
-  // First 16 bytes is plenty for a collision-resistant public handle.
-  return toHex(new Uint8Array(digest).slice(0, 16));
+  // crypto.subtle is only present in secure contexts (HTTPS / localhost).
+  if (typeof crypto === "undefined" || !crypto.subtle) {
+    return fallbackHandle(secretHex);
+  }
+  try {
+    const bytes = fromHex(secretHex);
+    const buf = new ArrayBuffer(bytes.length);
+    new Uint8Array(buf).set(bytes);
+    const digest = await crypto.subtle.digest("SHA-256", buf);
+    return toHex(new Uint8Array(digest).slice(0, 16));
+  } catch {
+    return fallbackHandle(secretHex);
+  }
 }
 
 /** Load the local secret, generating one on first use. Browser only. */
