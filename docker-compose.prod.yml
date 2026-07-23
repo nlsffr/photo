@@ -1,0 +1,150 @@
+# Production stack — anonymity-first, no public origin IP.
+#
+# Two ways in, both hiding the origin:
+#   1) Clearnet: DDoS-Guard -> edge (nginx) -> app   (public domain)
+#   2) Tor:      .onion hidden service -> app         (no IP at all)
+#
+# The data stores (mariadb/redis/elasticsearch/minio) live on an INTERNAL
+# docker network with NO published ports — reachable only by the app.
+# Nothing here writes visitor logs (see nginx.conf: access_log off).
+#
+# Usage:
+#   cp .env.example .env.prod   # fill real values
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+
+services:
+  edge:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      # Only the edge is public. Point DDoS-Guard here; firewall the host so
+      # ONLY DDoS-Guard IP ranges can reach these ports (see docs/DEPLOY.md).
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/nginx/certs:/etc/nginx/certs:ro
+    networks:
+      - edge-net
+
+  app:
+    image: ${IMAGE:-lumengallery:latest}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      DB_SSL: "true"
+      DB_SSL_CA: ${DB_SSL_CA}
+      REDIS_URL: redis://redis:6379
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_BUCKET: ${S3_BUCKET:-lumengallery-media}
+      CDN_HOSTNAME: ${CDN_HOSTNAME}
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - edge-net      # reachable by edge + tor
+      - internal-net  # reachable to data stores
+    # No published ports: the app is never directly public.
+
+  tor:
+    image: dperson/torproxy:latest
+    restart: unless-stopped
+    # Publishes a v3 .onion hidden service that forwards to the app.
+    # The onion hostname appears in ./infra/tor/data/hidden_service/hostname
+    # after first start. Back up that folder to keep the same .onion.
+    environment:
+      # 80 on the onion -> app:3000
+      TOR_HIDDEN_SERVICE: "true"
+    command: >
+      -s "80:app:3000"
+    volumes:
+      - tor-data:/var/lib/tor
+    depends_on:
+      app:
+        condition: service_healthy
+    networks:
+      - edge-net
+
+  mariadb:
+    image: mariadb:11.4
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${DB_NAME:-lumengallery}
+      MARIADB_USER: ${DB_USER}
+      MARIADB_PASSWORD: ${DB_PASSWORD}
+    command:
+      - --innodb-encrypt-tables=ON
+      - --innodb-encrypt-log=ON
+      - --skip-name-resolve   # don't do reverse DNS on clients
+      - --general-log=0       # never log queries
+    volumes:
+      - mariadb-data:/var/lib/mysql
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal-net
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]  # no persistence
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - internal-net
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms1g -Xmx1g"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    networks:
+      - internal-net
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY}
+    volumes:
+      - minio-data:/data
+    networks:
+      - internal-net
+    # Private bucket only. Never expose a public port. Media is served via the
+    # CDN (private origin) with signed URLs — see docs/DEPLOY.md.
+
+networks:
+  edge-net:
+    driver: bridge
+  internal-net:
+    driver: bridge
+    internal: true   # this network has NO route to the internet at all
+
+volumes:
+  mariadb-data:
+  es-data:
+  minio-data:
+  tor-data:

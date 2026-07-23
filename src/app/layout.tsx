@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AppShell } from "@/components/AppShell";
 import { InteractionsProvider } from "@/components/Interactions";
+import { AnonIdentityProvider } from "@/components/AnonIdentity";
 
 // No external font provider: we use the OS's own font stack (defined in
 // globals.css). This means ZERO network contact with any font CDN — not at
@@ -33,9 +34,11 @@ export default function RootLayout({
   return (
     <html lang="fr" className="h-full antialiased">
       <body className="min-h-full">
-        <InteractionsProvider>
-          <AppShell>{children}</AppShell>
-        </InteractionsProvider>
+        <AnonIdentityProvider>
+          <InteractionsProvider>
+            <AppShell>{children}</AppShell>
+          </InteractionsProvider>
+        </AnonIdentityProvider>
       </body>
     </html>
   );

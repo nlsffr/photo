@@ -8,6 +8,7 @@
 
 import "server-only";
 import { setDataProvider } from "./data-provider";
+import { log } from "./logger";
 
 let initialised = false;
 
@@ -23,8 +24,9 @@ export async function ensureDataProvider() {
   try {
     const { MariaDBProvider } = await import("./providers/mariadb");
     setDataProvider(new MariaDBProvider());
-  } catch (err) {
-    // Never crash the whole app if the DB is misconfigured; log and stay empty.
-    console.error("[bootstrap] MariaDB provider init failed:", err);
+  } catch {
+    // Never crash the whole app if the DB is misconfigured; stay empty.
+    // We intentionally don't log the error details (could include the DSN).
+    log.fatal("[bootstrap] data provider init failed");
   }
 }
