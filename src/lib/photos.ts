@@ -5,8 +5,13 @@
 
 import type { Photo, PhotoPage, PhotoView, SortKey, MediaType } from "./types";
 import { getDataProvider } from "./data-provider";
+import { ensureDataProvider } from "./bootstrap";
 
-const DEFAULT_LIMIT = 30;
+/** Resolve the active data provider, wiring the real DB on first use. */
+async function getProvider() {
+  await ensureDataProvider();
+  return getDataProvider();
+}
 
 export async function getPhotos(query: {
   sort?: SortKey;
@@ -17,35 +22,30 @@ export async function getPhotos(query: {
   cursor?: number;
   limit?: number;
 }): Promise<PhotoPage> {
-  const provider = getDataProvider();
-  return provider.getPhotos(query);
+  return (await getProvider()).getPhotos(query);
 }
 
 export async function getPhotoById(id: string): Promise<Photo | undefined> {
-  const provider = getDataProvider();
-  return provider.getPhoto(id);
+  return (await getProvider()).getPhoto(id);
 }
 
 export async function getAllPhotoViews(): Promise<PhotoView[]> {
-  const provider = getDataProvider();
-  return provider.getAllPhotos();
+  return (await getProvider()).getAllPhotos();
 }
 
 export async function getRelatedPhotos(
   photo: Photo,
   limit = 12,
 ): Promise<PhotoView[]> {
-  const provider = getDataProvider();
-  return provider.getRelatedPhotos(photo, limit);
+  return (await getProvider()).getRelatedPhotos(photo, limit);
 }
 
 export async function getCreatorStats(handle: string) {
-  const provider = getDataProvider();
-  return provider.getCreatorStats(handle);
+  return (await getProvider()).getCreatorStats(handle);
 }
 
 export async function getModels(sort: "followers" | "views" = "followers") {
-  const provider = getDataProvider();
+  const provider = await getProvider();
   const creators = await provider.getCreators();
   const photos = await provider.getAllPhotos();
 
@@ -80,7 +80,7 @@ export async function getModels(sort: "followers" | "views" = "followers") {
 }
 
 export async function getRankings(limit = 20) {
-  const provider = getDataProvider();
+  const provider = await getProvider();
   const creators = await provider.getCreators();
   const photos = await provider.getAllPhotos();
 
@@ -102,24 +102,17 @@ export async function getRankings(limit = 20) {
   return ranked.slice(0, limit);
 }
 
-export async function getRecommendedCreators(
-  exclude?: string,
-  limit = 6,
-) {
+export async function getRecommendedCreators(exclude?: string, limit = 6) {
   const models = await getModels("followers");
-  return models
-    .filter((c) => c.handle !== exclude)
-    .slice(0, limit);
+  return models.filter((c) => c.handle !== exclude).slice(0, limit);
 }
 
 export async function getAllTags(): Promise<string[]> {
-  const provider = getDataProvider();
-  return provider.getTags();
+  return (await getProvider()).getTags();
 }
 
 export async function getCreator(handle: string) {
-  const provider = getDataProvider();
-  return provider.getCreator(handle);
+  return (await getProvider()).getCreator(handle);
 }
 
 /** Attach a lightweight creator summary to a photo (for now returns minimal data). */

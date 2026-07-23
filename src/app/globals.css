@@ -5,8 +5,11 @@
 /*  Dark, dense, red/"fire" accent — matching the reference layout.    */
 /* ------------------------------------------------------------------ */
 @theme {
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  /* System font stack — no external font download, fully anonymous. */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+    Arial, ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
+    "Segoe UI Emoji";
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   /* Surfaces */
   --color-bg: #0d0d0f;
