@@ -33,16 +33,18 @@ export default async function ModelsPage({
         <div className="inline-flex rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] p-1">
           <Link
             href="/models"
+            title="Trier par nombre d’abonnés"
             className={`${toggle} ${
               sort === "followers"
                 ? "bg-[var(--color-accent)] text-white"
                 : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
             }`}
           >
-            Populaires
+            Plus suivis
           </Link>
           <Link
             href="/models?sort=views"
+            title="Trier par nombre de vues du contenu"
             className={`${toggle} ${
               sort === "views"
                 ? "bg-[var(--color-accent)] text-white"
