@@ -57,7 +57,7 @@ export function ForYouGallery({
         <div className="mb-5 rounded-2xl border border-[var(--color-border)] bg-gradient-to-br from-[var(--color-accent-soft)] to-transparent p-5">
           <p className="text-lg font-bold">Ton feed, rien qu’à toi ✨</p>
           <p className="mt-1 max-w-lg text-sm text-[var(--color-ink-muted)]">
-            Aime des photos ❤️ et suis des photographes 👤 : « Pour toi »
+            Aime des photos ❤️ et suis des modèles 👤 : « Pour toi »
             apprend tes goûts et te propose du contenu de plus en plus pertinent.
             En attendant, voici les tendances.
           </p>

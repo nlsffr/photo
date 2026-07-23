@@ -3,7 +3,7 @@
  * This remains the same interface; implementation swaps based on where data comes from.
  */
 
-import type { Photo, PhotoPage, PhotoView, SortKey, MediaType } from "./types";
+import type { Creator, Photo, PhotoPage, PhotoView, SortKey, MediaType } from "./types";
 import { getDataProvider } from "./data-provider";
 import { ensureDataProvider } from "./bootstrap";
 
@@ -115,15 +115,23 @@ export async function getCreator(handle: string) {
   return (await getProvider()).getCreator(handle);
 }
 
-/** Attach a lightweight creator summary to a photo (for now returns minimal data). */
-export function withCreator(p: Photo): PhotoView {
+/**
+ * Attach a creator summary to a photo. Pass the real creator when you have it
+ * (e.g. fetched via getCreator); otherwise it derives a readable name from the
+ * handle so nothing ever shows a fake "loading" label.
+ */
+export function withCreator(p: Photo, creator?: Creator): PhotoView {
+  const fallbackName = p.creatorHandle
+    .split("-")
+    .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+    .join(" ");
   return {
     ...p,
     creator: {
       handle: p.creatorHandle,
-      name: "Chargement...",
-      avatarUrl: "",
-      verified: false,
+      name: creator?.name ?? fallbackName,
+      avatarUrl: creator?.avatarUrl ?? "",
+      verified: creator?.verified ?? false,
     },
   };
 }

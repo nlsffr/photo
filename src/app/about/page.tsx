@@ -6,15 +6,15 @@ export const metadata: Metadata = { title: "À propos" };
 const FEATURES = [
   {
     title: "Une galerie communautaire",
-    body: "Des photographes partagent leurs portraits, séries mode et travaux éditoriaux dans un flux unique et infini.",
+    body: "Des modèles partagent leurs portraits, séries mode et travaux éditoriaux dans un flux unique et infini.",
   },
   {
     title: "Découverte",
-    body: "Tri par récents, tendances, plus aimés ou aléatoire, filtres par tags et recherche instantanée.",
+    body: "Contenu tendance trié par vues, filtres photos/vidéos et par tags, recherche instantanée.",
   },
   {
     title: "Profils de modèles",
-    body: "Chaque photographe dispose d’une page profil avec sa galerie, ses statistiques et ses abonnés.",
+    body: "Chaque modèle dispose d’une page profil avec sa galerie, ses statistiques et ses abonnés.",
   },
   {
     title: "Classements",
@@ -47,14 +47,12 @@ export default function AboutPage() {
         ))}
       </div>
 
-      <div className="mt-8 rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] p-5">
-        <h2 className="font-bold">Contenu de démonstration</h2>
+      <div className="mt-8 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
+        <h2 className="font-bold">Confidentialité par défaut</h2>
         <p className="mt-1.5 text-sm text-[var(--color-ink-muted)]">
-          Cette instance est une démo d’interface. Toutes les images, noms et
-          statistiques sont des placeholders générés (images via picsum.photos,
-          avatars via i.pravatar.cc). Aucun contenu réel n’est hébergé — la
-          couche de données est destinée à être remplacée par votre propre
-          contenu, dont vous détenez les droits.
+          LumenGallery ne trace pas ses visiteurs : aucun cookie publicitaire,
+          aucun service tiers, aucune conservation d’adresses IP. Tu peux même
+          utiliser une identité anonyme, sans e-mail.
         </p>
       </div>
 

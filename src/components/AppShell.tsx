@@ -26,35 +26,25 @@ const SECTIONS: NavSection[] = [
     items: [
       { href: "/", label: "Accueil", icon: I("M3 11l9-8 9 8M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"), active: (p) => p === "/" },
       { href: "/models", label: "Modèles", icon: I("M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"), active: (p) => p.startsWith("/models") },
-      { href: "/abonnements", label: "Abonnements", icon: I("M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM16 11l2 2 4-4"), active: (p) => p.startsWith("/abonnements") },
-      { href: "/recherche", label: "Recherche", icon: I("M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-4.3-4.3"), active: (p) => p.startsWith("/recherche") },
-      { href: "/connexion", label: "Connexion", icon: I("M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"), active: (p) => p.startsWith("/connexion") || p.startsWith("/inscription") },
       { href: "/feed", label: "Feed", icon: I("M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM10 8l6 4-6 4z"), active: (p) => p.startsWith("/feed") },
+      { href: "/recherche", label: "Recherche", icon: I("M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-4.3-4.3"), active: (p) => p.startsWith("/recherche") },
+      { href: "/abonnements", label: "Abonnements", icon: I("M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM16 11l2 2 4-4"), active: (p) => p.startsWith("/abonnements") },
       { href: "/favoris", label: "Enregistrés", icon: I("M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16l-7-4-7 4Z"), active: (p) => p.startsWith("/favoris") },
     ],
   },
   {
+    title: "Compte",
     items: [
-      { href: "#", label: "Premium", icon: I("M3 7l4 5 5-7 5 7 4-5v11H3z"), accent: "gold" },
       { href: "/connexion", label: "Connexion", icon: I("M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"), active: (p) => p.startsWith("/connexion") },
       { href: "/inscription", label: "Inscription", icon: I("M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6"), accent: "pink", active: (p) => p.startsWith("/inscription") },
+      { href: "/identite", label: "Identité anonyme", icon: I("M12 2a5 5 0 0 1 5 5v3a5 5 0 0 1-10 0V7a5 5 0 0 1 5-5zM4 21a8 8 0 0 1 16 0"), active: (p) => p.startsWith("/identite") },
     ],
   },
   {
+    title: "Découvrir",
     items: [
-      { href: "#", label: "Commentaires récents", icon: I("M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z") },
-      { href: "/models", label: "Top modèles", icon: I("M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"), active: (p) => p.startsWith("/models") },
       { href: "/classements", label: "Classements", icon: I("M8 21V9M16 21V5M4 21v-6M20 21v-10"), active: (p) => p.startsWith("/classements") },
       { href: "/about", label: "À propos", icon: I("M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 16v-4M12 8h.01"), active: (p) => p.startsWith("/about") },
-    ],
-  },
-  {
-    title: "Tendances 🔥",
-    items: [
-      { href: "/", label: "Récents", icon: I("M12 8v4l3 2M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z") },
-      { href: "/?sort=trending", label: "Tendances", icon: I("M5 17l6-6 4 4 8-8M21 7v6h-6") },
-      { href: "/?sort=liked", label: "Plus aimés", icon: I("M12 21s-7.5-4.6-10-9.3C.4 8.4 2 5 5.4 5c2 0 3.3 1.1 4.6 2.6C11.3 6.1 12.6 5 14.6 5 18 5 19.6 8.4 22 11.7 19.5 16.4 12 21 12 21Z") },
-      { href: "/?sort=random", label: "Aléatoire", icon: I("M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5") },
     ],
   },
 ];
@@ -99,12 +89,6 @@ function NavContent({ onNavigate }: { onNavigate?: () => void }) {
           )}
         </div>
       ))}
-      <p className="px-3 pt-2 text-xs font-bold uppercase tracking-wide text-[var(--color-ink-faint)]">
-        Partenaires
-      </p>
-      <div className="mx-3 grid aspect-[3/2] place-items-center rounded-lg border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] text-xs text-[var(--color-ink-faint)]">
-        Emplacement partenaire
-      </div>
     </nav>
   );
 }
@@ -196,24 +180,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <path d="m21 21-4.3-4.3" />
             </svg>
           </Link>
-          <button className="hidden items-center gap-1.5 rounded-lg bg-gradient-to-r from-amber-400 to-orange-500 px-3 py-2 text-sm font-bold text-black sm:inline-flex">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-              <path d="M3 7l4 5 5-7 5 7 4-5v11H3z" />
-            </svg>
-            Premium
-          </button>
-          <button aria-label="Thème" className="hidden h-9 w-9 place-items-center rounded-lg text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-2)] sm:grid">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-              <circle cx="12" cy="12" r="4" />
-              <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
-            </svg>
-          </button>
-          <button aria-label="Compte" className="grid h-9 w-9 place-items-center rounded-full bg-[var(--color-surface-2)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">
+          <Link
+            href="/inscription"
+            className="hidden items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-3.5 py-2 text-sm font-bold text-white hover:bg-[var(--color-accent-600)] sm:inline-flex"
+          >
+            S’inscrire
+          </Link>
+          <Link
+            href="/connexion"
+            aria-label="Connexion"
+            className="grid h-9 w-9 place-items-center rounded-full bg-[var(--color-surface-2)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+          >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
               <circle cx="12" cy="8" r="4" />
               <path d="M4 21a8 8 0 0 1 16 0" />
             </svg>
-          </button>
+          </Link>
         </div>
       </header>
 
@@ -268,16 +250,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <span className="text-base font-black tracking-tight">
               Lumen<span className="text-[var(--color-accent)]">gallery</span>
             </span>
-            <nav className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-[var(--color-ink-muted)]">
+            <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-[var(--color-ink-faint)]">
               {["Conditions", "Confidentialité", "Mentions légales", "DMCA", "Contact"].map((l) => (
-                <a key={l} href="#" className="hover:text-[var(--color-ink)]">
-                  {l}
-                </a>
+                <span key={l}>{l}</span>
               ))}
-            </nav>
+            </div>
           </div>
           <p className="mt-4 text-xs text-[var(--color-ink-faint)]">
-            © 2026 Lumengallery — Démo d’interface. Images placeholder (picsum.photos, i.pravatar.cc).
+            © 2026 Lumengallery. Tous droits réservés.
           </p>
         </div>
       </footer>

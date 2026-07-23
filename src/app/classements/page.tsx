@@ -17,21 +17,8 @@ export default async function RankingsPage() {
       <div className="mb-5">
         <h1 className="text-2xl font-bold tracking-tight">🏆 Classements</h1>
         <p className="text-sm text-[var(--color-ink-muted)]">
-          Les photographes les plus vus et appréciés.
+          Les modèles les plus vus et appréciés.
         </p>
-      </div>
-
-      {/* Decorative period tabs */}
-      <div className="mb-5 inline-flex rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] p-1 text-sm font-semibold">
-        <span className="rounded-full bg-[var(--color-accent)] px-4 py-1.5 text-white">
-          Cette semaine
-        </span>
-        <span className="rounded-full px-4 py-1.5 text-[var(--color-ink-faint)]">
-          Ce mois
-        </span>
-        <span className="rounded-full px-4 py-1.5 text-[var(--color-ink-faint)]">
-          Tout le temps
-        </span>
       </div>
 
       <ol className="flex flex-col gap-2">

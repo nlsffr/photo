@@ -27,7 +27,7 @@ export default async function ModelsPage({
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Modèles</h1>
           <p className="text-sm text-[var(--color-ink-muted)]">
-            {models.length} photographes sur LumenGallery
+            {models.length} modèles sur LumenGallery
           </p>
         </div>
         <div className="inline-flex rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] p-1">

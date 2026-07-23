@@ -33,7 +33,7 @@ export function FollowingFeed({ items }: { items: PhotoView[] }) {
         </div>
         <p className="text-lg font-semibold">Tu ne suis personne… encore</p>
         <p className="max-w-sm text-sm text-[var(--color-ink-muted)]">
-          Suis des photographes pour voir leurs dernières publications ici.
+          Suis des modèles pour voir leurs dernières publications ici.
         </p>
         <Link
           href="/models"
@@ -49,7 +49,7 @@ export function FollowingFeed({ items }: { items: PhotoView[] }) {
     <>
       <p className="mb-3 text-sm text-[var(--color-ink-muted)]">
         {posts.length} publication{posts.length > 1 ? "s" : ""} de{" "}
-        {followedHandles.length} photographe{followedHandles.length > 1 ? "s" : ""} suivi
+        {followedHandles.length} modèle{followedHandles.length > 1 ? "s" : ""} suivi
         {followedHandles.length > 1 ? "s" : ""}
       </p>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">

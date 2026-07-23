@@ -32,8 +32,8 @@ export default async function PhotoPage({
   const raw = await getPhotoById(id);
   if (!raw) notFound();
 
-  const photo = withCreator(raw);
-  const creator = await getCreator(photo.creatorHandle);
+  const creator = await getCreator(raw.creatorHandle);
+  const photo = withCreator(raw, creator);
   const related = await getRelatedPhotos(raw);
 
   return (

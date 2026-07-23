@@ -98,16 +98,6 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
             </label>
           )}
 
-          {!isSignup && (
-            <div className="text-right">
-              <Link
-                href="#"
-                className="text-xs font-medium text-[var(--color-accent)] hover:underline"
-              >
-                Mot de passe oublié ?
-              </Link>
-            </div>
-          )}
 
           <button
             type="submit"

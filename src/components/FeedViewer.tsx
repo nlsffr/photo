@@ -188,7 +188,9 @@ function FeedSlide({ item, muted }: { item: PhotoView; muted: boolean }) {
                 </svg>
               }
             />
-            <span className="text-xs font-semibold text-white drop-shadow">Save</span>
+            <span className="text-xs font-semibold text-white drop-shadow">
+              {saved ? "Enregistré" : "Enreg."}
+            </span>
           </div>
           <RailButton
             label="Partager"
