@@ -50,8 +50,10 @@ type PhotoRow = {
   title: string;
   image_url: string;
   video_url: string | null;
+  external_url: string | null;
   type: MediaType;
   duration_sec: number | null;
+  item_count: number | null;
   width: number;
   height: number;
   views_count: number;
@@ -73,8 +75,10 @@ function rowToView(row: PhotoRow, tags: string[]): PhotoView {
     title: row.title,
     imageUrl: row.image_url,
     videoUrl: row.video_url ?? undefined,
+    externalUrl: row.external_url ?? undefined,
     type: row.type,
     durationSec: row.duration_sec ?? undefined,
+    itemCount: row.item_count ?? undefined,
     width: row.width,
     height: row.height,
     views: row.views_count,
@@ -209,7 +213,7 @@ export class MariaDBProvider implements DataProvider {
     const total = Number(countRows[0].n);
 
     const rows = await this.q<RowDataPacket>(
-      `SELECT p.id, p.title, p.image_url, p.video_url, p.type, p.duration_sec,
+      `SELECT p.id, p.title, p.image_url, p.video_url, p.external_url, p.type, p.duration_sec, p.item_count,
               p.width, p.height, p.views_count, p.likes_count, p.created_at,
               c.handle AS creator_handle, c.name AS creator_name,
               c.avatar_url AS creator_avatar, c.verified AS creator_verified
@@ -230,7 +234,7 @@ export class MariaDBProvider implements DataProvider {
 
   async getPhoto(id: string): Promise<Photo | undefined> {
     const rows = await this.q<RowDataPacket>(
-      `SELECT p.id, p.title, p.image_url, p.video_url, p.type, p.duration_sec,
+      `SELECT p.id, p.title, p.image_url, p.video_url, p.external_url, p.type, p.duration_sec, p.item_count,
               p.width, p.height, p.views_count, p.likes_count, p.created_at,
               c.handle AS creator_handle, c.name AS creator_name,
               c.avatar_url AS creator_avatar, c.verified AS creator_verified
@@ -252,7 +256,7 @@ export class MariaDBProvider implements DataProvider {
   async getRelatedPhotos(photo: Photo, limit = 12): Promise<PhotoView[]> {
     if (photo.tags.length === 0) return [];
     const [rows] = await this.pool.query<RowDataPacket[]>(
-      `SELECT DISTINCT p.id, p.title, p.image_url, p.video_url, p.type, p.duration_sec,
+      `SELECT DISTINCT p.id, p.title, p.image_url, p.video_url, p.external_url, p.type, p.duration_sec, p.item_count,
               p.width, p.height, p.views_count, p.likes_count, p.created_at,
               c.handle AS creator_handle, c.name AS creator_name,
               c.avatar_url AS creator_avatar, c.verified AS creator_verified

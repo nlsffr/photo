@@ -79,9 +79,9 @@ export function ForYouGallery({
         )
       )}
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+      <div className="columns-2 gap-3 sm:columns-3 lg:columns-4 xl:columns-5">
         {list.map(({ photo, reason }) => (
-          <div key={photo.id} className="flex flex-col">
+          <div key={photo.id} className="mb-3 break-inside-avoid">
             <PhotoCard photo={photo} />
             <p className="mt-1 h-4 truncate text-xs text-[var(--color-accent)]">
               {hasTaste ? (reason ?? "") : ""}

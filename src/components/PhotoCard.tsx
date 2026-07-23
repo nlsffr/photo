@@ -16,8 +16,16 @@ export function PhotoCard({ photo }: { photo: PhotoView }) {
   const saved = ready && isSaved(photo.id);
   const likeCount = photo.likes + (liked ? 1 : 0);
 
+  // Masonry: use the image's real aspect ratio so cards have varying heights.
+  // Clamp so extreme ratios don't produce absurdly tall/short cards.
+  const ratio = photo.width && photo.height ? photo.width / photo.height : 0.8;
+  const clamped = Math.min(Math.max(ratio, 0.55), 1.4);
+
   return (
-    <div className="group relative aspect-[4/5] overflow-hidden rounded-xl bg-[var(--color-surface-2)] ring-1 ring-[var(--color-border)]">
+    <div
+      className="group relative w-full overflow-hidden rounded-xl bg-[var(--color-surface-2)] ring-1 ring-[var(--color-border)]"
+      style={{ aspectRatio: String(clamped) }}
+    >
       <Link href={`/photo/${photo.id}`} className="absolute inset-0" aria-label={photo.title}>
         <Image
           src={photo.imageUrl}
@@ -42,6 +50,15 @@ export function PhotoCard({ photo }: { photo: PhotoView }) {
               {formatDuration(photo.durationSec ?? 0)}
             </span>
           </>
+        )}
+
+        {photo.type === "pack" && (
+          <span className="absolute right-2 top-2 flex items-center gap-1 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-medium text-white">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+              <path d="M4 7h16M4 12h16M4 17h16" />
+            </svg>
+            Pack{photo.itemCount ? ` · ${photo.itemCount}` : ""}
+          </span>
         )}
       </Link>
 

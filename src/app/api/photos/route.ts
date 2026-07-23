@@ -34,7 +34,9 @@ export async function GET(request: Request) {
 
   const typeParam = searchParams.get("type");
   const type: MediaType | undefined =
-    typeParam === "photo" || typeParam === "video" ? typeParam : undefined;
+    typeParam === "photo" || typeParam === "video" || typeParam === "pack"
+      ? typeParam
+      : undefined;
 
   const page = await getPhotos({
     sort,

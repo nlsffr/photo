@@ -8,7 +8,7 @@ export interface Creator {
   verified: boolean;
 }
 
-export type MediaType = "photo" | "video";
+export type MediaType = "photo" | "video" | "pack";
 
 export interface Photo {
   id: string;
@@ -30,6 +30,10 @@ export interface Photo {
   videoUrl?: string;
   /** Duration in seconds for videos. */
   durationSec?: number;
+  /** Number of items in a "pack" (photo/video collection). */
+  itemCount?: number;
+  /** Optional external link to the full content (hosted elsewhere). */
+  externalUrl?: string;
 }
 
 export type SortKey =

@@ -7,6 +7,7 @@ const TABS: { key: string | null; label: string }[] = [
   { key: null, label: "Tout" },
   { key: "photo", label: "Photos" },
   { key: "video", label: "Vidéos" },
+  { key: "pack", label: "Packs" },
 ];
 
 export function MediaTypeTabs({ basePath = "/" }: { basePath?: string }) {

@@ -54,9 +54,11 @@ export function SavedGallery({ items }: { items: PhotoView[] }) {
       <p className="mb-3 text-sm text-[var(--color-ink-muted)]">
         {saved.length} enregistrement{saved.length > 1 ? "s" : ""}
       </p>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+      <div className="columns-2 gap-3 sm:columns-3 lg:columns-4 xl:columns-5">
         {saved.map((p) => (
-          <PhotoCard key={p.id} photo={p} />
+          <div key={p.id} className="mb-3 break-inside-avoid">
+            <PhotoCard photo={p} />
+          </div>
         ))}
       </div>
     </>
