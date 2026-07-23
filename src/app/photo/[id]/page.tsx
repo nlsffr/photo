@@ -19,7 +19,7 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const photo = getPhotoById(id);
+  const photo = await getPhotoById(id);
   return { title: photo ? photo.title : "Photo introuvable" };
 }
 
@@ -29,12 +29,12 @@ export default async function PhotoPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const raw = getPhotoById(id);
+  const raw = await getPhotoById(id);
   if (!raw) notFound();
 
   const photo = withCreator(raw);
-  const creator = getCreator(photo.creatorHandle);
-  const related = getRelatedPhotos(raw);
+  const creator = await getCreator(photo.creatorHandle);
+  const related = await getRelatedPhotos(raw);
 
   return (
     <div className="mx-auto max-w-[1600px] px-4 sm:px-6 py-6">

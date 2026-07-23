@@ -13,7 +13,7 @@ export async function generateMetadata({
   params: Promise<{ handle: string }>;
 }): Promise<Metadata> {
   const { handle } = await params;
-  const creator = getCreator(handle);
+  const creator = await getCreator(handle);
   return { title: creator ? creator.name : "Profil introuvable" };
 }
 
@@ -23,13 +23,17 @@ export default async function CreatorPage({
   params: Promise<{ handle: string }>;
 }) {
   const { handle } = await params;
-  const creator = getCreator(handle);
+  const creator = await getCreator(handle);
   if (!creator) notFound();
 
-  const stats = getCreatorStats(handle);
-  const page = getPhotos({ creator: handle, sort: "recent", limit: 30 });
-  const cover = getPhotos({ creator: handle, sort: "trending", limit: 1 })
-    .items[0];
+  const stats = await getCreatorStats(handle);
+  const page = await getPhotos({ creator: handle, sort: "recent", limit: 30 });
+  const coverPage = await getPhotos({
+    creator: handle,
+    sort: "trending",
+    limit: 1,
+  });
+  const cover = coverPage.items[0];
 
   return (
     <div>

@@ -16,7 +16,7 @@ export default async function ModelsPage({
 }) {
   const sp = await searchParams;
   const sort = first(sp.sort) === "views" ? "views" : "followers";
-  const models = getModels(sort);
+  const models = await getModels(sort);
 
   const toggle =
     "rounded-full px-4 py-1.5 text-sm font-semibold transition-colors";

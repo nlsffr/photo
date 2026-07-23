@@ -1,6 +1,5 @@
 import { Suspense } from "react";
-import { ALL_TAGS } from "@/lib/data";
-import { getPhotos } from "@/lib/photos";
+import { getPhotos, getAllTags } from "@/lib/photos";
 import type { MediaType, SortKey } from "@/lib/types";
 import { InfiniteGallery } from "@/components/InfiniteGallery";
 import { FeaturedCreators } from "@/components/FeaturedCreators";
@@ -36,7 +35,8 @@ export default async function Home({
   const type: MediaType | undefined =
     typeRaw === "photo" || typeRaw === "video" ? typeRaw : undefined;
 
-  const page = getPhotos({ sort, tag, type });
+  const page = await getPhotos({ sort, tag, type });
+  const allTags = await getAllTags();
   const queryKey = `${sort}|${tag ?? ""}|${type ?? ""}`;
 
   const heading = tag ? `#${tag}` : SORT_LABEL[sort];
@@ -45,7 +45,7 @@ export default async function Home({
     <div className="px-3 py-4 sm:px-5">
       <FeaturedCreators />
 
-      <TagChips tags={ALL_TAGS} activeTag={tag} />
+      <TagChips tags={allTags} activeTag={tag} />
 
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">

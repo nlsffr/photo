@@ -7,10 +7,10 @@ import { VerifiedBadge } from "@/components/VerifiedBadge";
 
 export const metadata: Metadata = { title: "Classements" };
 
-export default function RankingsPage() {
-  const ranked = getRankings(20);
+export default async function RankingsPage() {
+  const ranked = await getRankings(20);
   const top = ranked[0];
-  const maxScore = top ? top.totalViews + top.totalLikes * 3 : 1;
+  const maxScore = top ? top.score : 1;
 
   return (
     <div className="mx-auto max-w-3xl px-3 py-6 sm:px-5">
@@ -36,7 +36,7 @@ export default function RankingsPage() {
 
       <ol className="flex flex-col gap-2">
         {ranked.map((c, i) => {
-          const score = c.totalViews + c.totalLikes * 3;
+          const score = c.score;
           const pct = Math.round((score / maxScore) * 100);
           return (
             <Link
@@ -75,7 +75,7 @@ export default function RankingsPage() {
                 </div>
               </div>
               <div className="shrink-0 text-right">
-                <p className="font-semibold">{formatCount(c.totalViews)}</p>
+                <p className="font-semibold">{formatCount(c.views)}</p>
                 <p className="text-xs text-[var(--color-ink-faint)]">vues</p>
               </div>
             </Link>

@@ -2,8 +2,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { getModels } from "@/lib/photos";
 
-export function FeaturedCreators() {
-  const creators = getModels("followers").slice(0, 16);
+export async function FeaturedCreators() {
+  const models = await getModels("followers");
+  const creators = models.slice(0, 16);
 
   return (
     <section className="mb-5">

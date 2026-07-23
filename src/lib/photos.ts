@@ -1,164 +1,136 @@
-import { CREATORS, CREATOR_BY_HANDLE, PHOTOS } from "./data";
-import type {
-  Creator,
-  CreatorWithStats,
-  Photo,
-  PhotoPage,
-  PhotoQuery,
-  PhotoView,
-  SortKey,
-} from "./types";
+/**
+ * Query layer — delegates to DataProvider.
+ * This remains the same interface; implementation swaps based on where data comes from.
+ */
+
+import type { Photo, PhotoPage, PhotoView, SortKey, MediaType } from "./types";
+import { getDataProvider } from "./data-provider";
 
 const DEFAULT_LIMIT = 30;
 
-/** Stable pseudo-random key for a photo id (for the "Aléatoire" sort). */
-function hashKey(id: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < id.length; i++) {
-    h ^= id.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
+export async function getPhotos(query: {
+  sort?: SortKey;
+  tag?: string;
+  q?: string;
+  creator?: string;
+  type?: MediaType;
+  cursor?: number;
+  limit?: number;
+}): Promise<PhotoPage> {
+  const provider = getDataProvider();
+  return provider.getPhotos(query);
 }
 
-/** Attach a lightweight creator summary to a photo. */
+export async function getPhotoById(id: string): Promise<Photo | undefined> {
+  const provider = getDataProvider();
+  return provider.getPhoto(id);
+}
+
+export async function getAllPhotoViews(): Promise<PhotoView[]> {
+  const provider = getDataProvider();
+  return provider.getAllPhotos();
+}
+
+export async function getRelatedPhotos(
+  photo: Photo,
+  limit = 12,
+): Promise<PhotoView[]> {
+  const provider = getDataProvider();
+  return provider.getRelatedPhotos(photo, limit);
+}
+
+export async function getCreatorStats(handle: string) {
+  const provider = getDataProvider();
+  return provider.getCreatorStats(handle);
+}
+
+export async function getModels(sort: "followers" | "views" = "followers") {
+  const provider = getDataProvider();
+  const creators = await provider.getCreators();
+  const photos = await provider.getAllPhotos();
+
+  const stats = new Map<string, { views: number; likes: number }>();
+  for (const p of photos) {
+    const s = stats.get(p.creatorHandle) ?? { views: 0, likes: 0 };
+    s.views += p.views;
+    s.likes += p.likes;
+    stats.set(p.creatorHandle, s);
+  }
+
+  const withStats = creators.map((c) => {
+    const s = stats.get(c.handle) ?? { views: 0, likes: 0 };
+    const photoCount = photos.filter((p) => p.creatorHandle === c.handle).length;
+    const cover = photos.find((p) => p.creatorHandle === c.handle);
+    return {
+      ...c,
+      photoCount,
+      totalViews: s.views,
+      totalLikes: s.likes,
+      coverUrl: cover?.imageUrl ?? "",
+    };
+  });
+
+  if (sort === "followers") {
+    withStats.sort((a, b) => b.followers - a.followers);
+  } else {
+    withStats.sort((a, b) => b.totalViews - a.totalViews);
+  }
+
+  return withStats;
+}
+
+export async function getRankings(limit = 20) {
+  const provider = getDataProvider();
+  const creators = await provider.getCreators();
+  const photos = await provider.getAllPhotos();
+
+  const stats = new Map<string, { views: number; likes: number }>();
+  for (const p of photos) {
+    const s = stats.get(p.creatorHandle) ?? { views: 0, likes: 0 };
+    s.views += p.views;
+    s.likes += p.likes;
+    stats.set(p.creatorHandle, s);
+  }
+
+  const ranked = creators.map((c) => {
+    const s = stats.get(c.handle) ?? { views: 0, likes: 0 };
+    const score = s.views + s.likes * 3;
+    return { ...c, score, views: s.views, likes: s.likes };
+  });
+
+  ranked.sort((a, b) => b.score - a.score);
+  return ranked.slice(0, limit);
+}
+
+export async function getRecommendedCreators(
+  exclude?: string,
+  limit = 6,
+) {
+  const models = await getModels("followers");
+  return models
+    .filter((c) => c.handle !== exclude)
+    .slice(0, limit);
+}
+
+export async function getAllTags(): Promise<string[]> {
+  const provider = getDataProvider();
+  return provider.getTags();
+}
+
+export async function getCreator(handle: string) {
+  const provider = getDataProvider();
+  return provider.getCreator(handle);
+}
+
+/** Attach a lightweight creator summary to a photo (for now returns minimal data). */
 export function withCreator(p: Photo): PhotoView {
-  const c = CREATOR_BY_HANDLE.get(p.creatorHandle);
   return {
     ...p,
     creator: {
       handle: p.creatorHandle,
-      name: c?.name ?? "Inconnu",
-      avatarUrl: c?.avatarUrl ?? `https://i.pravatar.cc/240?u=${p.creatorHandle}`,
-      verified: c?.verified ?? false,
+      name: "Chargement...",
+      avatarUrl: "",
+      verified: false,
     },
   };
-}
-
-function sorted(list: Photo[], sort: SortKey): Photo[] {
-  const copy = [...list];
-  switch (sort) {
-    case "recent":
-      return copy.sort((a, b) => a.ageMinutes - b.ageMinutes);
-    case "popular":
-      return copy.sort((a, b) => b.views - a.views);
-    case "liked":
-      return copy.sort((a, b) => b.likes - a.likes);
-    case "random":
-      return copy.sort((a, b) => hashKey(a.id) - hashKey(b.id));
-    case "trending":
-    default:
-      return copy.sort((a, b) => b.trending - a.trending);
-  }
-}
-
-/** Core query: filter -> sort -> paginate. Pure function over in-memory data. */
-export function getPhotos(query: PhotoQuery = {}): PhotoPage {
-  const {
-    sort = "recent",
-    tag,
-    q,
-    creator,
-    type,
-    cursor = 0,
-    limit = DEFAULT_LIMIT,
-  } = query;
-
-  let list = PHOTOS;
-
-  if (creator) list = list.filter((p) => p.creatorHandle === creator);
-  if (tag) list = list.filter((p) => p.tags.includes(tag));
-  if (type) list = list.filter((p) => p.type === type);
-
-  if (q && q.trim()) {
-    const needle = q.trim().toLowerCase();
-    list = list.filter((p) => {
-      const c = CREATOR_BY_HANDLE.get(p.creatorHandle);
-      return (
-        p.title.toLowerCase().includes(needle) ||
-        p.tags.some((t) => t.includes(needle)) ||
-        (c?.name.toLowerCase().includes(needle) ?? false)
-      );
-    });
-  }
-
-  const ordered = sorted(list, sort);
-  const start = cursor;
-  const items = ordered.slice(start, start + limit).map(withCreator);
-  const nextCursor = start + limit < ordered.length ? start + limit : null;
-
-  return { items, nextCursor, total: ordered.length };
-}
-
-export function getPhotoById(id: string): Photo | undefined {
-  return PHOTOS.find((p) => p.id === id);
-}
-
-/** All photos as views (creator embedded). Used by the client-side favorites page. */
-export function getAllPhotoViews(): PhotoView[] {
-  return PHOTOS.map(withCreator);
-}
-
-export function getCreator(handle: string): Creator | undefined {
-  return CREATOR_BY_HANDLE.get(handle);
-}
-
-/** Photos that share at least one tag with the given photo (excluding itself). */
-export function getRelatedPhotos(photo: Photo, limit = 12): PhotoView[] {
-  return PHOTOS.filter(
-    (p) => p.id !== photo.id && p.tags.some((t) => photo.tags.includes(t)),
-  )
-    .sort((a, b) => b.trending - a.trending)
-    .slice(0, limit)
-    .map(withCreator);
-}
-
-export function getCreatorStats(handle: string) {
-  const photos = PHOTOS.filter((p) => p.creatorHandle === handle);
-  return {
-    photoCount: photos.length,
-    totalViews: photos.reduce((sum, p) => sum + p.views, 0),
-    totalLikes: photos.reduce((sum, p) => sum + p.likes, 0),
-  };
-}
-
-/** All creators enriched with aggregate stats + a cover image (their top photo). */
-export function getCreatorsWithStats(): CreatorWithStats[] {
-  return CREATORS.map((c) => {
-    const stats = getCreatorStats(c.handle);
-    const cover = PHOTOS.filter((p) => p.creatorHandle === c.handle).sort(
-      (a, b) => b.trending - a.trending,
-    )[0];
-    return {
-      ...c,
-      ...stats,
-      coverUrl: cover?.imageUrl ?? c.avatarUrl,
-    };
-  });
-}
-
-/** Models directory, sorted by follower count (default) or total views. */
-export function getModels(sort: "followers" | "views" = "followers") {
-  const list = getCreatorsWithStats();
-  return list.sort((a, b) =>
-    sort === "views" ? b.totalViews - a.totalViews : b.followers - a.followers,
-  );
-}
-
-/** Rankings — top creators by an engagement score. */
-export function getRankings(limit = 20): CreatorWithStats[] {
-  return getCreatorsWithStats()
-    .sort((a, b) => b.totalViews + b.totalLikes * 3 - (a.totalViews + a.totalLikes * 3))
-    .slice(0, limit);
-}
-
-/** A handful of recommended models for the sidebar (excludes an optional handle). */
-export function getRecommendedCreators(
-  exclude?: string,
-  limit = 6,
-): CreatorWithStats[] {
-  return getCreatorsWithStats()
-    .filter((c) => c.handle !== exclude)
-    .sort((a, b) => b.followers - a.followers)
-    .slice(0, limit);
 }

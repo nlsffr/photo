@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { ALL_TAGS } from "@/lib/data";
-import { getPhotos } from "@/lib/photos";
+import { getPhotos, getAllTags } from "@/lib/photos";
 import type { MediaType } from "@/lib/types";
 import { SearchForm } from "@/components/SearchForm";
 import { InfiniteGallery } from "@/components/InfiniteGallery";
@@ -28,8 +27,9 @@ export default async function SearchPage({
 
   const label = q ? q : tag ? `#${tag}` : null;
   const page = hasQuery
-    ? getPhotos({ q, tag, type, sort: "popular" })
-    : getPhotos({ type, sort: "trending" });
+    ? await getPhotos({ q, tag, type, sort: "popular" })
+    : await getPhotos({ type, sort: "trending" });
+  const allTags = await getAllTags();
 
   return (
     <div className="px-3 py-5 sm:px-5">
@@ -42,7 +42,7 @@ export default async function SearchPage({
 
       <div className="mb-6 max-w-4xl">
         <Suspense fallback={<div className="h-32" />}>
-          <SearchForm tags={ALL_TAGS} />
+          <SearchForm tags={allTags} />
         </Suspense>
       </div>
 
