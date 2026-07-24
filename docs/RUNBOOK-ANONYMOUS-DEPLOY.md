@@ -8,6 +8,11 @@ Follow it in order. Each step lists *why* it matters for untraceability.
 > legitimate platform (content you have the rights to). It is not a tool for
 > hiding illegal activity.
 
+**Current recommended stack:**
+- Origin: **Abelohost Storage Pro** (~€39.99/mo, Netherlands)
+- Media: **Backblaze B2** (private S3-compatible buckets)
+- Edge: **DDoS-Guard** (or any no-log anti-DDoS you prefer)
+
 ---
 
 ## 0. Threat model (what we defend against)
@@ -25,28 +30,35 @@ Follow it in order. Each step lists *why* it matters for untraceability.
    dedicated **WireGuard VPN** or **Tails/Whonix**. Your real IP must never
    appear in any provider log.
 2. **Anonymous identities & payment**: register accounts (host, domain, DDoS
-   provider) with a dedicated email (**Proton**) and pay with **Monero** where
-   accepted, or privacy-preserving prepaid methods otherwise.
+   provider, Backblaze) with a dedicated email (**Proton**) and pay with
+   **Monero** where accepted, or privacy-preserving prepaid methods otherwise.
 3. **Dedicated password manager + hardware 2FA**, kept off your daily machine.
 
 ## 2. Domain + DNS
 
-1. Register the domain (e.g. a `.bs`) through a **privacy-first registrar
-   (Njalla)** — they register it *for* you, so **WHOIS never shows you**.
+1. Register the domain (e.g. a `.bs` or other privacy-friendly TLD) through a
+   **privacy-first registrar (Njalla)** — they register it *for* you, so
+   **WHOIS never shows you**.
 2. DNS: use the registrar's DNS or a **no-log resolver**. Enable **DNSSEC**.
-3. The **only** public A/AAAA record points at **DDoS-Guard**, never the origin.
+3. The **only** public A/AAAA record points at **DDoS-Guard** (or your chosen
+   edge), never the Abelohost origin IP.
 
 ## 3. DDoS-Guard edge (clearnet path)
 
-1. Put **DDoS-Guard** (or equivalent no-log anti-DDoS, *not* Cloudflare) in
-   front. It terminates the public connection and **hides the origin IP**.
-2. On the origin host firewall, **allow inbound 80/443 ONLY from DDoS-Guard IP
-   ranges**. Drop everything else. If the origin IP ever leaks, this is what
-   still saves you.
+1. Put **DDoS-Guard** (or equivalent no-log anti-DDoS, *not* Cloudflare if you
+   want maximum log avoidance) in front. It terminates the public connection
+   and **hides the origin IP**.
+2. On the Abelohost VPS firewall, **allow inbound 80/443 ONLY from the DDoS
+   provider's IP ranges**. Drop everything else. If the origin IP ever leaks,
+   this is what still saves you.
 
-## 4. Origin host hardening
+## 4. Origin host — Abelohost Storage Pro
 
-Pick a provider outside hostile jurisdictions, paid anonymously. Then:
+1. Order the **Storage Pro** plan (≈ €39.99/mo: 4 GB RAM, 2 CPU, 200 GB SAS,
+   unmetered, dedicated IPv4).
+2. Install with **full-disk encryption (LUKS)** if the provider offers it at
+   install time (or set it up yourself).
+3. Harden:
 
 ```bash
 # Non-root sudo user, key-only SSH on a non-standard port, no passwords.
@@ -54,10 +66,10 @@ sudo sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh
 sudo sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
 sudo systemctl restart ssh
 
-# Firewall: default deny; SSH only over the VPN subnet; web only from DDoS-Guard.
+# Firewall: default deny; SSH only over the VPN subnet; web only from DDoS ranges.
 sudo ufw default deny incoming
 sudo ufw allow in on wg0 to any port 22 proto tcp
-# (repeat 'ufw allow from <DDoS-Guard-range> to any port 443' for each range)
+# (repeat 'ufw allow from <DDoS-range> to any port 80/443' for each range)
 sudo ufw enable
 
 # Disable persistent logging of network/journal to disk (RAM only).
@@ -66,10 +78,6 @@ printf '[Journal]\nStorage=volatile\nRuntimeMaxUse=64M\n' | \
   sudo tee /etc/systemd/journald.conf.d/volatile.conf
 sudo systemctl restart systemd-journald
 ```
-
-- **Full-disk encryption (LUKS)** so a seized disk is unreadable.
-- Consider a provider that lets you run **encrypted + ephemeral** (data in RAM,
-  gone on reboot) if your content model allows it.
 
 ## 5. Tor hidden service (no-IP path)
 
@@ -92,9 +100,8 @@ docker compose -f docker-compose.prod.yml exec tor \
 
 - Public CI (`.github/workflows/ci.yml`) only builds + smoke-tests. **No
   secrets.**
-- The image is pushed to **Harbor** only from the **VPN-only self-hosted
-  runner** (`.github/workflows/deploy.yml`), manually. Harbor is **never**
-  exposed to the internet. This is the "registry is not the weak link" rule.
+- The image is pushed / pulled only from trusted, non-public paths. Prefer
+  building on the VPS itself or a VPN-only runner.
 
 ## 7. Database + media
 
@@ -107,10 +114,12 @@ DATABASE_URL="mysql://$DB_USER:$DB_PASSWORD@127.0.0.1:3306/lumengallery" \
   node scripts/seed.mjs ./content.json
 ```
 
-- **Minio buckets stay private** (the classic catastrophic leak is a public
-  S3 bucket — never make one public). Media is served via a **CDN with a
-  private origin + signed, expiring URLs**, and the CDN sits behind DDoS-Guard.
-- **Encrypted off-site backups**: `mysqldump --single-transaction | gpg -e`.
+- **Backblaze B2 buckets stay private** (the classic catastrophic leak is a
+  public object-storage bucket — never make one public). Media is served via
+  **signed, expiring URLs** or a CDN whose origin is the private B2 bucket.
+- Put your B2 Key ID, Application Key, region and endpoint in `.env.prod`.
+- **Encrypted off-site backups**: `mysqldump --single-transaction | gpg -e`
+  and store the result on a second B2 bucket or another encrypted remote.
 
 ## 8. No logs, anywhere
 
@@ -135,16 +144,15 @@ DATABASE_URL="mysql://$DB_USER:$DB_PASSWORD@127.0.0.1:3306/lumengallery" \
 ## 10. Go-live checklist
 
 - [ ] Home IP never used; all admin over VPN/Tails.
-- [ ] WHOIS masked; only public DNS record = DDoS-Guard.
-- [ ] Origin firewall allows web only from DDoS-Guard, SSH only over VPN.
+- [ ] WHOIS masked; only public DNS record = DDoS edge.
+- [ ] Abelohost origin firewall allows web only from DDoS provider, SSH only over VPN.
 - [ ] `.onion` published and its volume backed up.
-- [ ] Harbor unreachable from the internet; verified with an external scan.
+- [ ] B2 buckets are **private**; media only via signed URLs / CDN.
 - [ ] Staging/QA are VPN-only, separate creds, same hardening.
 - [ ] `curl -sI https://your-domain` shows the security headers and **no**
       `Server`/`X-Powered-By`.
 - [ ] No access logs on disk anywhere (`docker compose logs edge` is empty of
       request lines; journald is volatile).
-- [ ] Minio buckets private; media only via signed CDN URLs.
 - [ ] Encrypted backups tested (restore dry-run).
 - [ ] Certificate Transparency monitored (crt.sh) for origin-hostname leaks.
 
@@ -155,4 +163,5 @@ If you must take everything down with no residue:
 ```bash
 docker compose -f docker-compose.prod.yml down -v   # -v wipes volumes/data
 # On an ephemeral/RAM host, a simple reboot destroys all state.
+# Also delete the B2 application keys and (if desired) empty the buckets.
 ```
