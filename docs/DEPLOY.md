@@ -6,8 +6,8 @@ internal is ever reachable from the public internet. Only the edge is public.
 
 **Current target stack (July 2026):**
 - **Origin VPS**: Abelohost Storage Pro (~€39.99/mo) — 4 GB RAM, 2 CPU, 200 GB SAS, unmetered traffic, dedicated IPv4 (Netherlands)
-- **Media storage**: Backblaze B2 (S3-compatible object storage, private buckets)
-- **Edge / DDoS**: DDoS-Guard (or any equivalent no-log anti-DDoS you choose)
+- **Media storage**: Self-hosted **MinIO** on the same VPS (most anonymous option, you control the keys)
+- **Edge / DDoS**: DDoS-Guard (or any equivalent no-log anti-DDoS you choose later)
 - **SQL**: MariaDB 11.x on the VPS (InnoDB encryption at rest)
 
 ```
@@ -33,17 +33,12 @@ internal is ever reachable from the public internet. Only the edge is public.
                     │  output: standalone     │  no direct public exposure
                     └───────────┬────────────┘
                                 │  (internal docker network only)
-      ┌─────────────┬───────────┼───────────┐
-      │             │           │           │
- ┌────▼────┐  ┌─────▼────┐  ┌───▼────┐     │
- │ MariaDB │  │  Redis   │  │Elastic │     │
- │(encrypt)│  │ (cache)  │  │search  │     │
- └─────────┘  └──────────┘  └────────┘     │
-                                           │
-                              ┌────────────▼────────────┐
-                              │  Backblaze B2 (private) │  media files
-                              │  signed URLs / CDN      │  (external)
-                              └─────────────────────────┘
+      ┌─────────────┬───────────┼───────────┬────────────┐
+      │             │           │           │            │
+ ┌────▼────┐  ┌─────▼────┐  ┌───▼────┐  ┌───▼────┐     │
+ │ MariaDB │  │  Redis   │  │Elastic │  │  MinIO │     │
+ │(encrypt)│  │ (cache)  │  │search  │  │(private)│     │
+ └─────────┘  └──────────┘  └────────┘  └────────┘     │
 
   Observability (VPN-only):  Grafana + Prometheus + Loki (optional)
   Admin access:              WireGuard VPN + bastion + 2FA
@@ -67,24 +62,23 @@ internal is ever reachable from the public internet. Only the edge is public.
 3. **Staging / dev / QA are not the weak link.** Non-prod environments are
    VPN-only, separate credentials, same hardening.
 
-4. **Data stores have no public port.** MariaDB, Redis, Elasticsearch bind
-   only to the internal docker network. In `docker-compose.prod.yml` they
-   have **no published ports**.
+4. **Data stores have no public port.** MariaDB, Redis, Elasticsearch and
+   MinIO bind only to the internal docker network. In `docker-compose.prod.yml`
+   they have **no published ports**.
 
 5. **Secrets never live in the repo or images.** Use environment files or a
    secret store. `.env` is git-ignored; only `.env.example` is committed.
 
-6. **Media buckets stay private.** Backblaze B2 buckets must never be public.
-   Serve via signed expiring URLs or a CDN whose origin is the private B2
-   bucket (CDN still behind the DDoS edge if possible).
+6. **Media buckets stay private.** MinIO buckets must never be public.
+   Serve via signed expiring URLs through the app / edge.
 
 ## Environments
 
-| Env       | Public? | DNS            | DB            | Media     | Access        |
-|-----------|---------|----------------|---------------|-----------|---------------|
+| Env       | Public? | DNS            | DB            | Media       | Access        |
+|-----------|---------|----------------|---------------|-------------|---------------|
 | dev       | no      | none           | local/compose | local MinIO | localhost/VPN |
-| staging   | no      | internal only  | staging DB    | B2 (staging) | VPN only    |
-| prod      | yes     | public → edge  | prod MariaDB  | B2 (prod) | edge + VPN admin |
+| staging   | no      | internal only  | staging DB    | MinIO       | VPN only      |
+| prod      | yes     | public → edge  | prod MariaDB  | MinIO       | edge + VPN admin |
 
 ## CI/CD runner placement
 
@@ -106,23 +100,21 @@ internal is ever reachable from the public internet. Only the edge is public.
 ## Database (MariaDB on Abelohost)
 
 - MariaDB 11.4 with **InnoDB encryption at rest** (see `docs/DATABASE.md`).
-- Read replica optional later.
-- Encrypted, off-site backups (`mysqldump | gpg`) → store on another B2 bucket
-  or encrypted remote.
+- Encrypted, off-site backups (`mysqldump | gpg`).
 
-## Media storage — Backblaze B2
+## Media storage — Self-hosted MinIO (most anonymous)
 
-1. Create a **private** B2 bucket (never public).
-2. Create an Application Key limited to that bucket (read + write).
-3. Put the Key ID / Application Key / region / endpoint in `.env.prod`.
-4. Endpoint example: `https://s3.us-west-004.backblazeb2.com`
-5. Media is referenced by URL in the `photos` table (`image_url`, `video_url`).
-   When you add upload endpoints later, use any S3-compatible client
-   (`@aws-sdk/client-s3` with custom endpoint + path-style).
+- Runs on the same Abelohost VPS inside the internal docker network.
+- Bucket is **private** by default.
+- Media is referenced by URL in the `photos` table (`image_url`, `video_url`).
+- When you add upload endpoints later, use any S3-compatible client
+  (`@aws-sdk/client-s3` with endpoint `http://minio:9000` + path-style).
+- 200 GB on the Storage Pro plan is enough to start. Scale later by adding
+  disks or a second storage VPS if needed.
 
 ## Abelohost VPS specifics
 
-- Storage Pro plan is sufficient for the app + MariaDB + Redis + light ES.
+- Storage Pro plan is sufficient for the app + MariaDB + Redis + light ES + MinIO.
 - Keep Elasticsearch memory low (`ES_JAVA_OPTS=-Xms512m -Xmx512m`) so the
   4 GB RAM is not exhausted.
 - Full-disk encryption (LUKS) recommended at install time.
@@ -137,7 +129,7 @@ internal is ever reachable from the public internet. Only the edge is public.
 ## Local development
 
 ```bash
-cp .env.example .env      # fill in dev values (MinIO still used locally)
+cp .env.example .env      # fill in dev values
 docker compose up -d      # app + mariadb + redis + elasticsearch + minio
 # app on http://localhost:3000
 # minio console on http://localhost:9001 (dev only)
@@ -146,8 +138,8 @@ docker compose up -d      # app + mariadb + redis + elasticsearch + minio
 ## Production start (Abelohost)
 
 ```bash
-# On the VPS (after cloning / pulling the image)
+# On the VPS (after cloning / building the image)
 cp .env.example .env.prod
-# Edit .env.prod → real B2 keys, strong DB passwords, etc.
+# Edit .env.prod → strong passwords for DB + MinIO, JWT secrets, etc.
 docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
 ```
