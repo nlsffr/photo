@@ -10,8 +10,8 @@ Follow it in order. Each step lists *why* it matters for untraceability.
 
 **Current recommended stack:**
 - Origin: **Abelohost Storage Pro** (~€39.99/mo, Netherlands)
-- Media: **Backblaze B2** (private S3-compatible buckets)
-- Edge: **DDoS-Guard** (or any no-log anti-DDoS you prefer)
+- Media: **Self-hosted MinIO** on the same VPS (most anonymous)
+- Edge: **DDoS-Guard** (or any no-log anti-DDoS you prefer later)
 
 ---
 
@@ -30,8 +30,8 @@ Follow it in order. Each step lists *why* it matters for untraceability.
    dedicated **WireGuard VPN** or **Tails/Whonix**. Your real IP must never
    appear in any provider log.
 2. **Anonymous identities & payment**: register accounts (host, domain, DDoS
-   provider, Backblaze) with a dedicated email (**Proton**) and pay with
-   **Monero** where accepted, or privacy-preserving prepaid methods otherwise.
+   provider) with a dedicated email (**Proton**) and pay with **Monero** /
+   crypto where accepted, or privacy-preserving prepaid methods otherwise.
 3. **Dedicated password manager + hardware 2FA**, kept off your daily machine.
 
 ## 2. Domain + DNS
@@ -45,9 +45,8 @@ Follow it in order. Each step lists *why* it matters for untraceability.
 
 ## 3. DDoS-Guard edge (clearnet path)
 
-1. Put **DDoS-Guard** (or equivalent no-log anti-DDoS, *not* Cloudflare if you
-   want maximum log avoidance) in front. It terminates the public connection
-   and **hides the origin IP**.
+1. Put **DDoS-Guard** (or equivalent no-log anti-DDoS) in front. It terminates
+   the public connection and **hides the origin IP**.
 2. On the Abelohost VPS firewall, **allow inbound 80/443 ONLY from the DDoS
    provider's IP ranges**. Drop everything else. If the origin IP ever leaks,
    this is what still saves you.
@@ -100,10 +99,10 @@ docker compose -f docker-compose.prod.yml exec tor \
 
 - Public CI (`.github/workflows/ci.yml`) only builds + smoke-tests. **No
   secrets.**
-- The image is pushed / pulled only from trusted, non-public paths. Prefer
-  building on the VPS itself or a VPN-only runner.
+- Prefer building the image directly on the Abelohost VPS or from a VPN-only
+  runner. Never push secrets to public CI.
 
-## 7. Database + media
+## 7. Database + media (MinIO)
 
 ```bash
 # Migrations run automatically on first mariadb start (mounted initdb).
@@ -114,12 +113,11 @@ DATABASE_URL="mysql://$DB_USER:$DB_PASSWORD@127.0.0.1:3306/lumengallery" \
   node scripts/seed.mjs ./content.json
 ```
 
-- **Backblaze B2 buckets stay private** (the classic catastrophic leak is a
-  public object-storage bucket — never make one public). Media is served via
-  **signed, expiring URLs** or a CDN whose origin is the private B2 bucket.
-- Put your B2 Key ID, Application Key, region and endpoint in `.env.prod`.
+- **MinIO** runs on the same VPS, on the internal network only.
+- Bucket stays **private**. Media is served via signed URLs through the app/edge.
+- Put strong `S3_ACCESS_KEY` / `S3_SECRET_KEY` in `.env.prod`.
 - **Encrypted off-site backups**: `mysqldump --single-transaction | gpg -e`
-  and store the result on a second B2 bucket or another encrypted remote.
+  and store the result elsewhere (another encrypted remote or second VPS).
 
 ## 8. No logs, anywhere
 
@@ -147,7 +145,7 @@ DATABASE_URL="mysql://$DB_USER:$DB_PASSWORD@127.0.0.1:3306/lumengallery" \
 - [ ] WHOIS masked; only public DNS record = DDoS edge.
 - [ ] Abelohost origin firewall allows web only from DDoS provider, SSH only over VPN.
 - [ ] `.onion` published and its volume backed up.
-- [ ] B2 buckets are **private**; media only via signed URLs / CDN.
+- [ ] MinIO bucket is **private**; media only via signed URLs.
 - [ ] Staging/QA are VPN-only, separate creds, same hardening.
 - [ ] `curl -sI https://your-domain` shows the security headers and **no**
       `Server`/`X-Powered-By`.
@@ -163,5 +161,4 @@ If you must take everything down with no residue:
 ```bash
 docker compose -f docker-compose.prod.yml down -v   # -v wipes volumes/data
 # On an ephemeral/RAM host, a simple reboot destroys all state.
-# Also delete the B2 application keys and (if desired) empty the buckets.
 ```
