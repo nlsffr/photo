@@ -1,10 +1,10 @@
 # Production stack — anonymity-first, no public origin IP.
 #
-# Target hardware: Abelohost Storage Pro (~€39.99/mo)
-#   4 GB RAM / 2 CPU / 200 GB SAS / unmetered / dedicated IPv4 (NL)
+# Target hardware: Parkinhost Russia Dedicated (~€110/mo)
+#   Xeon E3 / 16 GB RAM / 2×16 TB HDD / 1 Gbps / Moscow
 #
-# Media: Self-hosted MinIO on the SAME VPS (most anonymous + crypto-payable)
-# Edge:  DDoS-Guard (or any no-log anti-DDoS) → nginx → app
+# Media: Self-hosted MinIO on the SAME server (most anonymous + crypto-payable)
+# Edge:  DDoS-Guard Website Protection → nginx → app
 # Tor:   optional .onion path
 #
 # Two ways in, both hiding the origin:
@@ -47,7 +47,7 @@ services:
       DB_SSL_CA: ${DB_SSL_CA}
       REDIS_URL: redis://redis:6379
       ELASTICSEARCH_URL: http://elasticsearch:9200
-      # MinIO (self-hosted on this VPS)
+      # MinIO (self-hosted on this dedicated)
       S3_ENDPOINT: http://minio:9000
       S3_ACCESS_KEY: ${S3_ACCESS_KEY}
       S3_SECRET_KEY: ${S3_SECRET_KEY}
@@ -134,7 +134,8 @@ services:
     environment:
       discovery.type: single-node
       xpack.security.enabled: "false"
-      ES_JAVA_OPTS: "-Xms512m -Xmx512m"   # important on 4 GB VPS
+      # 16 GB host → safer than the old 512m on a 4 GB VPS
+      ES_JAVA_OPTS: "-Xms1g -Xmx1g"
     volumes:
       - es-data:/usr/share/elasticsearch/data
     networks:
@@ -153,6 +154,7 @@ services:
       - internal-net
     # PRIVATE only. Never publish ports 9000/9001.
     # Media is served via signed URLs through the app / edge.
+    # Mount /data onto the large HDD volume on the dedicated.
 
 networks:
   edge-net:

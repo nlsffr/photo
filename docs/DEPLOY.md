@@ -5,10 +5,11 @@ resilience, and a hardened attack surface**. The guiding rule: nothing
 internal is ever reachable from the public internet. Only the edge is public.
 
 **Current target stack (July 2026):**
-- **Origin VPS**: Abelohost Storage Pro (~€39.99/mo) — 4 GB RAM, 2 CPU, 200 GB SAS, unmetered traffic, dedicated IPv4 (Netherlands)
-- **Media storage**: Self-hosted **MinIO** on the same VPS (most anonymous option, you control the keys)
-- **Edge / DDoS**: DDoS-Guard (or any equivalent no-log anti-DDoS you choose later)
-- **SQL**: MariaDB 11.x on the VPS (InnoDB encryption at rest)
+- **Origin**: Parkinhost Russia Dedicated (~€110/mo) — Xeon E3, 16 GB RAM, 2×16 TB HDD, 1 Gbps, Moscow
+- **Media storage**: Self-hosted **MinIO** on the same server (most anonymous option, you control the keys)
+- **Edge / DDoS**: DDoS-Guard Website Protection (hides origin IP + strong mitigation)
+- **SQL**: MariaDB 11.x on the dedicated (InnoDB encryption at rest)
+- **Jurisdiction**: Russia (low judicial cooperation with France / EU)
 
 ```
                           Public Internet
@@ -19,13 +20,13 @@ internal is ever reachable from the public internet. Only the edge is public.
                     └───────────┬────────────┘
                                 │
                     ┌───────────▼────────────┐
-                    │   DDoS-Guard (edge)     │  Anti-DDoS + WAF + rate limit
-                    │   Hides origin IP       │  (or equivalent no-log provider)
+                    │   DDoS-Guard (edge)     │  Website Protection
+                    │   Hides origin IP       │  L7 reverse proxy + DDoS
                     └───────────┬────────────┘
                                 │
                     ┌───────────▼────────────┐
                     │  Edge proxy (nginx)     │  TLS termination, HSTS,
-                    │  on Abelohost VPS       │  rate limiting, bot filtering
+                    │  on Parkinhost RU       │  rate limiting, bot filtering
                     └───────────┬────────────┘
                                 │
                     ┌───────────▼────────────┐
@@ -47,10 +48,10 @@ internal is ever reachable from the public internet. Only the edge is public.
 ## Non-negotiables (the "no weak link" rules)
 
 1. **Origin IP is never exposed.** The only public DNS record points at
-   DDoS-Guard (or your chosen edge). If the origin IP leaks the whole edge
-   protection is bypassable. Mitigations:
-   - Firewall the Abelohost VPS to accept traffic **only** from the DDoS
-     provider's IP ranges on 80/443.
+   DDoS-Guard. If the origin IP leaks the whole edge protection is bypassable.
+   Mitigations:
+   - Firewall the Parkinhost dedicated to accept traffic **only** from the
+     DDoS-Guard IP ranges on 80/443.
    - Use a **wildcard TLS cert** or a cert that does not name the origin, and
      avoid putting the origin hostname in any public DNS or cert SAN.
    - Monitor **certificate transparency logs** (crt.sh) for any cert that
@@ -85,7 +86,7 @@ internal is ever reachable from the public internet. Only the edge is public.
 - **`ci.yml`** → GitHub-hosted runners. Build, typecheck, lint, docker build +
   healthcheck smoke test. **No secrets, no registry access.**
 - **`deploy.yml`** → self-hosted runner **inside the VPN network** (or manual
-  on the Abelohost VPS). Manually triggered. This is the only path that
+  on the Parkinhost dedicated). Manually triggered. This is the only path that
   touches production credentials.
 
 ## TLS hardening (origin + edge)
@@ -96,30 +97,30 @@ internal is ever reachable from the public internet. Only the edge is public.
 - OCSP stapling.
 - Rotate certs via ACME (Let's Encrypt) with **DNS-01** challenge (so no
   public HTTP endpoint is needed and the origin hostname stays private).
+  DDoS-Guard can also terminate TLS for you.
 
-## Database (MariaDB on Abelohost)
+## Database (MariaDB on Parkinhost)
 
 - MariaDB 11.4 with **InnoDB encryption at rest** (see `docs/DATABASE.md`).
 - Encrypted, off-site backups (`mysqldump | gpg`).
 
 ## Media storage — Self-hosted MinIO (most anonymous)
 
-- Runs on the same Abelohost VPS inside the internal docker network.
+- Runs on the same Parkinhost dedicated inside the internal docker network.
 - Bucket is **private** by default.
 - Media is referenced by URL in the `photos` table (`image_url`, `video_url`).
 - When you add upload endpoints later, use any S3-compatible client
   (`@aws-sdk/client-s3` with endpoint `http://minio:9000` + path-style).
-- 200 GB on the Storage Pro plan is enough to start. Scale later by adding
-  disks or a second storage VPS if needed.
+- **2×16 TB HDD** → massive headroom for media. Prefer putting the MinIO
+  data volume on the HDD array; keep OS + MariaDB on faster storage if possible.
 
-## Abelohost VPS specifics
+## Parkinhost Russia Dedicated specifics
 
-- Storage Pro plan is sufficient for the app + MariaDB + Redis + light ES + MinIO.
-- Keep Elasticsearch memory low (`ES_JAVA_OPTS=-Xms512m -Xmx512m`) so the
-  4 GB RAM is not exhausted.
-- Full-disk encryption (LUKS) recommended at install time.
+- 16 GB RAM is comfortable for app + MariaDB + Redis + ES (1g) + MinIO.
+- Full-disk encryption (LUKS) recommended at install time if available.
 - Firewall (ufw): default deny; allow SSH only over WireGuard; allow 80/443
-  only from your DDoS provider IP ranges.
+  only from DDoS-Guard IP ranges.
+- Admin only via Mullvad / WireGuard + SSH keys (no passwords).
 
 ## Monitoring
 
@@ -135,10 +136,10 @@ docker compose up -d      # app + mariadb + redis + elasticsearch + minio
 # minio console on http://localhost:9001 (dev only)
 ```
 
-## Production start (Abelohost)
+## Production start (Parkinhost)
 
 ```bash
-# On the VPS (after cloning / building the image)
+# On the dedicated (after cloning / building the image)
 cp .env.example .env.prod
 # Edit .env.prod → strong passwords for DB + MinIO, JWT secrets, etc.
 docker compose -f docker-compose.prod.yml --env-file .env.prod up -d

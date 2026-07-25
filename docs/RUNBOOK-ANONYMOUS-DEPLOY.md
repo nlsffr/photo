@@ -9,9 +9,10 @@ Follow it in order. Each step lists *why* it matters for untraceability.
 > hiding illegal activity.
 
 **Current recommended stack:**
-- Origin: **Abelohost Storage Pro** (~€39.99/mo, Netherlands)
-- Media: **Self-hosted MinIO** on the same VPS (most anonymous)
-- Edge: **DDoS-Guard** (or any no-log anti-DDoS you prefer later)
+- Origin: **Parkinhost Russia Dedicated** (~€110/mo, Moscow, 2×16 TB HDD)
+- Media: **Self-hosted MinIO** on the same server (most anonymous)
+- Edge: **DDoS-Guard Website Protection** (hides origin IP + strong DDoS)
+- Admin: Mullvad / WireGuard + SSH keys only
 
 ---
 
@@ -26,37 +27,35 @@ Follow it in order. Each step lists *why* it matters for untraceability.
 
 ## 1. Operator anonymity (before you touch a server)
 
-1. **Never** administer from your home/work IP. Do everything through a
-   dedicated **WireGuard VPN** or **Tails/Whonix**. Your real IP must never
+1. **Never** administer from your home/work IP. Do everything through
+   **Mullvad**, **WireGuard**, or **Tails/Whonix**. Your real IP must never
    appear in any provider log.
 2. **Anonymous identities & payment**: register accounts (host, domain, DDoS
    provider) with a dedicated email (**Proton**) and pay with **Monero** /
-   crypto where accepted, or privacy-preserving prepaid methods otherwise.
+   crypto where accepted.
 3. **Dedicated password manager + hardware 2FA**, kept off your daily machine.
 
 ## 2. Domain + DNS
 
-1. Register the domain (e.g. a `.bs` or other privacy-friendly TLD) through a
-   **privacy-first registrar (Njalla)** — they register it *for* you, so
-   **WHOIS never shows you**.
+1. Register the domain through a **privacy-first registrar (Njalla)** — they
+   register it *for* you, so **WHOIS never shows you**.
 2. DNS: use the registrar's DNS or a **no-log resolver**. Enable **DNSSEC**.
-3. The **only** public A/AAAA record points at **DDoS-Guard** (or your chosen
-   edge), never the Abelohost origin IP.
+3. The **only** public A/AAAA record points at **DDoS-Guard**, never the
+   Parkinhost origin IP.
 
 ## 3. DDoS-Guard edge (clearnet path)
 
-1. Put **DDoS-Guard** (or equivalent no-log anti-DDoS) in front. It terminates
-   the public connection and **hides the origin IP**.
-2. On the Abelohost VPS firewall, **allow inbound 80/443 ONLY from the DDoS
-   provider's IP ranges**. Drop everything else. If the origin IP ever leaks,
-   this is what still saves you.
+1. Put **DDoS-Guard Website Protection** in front. It terminates the public
+   connection and **hides the origin IP**.
+2. On the Parkinhost firewall, **allow inbound 80/443 ONLY from the DDoS-Guard
+   IP ranges**. Drop everything else. If the origin IP ever leaks, this is
+   what still saves you.
 
-## 4. Origin host — Abelohost Storage Pro
+## 4. Origin host — Parkinhost Russia Dedicated
 
-1. Order the **Storage Pro** plan (≈ €39.99/mo: 4 GB RAM, 2 CPU, 200 GB SAS,
-   unmetered, dedicated IPv4).
-2. Install with **full-disk encryption (LUKS)** if the provider offers it at
-   install time (or set it up yourself).
+1. Order the **Russia Dedicated** plan with large storage (e.g. 2×16 TB HDD).
+2. Install **Ubuntu 22.04 / 24.04**. Prefer full-disk encryption (LUKS) if
+   offered.
 3. Harden:
 
 ```bash
@@ -68,7 +67,7 @@ sudo systemctl restart ssh
 # Firewall: default deny; SSH only over the VPN subnet; web only from DDoS ranges.
 sudo ufw default deny incoming
 sudo ufw allow in on wg0 to any port 22 proto tcp
-# (repeat 'ufw allow from <DDoS-range> to any port 80/443' for each range)
+# (repeat 'ufw allow from <DDoS-Guard-range> to any port 80/443' for each range)
 sudo ufw enable
 
 # Disable persistent logging of network/journal to disk (RAM only).
@@ -77,6 +76,9 @@ printf '[Journal]\nStorage=volatile\nRuntimeMaxUse=64M\n' | \
   sudo tee /etc/systemd/journald.conf.d/volatile.conf
 sudo systemctl restart systemd-journald
 ```
+
+4. Put **MinIO data** on the large HDD volume(s). Keep OS + MariaDB on faster
+   storage when possible.
 
 ## 5. Tor hidden service (no-IP path)
 
@@ -99,8 +101,8 @@ docker compose -f docker-compose.prod.yml exec tor \
 
 - Public CI (`.github/workflows/ci.yml`) only builds + smoke-tests. **No
   secrets.**
-- Prefer building the image directly on the Abelohost VPS or from a VPN-only
-  runner. Never push secrets to public CI.
+- Prefer building the image directly on the Parkinhost dedicated or from a
+  VPN-only runner. Never push secrets to public CI.
 
 ## 7. Database + media (MinIO)
 
@@ -113,11 +115,11 @@ DATABASE_URL="mysql://$DB_USER:$DB_PASSWORD@127.0.0.1:3306/lumengallery" \
   node scripts/seed.mjs ./content.json
 ```
 
-- **MinIO** runs on the same VPS, on the internal network only.
+- **MinIO** runs on the same server, on the internal network only.
 - Bucket stays **private**. Media is served via signed URLs through the app/edge.
 - Put strong `S3_ACCESS_KEY` / `S3_SECRET_KEY` in `.env.prod`.
 - **Encrypted off-site backups**: `mysqldump --single-transaction | gpg -e`
-  and store the result elsewhere (another encrypted remote or second VPS).
+  and store the result elsewhere (another encrypted remote).
 
 ## 8. No logs, anywhere
 
@@ -141,9 +143,9 @@ DATABASE_URL="mysql://$DB_USER:$DB_PASSWORD@127.0.0.1:3306/lumengallery" \
 
 ## 10. Go-live checklist
 
-- [ ] Home IP never used; all admin over VPN/Tails.
-- [ ] WHOIS masked; only public DNS record = DDoS edge.
-- [ ] Abelohost origin firewall allows web only from DDoS provider, SSH only over VPN.
+- [ ] Home IP never used; all admin over Mullvad / WireGuard.
+- [ ] WHOIS masked; only public DNS record = DDoS-Guard.
+- [ ] Parkinhost origin firewall allows web only from DDoS-Guard, SSH only over VPN.
 - [ ] `.onion` published and its volume backed up.
 - [ ] MinIO bucket is **private**; media only via signed URLs.
 - [ ] Staging/QA are VPN-only, separate creds, same hardening.
