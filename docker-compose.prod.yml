@@ -7,17 +7,13 @@
 # Edge:  DDoS-Guard Website Protection → nginx → app
 # Tor:   optional .onion path
 #
-# Two ways in, both hiding the origin:
-#   1) Clearnet: DDoS-Guard -> edge (nginx) -> app   (public domain)
-#   2) Tor:      .onion hidden service -> app         (no IP at all)
-#
-# All data stores (mariadb / redis / elasticsearch / minio) live on an
-# INTERNAL docker network with NO published ports — reachable only by the app.
-# Nothing here writes visitor logs (see nginx.conf: access_log off).
-#
 # Usage:
 #   cp .env.example .env.prod   # fill real strong passwords
 #   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+#
+# MinIO data on the big HDD (example — adjust device/path on the dedicated):
+#   volumes:
+#     - /data/minio:/data
 
 services:
   edge:
@@ -43,19 +39,19 @@ services:
     environment:
       NODE_ENV: production
       DATABASE_URL: ${DATABASE_URL}
-      DB_SSL: "true"
-      DB_SSL_CA: ${DB_SSL_CA}
+      # Internal Docker MariaDB usually has no TLS — default false unless you set certs.
+      DB_SSL: ${DB_SSL:-false}
+      DB_SSL_CA: ${DB_SSL_CA:-}
       REDIS_URL: redis://redis:6379
       ELASTICSEARCH_URL: http://elasticsearch:9200
-      # MinIO (self-hosted on this dedicated)
       S3_ENDPOINT: http://minio:9000
       S3_ACCESS_KEY: ${S3_ACCESS_KEY}
       S3_SECRET_KEY: ${S3_SECRET_KEY}
       S3_BUCKET: ${S3_BUCKET:-lumengallery-media}
       S3_REGION: ${S3_REGION:-us-east-1}
       S3_FORCE_PATH_STYLE: "true"
-      CDN_HOSTNAME: ${CDN_HOSTNAME}
-      CDN_URL: ${CDN_URL}
+      CDN_HOSTNAME: ${CDN_HOSTNAME:-}
+      CDN_URL: ${CDN_URL:-}
     depends_on:
       mariadb:
         condition: service_healthy
@@ -64,9 +60,8 @@ services:
       minio:
         condition: service_started
     networks:
-      - edge-net      # reachable by edge + tor
-      - internal-net  # reachable to data stores
-    # No published ports: the app is never directly public.
+      - edge-net
+      - internal-net
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/healthz"]
       interval: 15s
@@ -77,9 +72,6 @@ services:
   tor:
     image: dperson/torproxy:latest
     restart: unless-stopped
-    # Publishes a v3 .onion hidden service that forwards to the app.
-    # The onion hostname appears in the tor-data volume after first start.
-    # Back up that volume to keep the same .onion forever.
     environment:
       TOR_HIDDEN_SERVICE: "true"
     command: >
@@ -105,6 +97,9 @@ services:
       - --innodb-encrypt-log=ON
       - --skip-name-resolve
       - --general-log=0
+    # Host-side bot access (localhost only — never expose publicly)
+    ports:
+      - "127.0.0.1:3306:3306"
     volumes:
       - mariadb-data:/var/lib/mysql
       - ./migrations:/docker-entrypoint-initdb.d:ro
@@ -134,7 +129,6 @@ services:
     environment:
       discovery.type: single-node
       xpack.security.enabled: "false"
-      # 16 GB host → safer than the old 512m on a 4 GB VPS
       ES_JAVA_OPTS: "-Xms1g -Xmx1g"
     volumes:
       - es-data:/usr/share/elasticsearch/data
@@ -148,20 +142,23 @@ services:
     environment:
       MINIO_ROOT_USER: ${S3_ACCESS_KEY}
       MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY}
+    # Localhost only: host bot (MegaBot) can upload without joining Docker network.
+    # NEVER bind 0.0.0.0 — firewall + 127.0.0.1 only.
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
     volumes:
+      # Prefer bind-mount to the large HDD, e.g. /data/minio:/data
       - minio-data:/data
     networks:
       - internal-net
-    # PRIVATE only. Never publish ports 9000/9001.
-    # Media is served via signed URLs through the app / edge.
-    # Mount /data onto the large HDD volume on the dedicated.
 
 networks:
   edge-net:
     driver: bridge
   internal-net:
     driver: bridge
-    internal: true   # no route to the internet at all
+    internal: true
 
 volumes:
   mariadb-data:
