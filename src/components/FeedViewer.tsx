@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
-import type { PhotoView } from "@/lib/types";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { PhotoPage, PhotoView } from "@/lib/types";
 import { formatCount } from "@/lib/format";
 import { VerifiedBadge } from "./VerifiedBadge";
 import { FollowPill, useInteractions } from "./Interactions";
@@ -49,6 +49,7 @@ function FeedSlide({ item, muted }: { item: PhotoView; muted: boolean }) {
   const liked = ready && isLiked(item.id);
   const saved = ready && isSaved(item.id);
   const likeCount = item.likes + (liked ? 1 : 0);
+  const isVideo = item.type === "video" && Boolean(item.videoUrl);
 
   useEffect(() => {
     const el = videoRef.current;
@@ -57,17 +58,17 @@ function FeedSlide({ item, muted }: { item: PhotoView; muted: boolean }) {
       (entries) => {
         const e = entries[0];
         if (!e) return;
-        if (e.isIntersecting && e.intersectionRatio > 0.6) {
+        if (e.isIntersecting && e.intersectionRatio > 0.55) {
           el.play().then(() => setPaused(false)).catch(() => {});
         } else {
           el.pause();
         }
       },
-      { threshold: [0, 0.6, 1] },
+      { threshold: [0, 0.55, 1] },
     );
     obs.observe(el);
     return () => obs.disconnect();
-  }, []);
+  }, [item.id]);
 
   function togglePlay() {
     const el = videoRef.current;
@@ -81,8 +82,8 @@ function FeedSlide({ item, muted }: { item: PhotoView; muted: boolean }) {
   }
 
   return (
-    <section className="relative h-full w-full snap-start snap-always overflow-hidden bg-black">
-      {item.type === "video" ? (
+    <section className="relative h-full w-full shrink-0 snap-start snap-always overflow-hidden bg-black">
+      {isVideo ? (
         <video
           ref={videoRef}
           src={item.videoUrl}
@@ -95,7 +96,7 @@ function FeedSlide({ item, muted }: { item: PhotoView; muted: boolean }) {
             const v = e.currentTarget;
             if (v.duration) setProgress(v.currentTime / v.duration);
           }}
-          className="absolute inset-0 h-full w-full object-cover"
+          className="absolute inset-0 h-full w-full object-contain sm:object-cover"
         />
       ) : (
         <MediaImg
@@ -103,11 +104,11 @@ function FeedSlide({ item, muted }: { item: PhotoView; muted: boolean }) {
           alt={item.title}
           fill
           sizes="(max-width: 1024px) 100vw, 500px"
-          className="object-cover"
+          className="object-contain sm:object-cover"
         />
       )}
 
-      {item.type === "video" && (
+      {isVideo && (
         <button
           type="button"
           onClick={togglePlay}
@@ -128,8 +129,8 @@ function FeedSlide({ item, muted }: { item: PhotoView; muted: boolean }) {
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/80 to-transparent" />
 
-      <div className="absolute inset-x-0 bottom-0 z-10 flex items-end justify-between gap-3 p-4 pr-2">
-        <div className="min-w-0 flex-1">
+      <div className="absolute inset-x-0 bottom-0 z-10 flex items-end justify-between gap-3 p-4 pr-2 pb-6">
+        <div className="min-w-0 flex-1 pointer-events-auto">
           <div className="flex items-center gap-2">
             <Link href={`/creator/${item.creatorHandle}`} className="flex items-center gap-2">
               <MediaImg
@@ -149,14 +150,16 @@ function FeedSlide({ item, muted }: { item: PhotoView; muted: boolean }) {
           <p className="mt-2 line-clamp-2 text-sm text-white/90 drop-shadow">
             {item.title}
           </p>
-          <div className="mt-1 flex flex-wrap gap-x-2 text-sm font-medium text-white/80">
-            {item.tags.map((t) => (
-              <span key={t}>#{t}</span>
-            ))}
-          </div>
+          {item.tags.length > 0 && (
+            <div className="mt-1 flex flex-wrap gap-x-2 text-sm font-medium text-white/80">
+              {item.tags.slice(0, 4).map((t) => (
+                <span key={t}>#{t}</span>
+              ))}
+            </div>
+          )}
         </div>
 
-        <div className="flex shrink-0 flex-col items-center gap-3 pb-1">
+        <div className="flex shrink-0 flex-col items-center gap-3 pb-1 pointer-events-auto">
           <div className="flex flex-col items-center gap-1">
             <RailButton
               label="J’aime"
@@ -189,10 +192,13 @@ function FeedSlide({ item, muted }: { item: PhotoView; muted: boolean }) {
               {saved ? "Enregistré" : "Enreg."}
             </span>
           </div>
+          <span className="text-xs font-medium text-white/70">
+            {formatCount(item.views)} vues
+          </span>
         </div>
       </div>
 
-      {item.type === "video" && (
+      {isVideo && (
         <div className="absolute inset-x-0 bottom-0 z-20 h-1 bg-white/20">
           <div
             className="h-full bg-[var(--color-accent)]"
@@ -204,8 +210,78 @@ function FeedSlide({ item, muted }: { item: PhotoView; muted: boolean }) {
   );
 }
 
-export function FeedViewer({ items }: { items: PhotoView[] }) {
+export function FeedViewer({
+  initial,
+  preferVideo = true,
+}: {
+  initial: PhotoView[];
+  preferVideo?: boolean;
+}) {
   const [muted, setMuted] = useState(true);
+  const [items, setItems] = useState<PhotoView[]>(initial);
+  const [cursor, setCursor] = useState<number | null>(
+    initial.length >= 20 ? initial.length : null,
+  );
+  const loadingRef = useRef(false);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  const loadMore = useCallback(async () => {
+    if (loadingRef.current || cursor === null) return;
+    loadingRef.current = true;
+    try {
+      const sp = new URLSearchParams();
+      sp.set("sort", "trending");
+      if (preferVideo) sp.set("type", "video");
+      sp.set("cursor", String(cursor));
+      sp.set("limit", "20");
+      const res = await fetch(`/api/photos?${sp}`);
+      const page: PhotoPage = await res.json();
+      if (!page.items?.length) {
+        setCursor(null);
+        return;
+      }
+      setItems((prev) => {
+        const seen = new Set(prev.map((p) => p.id));
+        const next = page.items.filter((p) => !seen.has(p.id));
+        return [...prev, ...next];
+      });
+      setCursor(page.nextCursor);
+    } catch {
+      // retry on next scroll
+    } finally {
+      loadingRef.current = false;
+    }
+  }, [cursor, preferVideo]);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || cursor === null) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) loadMore();
+      },
+      { rootMargin: "200% 0px" },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [loadMore, cursor]);
+
+  if (items.length === 0) {
+    return (
+      <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 top-[calc(3.5rem+env(safe-area-inset-top))] z-30 flex flex-col items-center justify-center gap-3 bg-black px-6 text-center lg:bottom-0 lg:left-60 lg:top-14">
+        <p className="text-lg font-semibold text-white">Feed vide</p>
+        <p className="max-w-sm text-sm text-white/60">
+          Le bot est encore en train d’importer des vidéos. Reviens dans quelques minutes.
+        </p>
+        <Link
+          href="/"
+          className="mt-2 rounded-full bg-[var(--color-accent)] px-6 py-2.5 text-sm font-semibold text-white"
+        >
+          Voir la galerie
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 top-[calc(3.5rem+env(safe-area-inset-top))] z-30 bg-black lg:bottom-0 lg:left-60 lg:top-14">
@@ -226,10 +302,17 @@ export function FeedViewer({ items }: { items: PhotoView[] }) {
         )}
       </button>
 
-      <div className="no-scrollbar mx-auto h-full max-w-[500px] snap-y snap-mandatory overflow-y-scroll">
+      <div className="no-scrollbar mx-auto h-full max-w-[500px] snap-y snap-mandatory overflow-y-scroll overscroll-y-contain">
         {items.map((item) => (
-          <FeedSlide key={item.id} item={item} muted={muted} />
+          <div key={item.id} className="h-full w-full">
+            <FeedSlide item={item} muted={muted} />
+          </div>
         ))}
+        {cursor !== null && (
+          <div ref={sentinelRef} className="flex h-24 items-center justify-center">
+            <span className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+          </div>
+        )}
       </div>
     </div>
   );

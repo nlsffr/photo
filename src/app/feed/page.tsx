@@ -5,6 +5,12 @@ import { FeedViewer } from "@/components/FeedViewer";
 export const metadata: Metadata = { title: "Feed" };
 
 export default async function FeedPage() {
-  const page = await getPhotos({ sort: "trending", limit: 40 });
-  return <FeedViewer items={page.items} />;
+  // TikTok-style: videos first (trending). Photos still included if few videos.
+  const videos = await getPhotos({ sort: "trending", type: "video", limit: 30 });
+  const items =
+    videos.items.length >= 5
+      ? videos.items
+      : (await getPhotos({ sort: "trending", limit: 40 })).items;
+
+  return <FeedViewer initial={items} preferVideo />;
 }
