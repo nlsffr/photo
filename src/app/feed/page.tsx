@@ -5,12 +5,28 @@ import { FeedViewer } from "@/components/FeedViewer";
 export const metadata: Metadata = { title: "Feed" };
 
 export default async function FeedPage() {
-  // TikTok-style: videos first (trending). Photos still included if few videos.
-  const videos = await getPhotos({ sort: "trending", type: "video", limit: 30 });
-  const items =
-    videos.items.length >= 5
-      ? videos.items
-      : (await getPhotos({ sort: "trending", limit: 40 })).items;
+  // 1) Prefer videos (TikTok style)
+  const videos = await getPhotos({
+    sort: "trending",
+    type: "video",
+    limit: 40,
+  });
 
-  return <FeedViewer initial={items} preferVideo />;
+  // 2) If almost no videos yet, mix all media so feed is never blank while bot runs
+  let items = videos.items;
+  if (items.length < 3) {
+    const all = await getPhotos({ sort: "trending", limit: 40 });
+    items = all.items;
+  }
+  if (items.length < 3) {
+    const popular = await getPhotos({ sort: "popular", limit: 40 });
+    items = popular.items;
+  }
+
+  return (
+    <FeedViewer
+      initial={items}
+      preferVideo={videos.total >= 5}
+    />
+  );
 }
