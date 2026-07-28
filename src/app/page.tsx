@@ -6,6 +6,7 @@ import { FeaturedCreators } from "@/components/FeaturedCreators";
 import { TagChips } from "@/components/TagChips";
 import { MediaTypeTabs } from "@/components/MediaTypeTabs";
 import { SortTabs } from "@/components/SortTabs";
+import { AiFilterTabs } from "@/components/AiFilterTabs";
 
 const VALID_SORTS: SortKey[] = ["popular", "recent", "trending", "liked"];
 
@@ -26,17 +27,26 @@ export default async function Home({
       ? typeRaw
       : undefined;
 
-  // Default = most-viewed; user can switch via the visible sort tabs.
   const sortRaw = first(sp.sort);
   const sort: SortKey = VALID_SORTS.includes(sortRaw as SortKey)
     ? (sortRaw as SortKey)
     : "popular";
 
-  const page = await getPhotos({ sort, tag, type });
-  const allTags = await getAllTags();
-  const queryKey = `${sort}|${tag ?? ""}|${type ?? ""}`;
+  const aiRaw = first(sp.ai);
+  const ai = aiRaw === "0" || aiRaw === "1" ? aiRaw : undefined;
+  const isAi = ai === "1" ? true : ai === "0" ? false : undefined;
 
-  const heading = tag ? `#${tag}` : "🔥 Tendances du moment";
+  const page = await getPhotos({ sort, tag, type, isAi });
+  const allTags = await getAllTags();
+  const queryKey = `${sort}|${tag ?? ""}|${type ?? ""}|${ai ?? ""}`;
+
+  const heading = tag
+    ? `#${tag}`
+    : ai === "1"
+      ? "🤖 Contenu IA"
+      : ai === "0"
+        ? "✨ Contenu réel"
+        : "🔥 Tendances du moment";
 
   return (
     <div className="px-3 py-4 sm:px-5">
@@ -49,9 +59,14 @@ export default async function Home({
           <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
             {heading}
           </h1>
-          <Suspense fallback={<div className="h-9 w-52" />}>
-            <MediaTypeTabs basePath="/" />
-          </Suspense>
+          <div className="flex flex-wrap items-center gap-2">
+            <Suspense fallback={<div className="h-9 w-28" />}>
+              <AiFilterTabs basePath="/" />
+            </Suspense>
+            <Suspense fallback={<div className="h-9 w-52" />}>
+              <MediaTypeTabs basePath="/" />
+            </Suspense>
+          </div>
         </div>
         <Suspense fallback={<div className="h-9" />}>
           <SortTabs basePath="/" />
@@ -61,7 +76,7 @@ export default async function Home({
       <InfiniteGallery
         key={queryKey}
         initial={page}
-        params={{ sort, tag, type }}
+        params={{ sort, tag, type, ai }}
       />
     </div>
   );

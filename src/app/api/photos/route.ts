@@ -5,9 +5,6 @@ import { anonKey, rateLimit, sweep } from "@/lib/ratelimit";
 const SORTS: SortKey[] = ["recent", "trending", "popular", "liked", "random"];
 
 export async function GET(request: Request) {
-  // Rate limit on a coarse, immediately-anonymised key. We never read or store
-  // a raw IP: we hash whatever the edge passed (or a constant fallback) with an
-  // ephemeral per-process salt. No identifiable data is retained.
   sweep();
   const coarse =
     request.headers.get("x-ratelimit-bucket") ?? "shared-anonymous-bucket";
@@ -38,9 +35,14 @@ export async function GET(request: Request) {
       ? typeParam
       : undefined;
 
+  const aiParam = searchParams.get("ai");
+  const isAi =
+    aiParam === "1" ? true : aiParam === "0" ? false : undefined;
+
   const page = await getPhotos({
     sort,
     type,
+    isAi,
     tag: searchParams.get("tag") ?? undefined,
     q: searchParams.get("q") ?? undefined,
     creator: searchParams.get("creator") ?? undefined,
@@ -49,6 +51,9 @@ export async function GET(request: Request) {
   });
 
   return Response.json(page, {
-    headers: { "X-RateLimit-Remaining": String(remaining) },
+    headers: {
+      "X-RateLimit-Remaining": String(remaining),
+      "Cache-Control": "public, s-maxage=15, stale-while-revalidate=60",
+    },
   });
 }

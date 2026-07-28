@@ -12,6 +12,8 @@ interface Props {
     q?: string;
     creator?: string;
     type?: MediaType;
+    /** "0" | "1" string for URL parity */
+    ai?: string;
   };
 }
 
@@ -29,10 +31,11 @@ export function InfiniteGallery({ initial, params }: Props) {
       if (params.q) sp.set("q", params.q);
       if (params.creator) sp.set("creator", params.creator);
       if (params.type) sp.set("type", params.type);
+      if (params.ai === "0" || params.ai === "1") sp.set("ai", params.ai);
       sp.set("cursor", String(c));
       return `/api/photos?${sp.toString()}`;
     },
-    [params.sort, params.tag, params.q, params.creator, params.type],
+    [params.sort, params.tag, params.q, params.creator, params.type, params.ai],
   );
 
   const loadMore = useCallback(async () => {
@@ -57,7 +60,7 @@ export function InfiniteGallery({ initial, params }: Props) {
       (entries) => {
         if (entries[0]?.isIntersecting) loadMore();
       },
-      { rootMargin: "800px 0px" },
+      { rootMargin: "1200px 0px" },
     );
     obs.observe(el);
     return () => obs.disconnect();
@@ -82,7 +85,6 @@ export function InfiniteGallery({ initial, params }: Props) {
 
   return (
     <>
-      {/* Masonry via CSS multi-columns: variable-height cards flow into columns. */}
       <div className="columns-2 gap-2.5 sm:columns-3 sm:gap-3 lg:columns-4 xl:columns-5">
         {items.map((p) => (
           <div key={p.id} className="mb-2.5 break-inside-avoid sm:mb-3">
@@ -103,7 +105,7 @@ export function InfiniteGallery({ initial, params }: Props) {
 
       {cursor === null && (
         <p className="py-10 text-center text-sm text-[var(--color-ink-faint)]">
-          Tu as tout vu — {items.length} photos.
+          Tu as tout vu — {items.length} médias.
         </p>
       )}
     </>

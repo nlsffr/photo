@@ -1,12 +1,11 @@
-import Image from "next/image";
 import Link from "next/link";
 import { getModels } from "@/lib/photos";
+import { MediaImg } from "./MediaImg";
 
 export async function FeaturedCreators() {
   const models = await getModels("followers");
   const creators = models.slice(0, 16);
 
-  // Nothing to feature yet — don't render an empty section header.
   if (creators.length === 0) return null;
 
   return (
@@ -22,9 +21,9 @@ export async function FeaturedCreators() {
             className="flex w-16 shrink-0 flex-col items-center gap-1.5"
           >
             <span className="rounded-full bg-gradient-to-tr from-[var(--color-accent)] to-orange-500 p-[2px]">
-              <span className="block rounded-full p-[2px] ring-0">
-                <Image
-                  src={c.avatarUrl}
+              <span className="block rounded-full p-[2px]">
+                <MediaImg
+                  src={c.avatarUrl || c.coverUrl}
                   alt={c.name}
                   width={58}
                   height={58}

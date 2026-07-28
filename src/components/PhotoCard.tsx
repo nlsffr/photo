@@ -35,6 +35,12 @@ export function PhotoCard({ photo }: { photo: PhotoView }) {
         <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/60 to-transparent" />
         <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/75 to-transparent opacity-100 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100" />
 
+        {photo.isAi && (
+          <span className="absolute left-2 bottom-14 z-[5] rounded bg-purple-600/90 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+            IA
+          </span>
+        )}
+
         {photo.type === "video" && (
           <>
             <span className="absolute inset-0 grid place-items-center">
