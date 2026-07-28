@@ -39,7 +39,7 @@ services:
       - edge-net
       - internal-net
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/healthz"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/healthz"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -94,6 +94,7 @@ services:
     volumes:
       - minio-data:/data
     networks:
+      - edge-net
       - internal-net
 
 networks:
@@ -101,7 +102,6 @@ networks:
     driver: bridge
   internal-net:
     driver: bridge
-    internal: true
 
 volumes:
   mariadb-data:
