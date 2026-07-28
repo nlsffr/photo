@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { SearchBar } from "./SearchBar";
+import { AccountMenu } from "./AccountMenu";
 
 type NavItem = {
   href: string;
@@ -196,22 +197,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <path d="m21 21-4.3-4.3" />
             </svg>
           </Link>
-          <Link
-            href="/inscription"
-            className="hidden items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-3.5 py-2 text-sm font-bold text-white hover:bg-[var(--color-accent-600)] sm:inline-flex"
-          >
-            S’inscrire
-          </Link>
-          <Link
-            href="/connexion"
-            aria-label="Connexion"
-            className="grid h-9 w-9 place-items-center rounded-full bg-[var(--color-surface-2)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-              <circle cx="12" cy="8" r="4" />
-              <path d="M4 21a8 8 0 0 1 16 0" />
-            </svg>
-          </Link>
+          <AccountMenu />
         </div>
       </header>
 

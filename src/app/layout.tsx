@@ -3,6 +3,7 @@ import "./globals.css";
 import { AppShell } from "@/components/AppShell";
 import { InteractionsProvider } from "@/components/Interactions";
 import { AnonIdentityProvider } from "@/components/AnonIdentity";
+import { SessionProvider } from "@/components/Session";
 
 // No external font provider: we use the OS's own font stack (defined in
 // globals.css). This means ZERO network contact with any font CDN — not at
@@ -34,11 +35,13 @@ export default function RootLayout({
   return (
     <html lang="fr" className="h-full antialiased">
       <body className="min-h-full">
-        <AnonIdentityProvider>
-          <InteractionsProvider>
-            <AppShell>{children}</AppShell>
-          </InteractionsProvider>
-        </AnonIdentityProvider>
+        <SessionProvider>
+          <AnonIdentityProvider>
+            <InteractionsProvider>
+              <AppShell>{children}</AppShell>
+            </InteractionsProvider>
+          </AnonIdentityProvider>
+        </SessionProvider>
       </body>
     </html>
   );
