@@ -1,85 +1,86 @@
 /**
  * Data Provider abstraction — separates the app from the data source.
- *
- * Implement this interface to swap between demo data, MySQL, or any other source.
  */
 
-import type { Creator, MediaType, Photo, PhotoPage, PhotoView, SortKey } from "./types";
+import type {
+  Creator,
+  CreatorWithStats,
+  MediaType,
+  Photo,
+  PhotoPage,
+  PhotoView,
+  SortKey,
+} from "./types";
 
 export interface DataProvider {
-  /** Get all creators. */
   getCreators(): Promise<Creator[]>;
-
-  /** Get creator by handle. */
   getCreator(handle: string): Promise<Creator | undefined>;
-
-  /** Get all photos (optionally filtered + sorted). */
   getPhotos(query: {
     sort?: SortKey;
     tag?: string;
     q?: string;
     creator?: string;
     type?: MediaType;
+    isAi?: boolean;
     cursor?: number;
     limit?: number;
   }): Promise<PhotoPage>;
-
-  /** Get photo by ID. */
   getPhoto(id: string): Promise<Photo | undefined>;
-
-  /** Get all photos with creator data embedded. */
   getAllPhotos(): Promise<PhotoView[]>;
-
-  /** Get photos related to a given photo (by shared tags). */
   getRelatedPhotos(photo: Photo, limit?: number): Promise<PhotoView[]>;
-
-  /** Get creator stats (photo count, total views/likes). */
   getCreatorStats(handle: string): Promise<{
     photoCount: number;
     totalViews: number;
     totalLikes: number;
   }>;
-
-  /** Get all unique tags. */
   getTags(): Promise<string[]>;
+  /** Fast aggregated models list (SQL when available). */
+  getModels?(sort: "followers" | "views"): Promise<CreatorWithStats[]>;
+  /** Search creators by name/handle. */
+  searchCreators?(q: string, limit?: number): Promise<Creator[]>;
+  getRankings?(limit?: number): Promise<
+    Array<
+      Creator & { score: number; views: number; likes: number }
+    >
+  >;
 }
 
-/** In-memory provider (used when DB is not available). */
 export class EmptyDataProvider implements DataProvider {
   async getCreators(): Promise<Creator[]> {
     return [];
   }
-
   async getCreator(): Promise<undefined> {
     return undefined;
   }
-
   async getPhotos(): Promise<PhotoPage> {
     return { items: [], nextCursor: null, total: 0 };
   }
-
   async getPhoto(): Promise<undefined> {
     return undefined;
   }
-
   async getAllPhotos(): Promise<PhotoView[]> {
     return [];
   }
-
   async getRelatedPhotos(): Promise<PhotoView[]> {
     return [];
   }
-
   async getCreatorStats() {
     return { photoCount: 0, totalViews: 0, totalLikes: 0 };
   }
-
   async getTags(): Promise<string[]> {
+    return [];
+  }
+  async getModels(): Promise<CreatorWithStats[]> {
+    return [];
+  }
+  async searchCreators(): Promise<Creator[]> {
+    return [];
+  }
+  async getRankings() {
     return [];
   }
 }
 
-/** Global provider instance. Swap this with real DB provider when ready. */
 let provider: DataProvider = new EmptyDataProvider();
 
 export function setDataProvider(p: DataProvider) {

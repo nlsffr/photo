@@ -34,6 +34,8 @@ export interface Photo {
   itemCount?: number;
   /** Optional external link to the full content (hosted elsewhere). */
   externalUrl?: string;
+  /** True when source marked the media as AI-generated. */
+  isAi?: boolean;
 }
 
 export type SortKey =
@@ -67,6 +69,8 @@ export interface PhotoQuery {
   q?: string;
   creator?: string;
   type?: MediaType;
+  /** true = IA only, false = real only, undefined = all */
+  isAi?: boolean;
   cursor?: number;
   limit?: number;
 }
