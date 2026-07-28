@@ -8,6 +8,9 @@ import { MediaTypeTabs } from "@/components/MediaTypeTabs";
 import { SortTabs } from "@/components/SortTabs";
 import { AiFilterTabs } from "@/components/AiFilterTabs";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const VALID_SORTS: SortKey[] = ["popular", "recent", "trending", "liked"];
 
 function first(v?: string | string[]): string | undefined {

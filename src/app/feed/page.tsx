@@ -4,15 +4,17 @@ import { FeedViewer } from "@/components/FeedViewer";
 
 export const metadata: Metadata = { title: "Feed" };
 
+// Never cache an empty snapshot from docker build (no DB at build time).
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function FeedPage() {
-  // 1) Prefer videos (TikTok style)
   const videos = await getPhotos({
     sort: "trending",
     type: "video",
     limit: 40,
   });
 
-  // 2) If almost no videos yet, mix all media so feed is never blank while bot runs
   let items = videos.items;
   if (items.length < 3) {
     const all = await getPhotos({ sort: "trending", limit: 40 });
