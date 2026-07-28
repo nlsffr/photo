@@ -1,12 +1,12 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { PhotoView } from "@/lib/types";
 import { formatCount } from "@/lib/format";
 import { VerifiedBadge } from "./VerifiedBadge";
 import { FollowPill, useInteractions } from "./Interactions";
+import { MediaImg } from "./MediaImg";
 
 function RailButton({
   icon,
@@ -98,7 +98,7 @@ function FeedSlide({ item, muted }: { item: PhotoView; muted: boolean }) {
           className="absolute inset-0 h-full w-full object-cover"
         />
       ) : (
-        <Image
+        <MediaImg
           src={item.imageUrl}
           alt={item.title}
           fill
@@ -107,7 +107,6 @@ function FeedSlide({ item, muted }: { item: PhotoView; muted: boolean }) {
         />
       )}
 
-      {/* Tap layer (video only) for play/pause */}
       {item.type === "video" && (
         <button
           type="button"
@@ -129,13 +128,12 @@ function FeedSlide({ item, muted }: { item: PhotoView; muted: boolean }) {
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/80 to-transparent" />
 
-      {/* Caption */}
       <div className="absolute inset-x-0 bottom-0 z-10 flex items-end justify-between gap-3 p-4 pr-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <Link href={`/creator/${item.creatorHandle}`} className="flex items-center gap-2">
-              <Image
-                src={item.creator.avatarUrl}
+              <MediaImg
+                src={item.creator.avatarUrl || item.imageUrl}
                 alt={item.creator.name}
                 width={36}
                 height={36}
@@ -158,7 +156,6 @@ function FeedSlide({ item, muted }: { item: PhotoView; muted: boolean }) {
           </div>
         </div>
 
-        {/* Action rail */}
         <div className="flex shrink-0 flex-col items-center gap-3 pb-1">
           <div className="flex flex-col items-center gap-1">
             <RailButton
@@ -192,18 +189,9 @@ function FeedSlide({ item, muted }: { item: PhotoView; muted: boolean }) {
               {saved ? "Enregistré" : "Enreg."}
             </span>
           </div>
-          <RailButton
-            label="Partager"
-            icon={
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13" />
-              </svg>
-            }
-          />
         </div>
       </div>
 
-      {/* Progress bar (video) */}
       {item.type === "video" && (
         <div className="absolute inset-x-0 bottom-0 z-20 h-1 bg-white/20">
           <div
@@ -221,7 +209,6 @@ export function FeedViewer({ items }: { items: PhotoView[] }) {
 
   return (
     <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 top-[calc(3.5rem+env(safe-area-inset-top))] z-30 bg-black lg:bottom-0 lg:left-60 lg:top-14">
-      {/* Sound toggle */}
       <button
         type="button"
         onClick={() => setMuted((m) => !m)}

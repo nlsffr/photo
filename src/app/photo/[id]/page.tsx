@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -12,6 +11,7 @@ import { formatAge, formatCount } from "@/lib/format";
 import { PhotoCard } from "@/components/PhotoCard";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { FollowButton, PostActions } from "@/components/Interactions";
+import { MediaImg } from "@/components/MediaImg";
 
 export async function generateMetadata({
   params,
@@ -49,7 +49,6 @@ export default async function PhotoPage({
       </Link>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-        {/* Viewer */}
         <div className="flex items-center justify-center overflow-hidden rounded-2xl bg-black ring-1 ring-[var(--color-border)]">
           {photo.type === "video" ? (
             <video
@@ -63,7 +62,7 @@ export default async function PhotoPage({
               className="max-h-[80vh] w-full"
             />
           ) : (
-            <Image
+            <MediaImg
               src={photo.imageUrl}
               alt={photo.title}
               width={photo.width}
@@ -75,7 +74,6 @@ export default async function PhotoPage({
           )}
         </div>
 
-        {/* Meta panel */}
         <aside className="flex flex-col gap-5">
           <div>
             <h1 className="text-xl font-bold leading-snug sm:text-2xl">
@@ -86,14 +84,13 @@ export default async function PhotoPage({
             </p>
           </div>
 
-          {/* Creator */}
           <div className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
             <Link
               href={`/creator/${photo.creatorHandle}`}
               className="flex min-w-0 flex-1 items-center gap-3"
             >
-              <Image
-                src={photo.creator.avatarUrl}
+              <MediaImg
+                src={photo.creator.avatarUrl || photo.imageUrl}
                 alt={photo.creator.name}
                 width={48}
                 height={48}
@@ -106,7 +103,8 @@ export default async function PhotoPage({
                 </p>
                 {creator && (
                   <p className="truncate text-sm text-[var(--color-ink-muted)]">
-                    {formatCount(creator.followers)} abonnés · {creator.location}
+                    {formatCount(creator.followers)} abonnés
+                    {creator.location ? ` · ${creator.location}` : ""}
                   </p>
                 )}
               </div>
@@ -114,7 +112,6 @@ export default async function PhotoPage({
             <FollowButton handle={photo.creatorHandle} className="ml-auto" />
           </div>
 
-          {/* Stats */}
           <div className="grid grid-cols-3 gap-2">
             {[
               { label: "Vues", value: formatCount(photo.views) },
@@ -131,20 +128,20 @@ export default async function PhotoPage({
             ))}
           </div>
 
-          {/* Tags */}
-          <div className="flex flex-wrap gap-2">
-            {photo.tags.map((tag) => (
-              <Link
-                key={tag}
-                href={`/?tag=${encodeURIComponent(tag)}`}
-                className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-sm capitalize text-[var(--color-ink-muted)] transition-colors hover:text-[var(--color-ink)]"
-              >
-                #{tag}
-              </Link>
-            ))}
-          </div>
+          {photo.tags.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {photo.tags.map((tag) => (
+                <Link
+                  key={tag}
+                  href={`/?tag=${encodeURIComponent(tag)}`}
+                  className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-sm capitalize text-[var(--color-ink-muted)] transition-colors hover:text-[var(--color-ink)]"
+                >
+                  #{tag}
+                </Link>
+              ))}
+            </div>
+          )}
 
-          {/* External content link (packs / externally-hosted content) */}
           {photo.externalUrl && (
             <a
               href={photo.externalUrl}
@@ -152,21 +149,14 @@ export default async function PhotoPage({
               rel="noopener noreferrer nofollow"
               className="flex items-center justify-center gap-2 rounded-xl bg-[var(--color-accent)] py-3 text-sm font-bold text-white transition-colors hover:bg-[var(--color-accent-600)]"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3" />
-              </svg>
-              {photo.type === "pack"
-                ? `Voir le pack${photo.itemCount ? ` (${photo.itemCount})` : ""}`
-                : "Voir le contenu complet"}
+              Voir le contenu
             </a>
           )}
 
-          {/* Actions */}
           <PostActions id={photo.id} baseLikes={photo.likes} />
         </aside>
       </div>
 
-      {/* Related */}
       {related.length > 0 && (
         <section className="mt-12">
           <h2 className="mb-4 text-lg font-bold">Photos similaires</h2>

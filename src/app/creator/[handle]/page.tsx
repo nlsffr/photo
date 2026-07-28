@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import { notFound } from "next/navigation";
 import { getCreator, getCreatorStats, getPhotos } from "@/lib/photos";
 import { formatCount } from "@/lib/format";
 import { InfiniteGallery } from "@/components/InfiniteGallery";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { FollowButton } from "@/components/Interactions";
+import { MediaImg } from "@/components/MediaImg";
 
 export async function generateMetadata({
   params,
@@ -34,30 +34,33 @@ export default async function CreatorPage({
     limit: 1,
   });
   const cover = coverPage.items[0];
+  const avatarSrc =
+    creator.avatarUrl && creator.avatarUrl.trim()
+      ? creator.avatarUrl
+      : cover?.imageUrl || "/media/placeholder.jpg";
 
   return (
     <div>
       {/* Cover banner */}
-      <div className="relative h-44 w-full overflow-hidden sm:h-56">
+      <div className="relative h-44 w-full overflow-hidden bg-[var(--color-surface-2)] sm:h-56">
         {cover && (
-          <Image
+          <MediaImg
             src={cover.imageUrl}
             alt=""
             fill
             sizes="100vw"
             priority
-            className="object-cover opacity-40"
+            className="object-cover opacity-50"
           />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-bg)] via-[var(--color-bg)]/40 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-bg)] via-[var(--color-bg)]/50 to-transparent" />
       </div>
 
       <div className="px-3 sm:px-5">
-        {/* Profile header */}
         <div className="-mt-14 flex flex-col gap-4 sm:-mt-16 sm:flex-row sm:items-end sm:justify-between">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-            <Image
-              src={creator.avatarUrl}
+            <MediaImg
+              src={avatarSrc}
               alt={creator.name}
               width={128}
               height={128}
@@ -68,16 +71,20 @@ export default async function CreatorPage({
                 {creator.name}
                 {creator.verified && <VerifiedBadge size={20} />}
               </h1>
-              <p className="mt-1 max-w-md text-[var(--color-ink-muted)]">
-                {creator.bio}
-              </p>
-              <p className="mt-1 flex items-center gap-1 text-sm text-[var(--color-ink-faint)]">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                  <path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0Z" />
-                  <circle cx="12" cy="10" r="3" />
-                </svg>
-                {creator.location}
-              </p>
+              {creator.bio ? (
+                <p className="mt-1 max-w-md text-[var(--color-ink-muted)]">
+                  {creator.bio}
+                </p>
+              ) : null}
+              {creator.location ? (
+                <p className="mt-1 flex items-center gap-1 text-sm text-[var(--color-ink-faint)]">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                    <path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0Z" />
+                    <circle cx="12" cy="10" r="3" />
+                  </svg>
+                  {creator.location}
+                </p>
+              ) : null}
             </div>
           </div>
 
@@ -87,7 +94,6 @@ export default async function CreatorPage({
           />
         </div>
 
-        {/* Stats */}
         <div className="mt-6 grid max-w-lg grid-cols-3 gap-3">
           {[
             { label: "Abonnés", value: formatCount(creator.followers) },
@@ -104,7 +110,6 @@ export default async function CreatorPage({
           ))}
         </div>
 
-        {/* Photos */}
         <section className="mt-8 pb-4">
           <h2 className="mb-3 text-lg font-bold">Galerie</h2>
           <InfiniteGallery
