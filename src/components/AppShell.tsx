@@ -24,37 +24,43 @@ const I = (d: string) => (
 const SECTIONS: NavSection[] = [
   {
     items: [
-      { href: "/", label: "Accueil", icon: I("M3 11l9-8 9 8M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"), active: (p) => p === "/" },
-      { href: "/models", label: "Modèles", icon: I("M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"), active: (p) => p.startsWith("/models") },
-      { href: "/abonnements", label: "Abonnements", icon: I("M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM16 11l2 2 4-4"), active: (p) => p.startsWith("/abonnements") },
+      { href: "/", label: "Bienvenue", icon: I("M3 11l9-8 9 8M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"), active: (p) => p === "/" },
+      { href: "/qu-est-ce-que-lumengallery", label: "Qu’est-ce que LumenGallery", icon: I("M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 16v-4M12 8h.01"), active: (p) => p.startsWith("/qu-est-ce-que-lumengallery") },
       { href: "/recherche", label: "Recherche", icon: I("M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-4.3-4.3"), active: (p) => p.startsWith("/recherche") },
-      { href: "/connexion", label: "Connexion", icon: I("M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"), active: (p) => p.startsWith("/connexion") || p.startsWith("/inscription") },
-      { href: "/feed", label: "Feed", icon: I("M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM10 8l6 4-6 4z"), active: (p) => p.startsWith("/feed") },
+      { href: "/models", label: "Découvrir", icon: I("M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM16.2 7.8l-2.9 6.4-6.4 2.9 2.9-6.4z"), active: (p) => p.startsWith("/models") },
+      { href: "/feed", label: "Publications des utilisateurs", icon: I("M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"), active: (p) => p.startsWith("/feed") },
+      { href: "/feed", label: "Feed", icon: I("M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM10 8l6 4-6 4z"), active: (p) => p === "/feed" },
       { href: "/favoris", label: "Enregistrés", icon: I("M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16l-7-4-7 4Z"), active: (p) => p.startsWith("/favoris") },
     ],
   },
   {
     items: [
-      { href: "#", label: "Premium", icon: I("M3 7l4 5 5-7 5 7 4-5v11H3z"), accent: "gold" },
+      { href: "#", label: "Passer Premium", icon: I("M3 7l4 5 5-7 5 7 4-5v11H3z"), accent: "gold" },
       { href: "/connexion", label: "Connexion", icon: I("M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"), active: (p) => p.startsWith("/connexion") },
-      { href: "/inscription", label: "Inscription", icon: I("M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6"), accent: "pink", active: (p) => p.startsWith("/inscription") },
+      { href: "/inscription", label: "S’inscrire", icon: I("M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6"), accent: "pink", active: (p) => p.startsWith("/inscription") },
     ],
   },
   {
     items: [
       { href: "#", label: "Commentaires récents", icon: I("M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z") },
-      { href: "/models", label: "Top modèles", icon: I("M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"), active: (p) => p.startsWith("/models") },
+      { href: "/models", label: "Top des profils", icon: I("M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"), active: (p) => p.startsWith("/models") },
       { href: "/classements", label: "Classements", icon: I("M8 21V9M16 21V5M4 21v-6M20 21v-10"), active: (p) => p.startsWith("/classements") },
-      { href: "/about", label: "À propos", icon: I("M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 16v-4M12 8h.01"), active: (p) => p.startsWith("/about") },
     ],
   },
   {
     title: "Tendances 🔥",
     items: [
-      { href: "/", label: "Récents", icon: I("M12 8v4l3 2M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z") },
-      { href: "/?sort=trending", label: "Tendances", icon: I("M5 17l6-6 4 4 8-8M21 7v6h-6") },
-      { href: "/?sort=liked", label: "Plus aimés", icon: I("M12 21s-7.5-4.6-10-9.3C.4 8.4 2 5 5.4 5c2 0 3.3 1.1 4.6 2.6C11.3 6.1 12.6 5 14.6 5 18 5 19.6 8.4 22 11.7 19.5 16.4 12 21 12 21Z") },
+      { href: "/?sort=trending", label: "Publications tendances", icon: I("M5 17l6-6 4 4 8-8M21 7v6h-6") },
+      { href: "/influenceuses-tendances", label: "Influenceuses tendances", icon: I("M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87"), active: (p) => p.startsWith("/influenceuses-tendances") },
+      { href: "/?sort=liked", label: "Les plus aimées", icon: I("M12 21s-7.5-4.6-10-9.3C.4 8.4 2 5 5.4 5c2 0 3.3 1.1 4.6 2.6C11.3 6.1 12.6 5 14.6 5 18 5 19.6 8.4 22 11.7 19.5 16.4 12 21 12 21Z") },
       { href: "/?sort=random", label: "Aléatoire", icon: I("M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5") },
+    ],
+  },
+  {
+    title: "Aide",
+    items: [
+      { href: "/contact", label: "Contact", icon: I("M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM22 6l-10 7L2 6"), active: (p) => p.startsWith("/contact") },
+      { href: "/dmca", label: "DMCA", icon: I("M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"), active: (p) => p.startsWith("/dmca") },
     ],
   },
 ];
@@ -261,9 +267,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               Lumen<span className="text-[var(--color-accent)]">gallery</span>
             </span>
             <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-[var(--color-ink-faint)]">
-              {["Conditions", "Confidentialité", "Mentions légales", "DMCA", "Contact"].map((l) => (
-                <span key={l}>{l}</span>
-              ))}
+              <Link href="/qu-est-ce-que-lumengallery" className="hover:text-[var(--color-ink-muted)]">
+                Qu’est-ce que LumenGallery
+              </Link>
+              <span>Conditions</span>
+              <span>Confidentialité</span>
+              <span>Mentions légales</span>
+              <Link href="/dmca" className="hover:text-[var(--color-ink-muted)]">
+                DMCA
+              </Link>
+              <Link href="/contact" className="hover:text-[var(--color-ink-muted)]">
+                Contact
+              </Link>
             </div>
           </div>
           <p className="mt-4 text-xs text-[var(--color-ink-faint)]">
