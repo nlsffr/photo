@@ -1,15 +1,10 @@
 /**
  * In-memory DEMO provider — ONLY for previewing the UI locally.
- *
- * Activated by DEMO_DATA=1. Generates rights-free placeholder imagery
- * (picsum.photos) with varied aspect ratios so the masonry layout, sort tabs,
- * media-type filter, packs and external links can all be seen in action.
- *
- * This never touches a real database and is never used in production.
  */
 
 import type {
   Creator,
+  CreatorWithStats,
   MediaType,
   Photo,
   PhotoPage,
@@ -52,7 +47,6 @@ const TYPES: MediaType[] = ["photo", "photo", "photo", "video", "pack"];
 
 const PHOTOS: Photo[] = Array.from({ length: 140 }).map((_, i) => {
   const type = TYPES[Math.floor(rng() * TYPES.length)];
-  // Varied ratios so masonry has visibly different heights.
   const ratios = [
     [1080, 1350],
     [1080, 1080],
@@ -81,6 +75,7 @@ const PHOTOS: Photo[] = Array.from({ length: 140 }).map((_, i) => {
     durationSec: type === "video" ? 8 + Math.floor(rng() * 120) : undefined,
     itemCount: type === "pack" ? 5 + Math.floor(rng() * 40) : undefined,
     externalUrl: type === "pack" || rng() < 0.2 ? "https://example.com/full" : undefined,
+    isAi: rng() < 0.15,
   };
 });
 
@@ -114,24 +109,36 @@ export class DemoProvider implements DataProvider {
   async getCreator(handle: string) {
     return BY_HANDLE.get(handle);
   }
+  async searchCreators(q: string, limit = 12) {
+    const term = q.toLowerCase();
+    return CREATORS.filter(
+      (c) =>
+        c.name.toLowerCase().includes(term) ||
+        c.handle.toLowerCase().includes(term),
+    ).slice(0, limit);
+  }
   async getPhotos(query: {
     sort?: SortKey;
     tag?: string;
     q?: string;
     creator?: string;
     type?: MediaType;
+    isAi?: boolean;
     cursor?: number;
     limit?: number;
   }): Promise<PhotoPage> {
     let list = PHOTOS.slice();
     if (query.creator) list = list.filter((p) => p.creatorHandle === query.creator);
     if (query.type) list = list.filter((p) => p.type === query.type);
+    if (query.isAi === true) list = list.filter((p) => p.isAi);
+    if (query.isAi === false) list = list.filter((p) => !p.isAi);
     if (query.tag) list = list.filter((p) => p.tags.includes(query.tag!));
     if (query.q) {
       const q = query.q.toLowerCase();
       list = list.filter(
         (p) =>
           p.title.toLowerCase().includes(q) ||
+          p.creatorHandle.toLowerCase().includes(q) ||
           (BY_HANDLE.get(p.creatorHandle)?.name.toLowerCase().includes(q) ?? false),
       );
     }
@@ -165,5 +172,30 @@ export class DemoProvider implements DataProvider {
   }
   async getTags() {
     return [...new Set(PHOTOS.flatMap((p) => p.tags))].slice(0, 40);
+  }
+  async getModels(sort: "followers" | "views" = "followers"): Promise<CreatorWithStats[]> {
+    const photos = PHOTOS;
+    const withStats = CREATORS.map((c) => {
+      const list = photos.filter((p) => p.creatorHandle === c.handle);
+      return {
+        ...c,
+        photoCount: list.length,
+        totalViews: list.reduce((s, p) => s + p.views, 0),
+        totalLikes: list.reduce((s, p) => s + p.likes, 0),
+        coverUrl: list[0]?.imageUrl ?? "",
+      };
+    }).filter((c) => c.photoCount > 0);
+    if (sort === "followers") withStats.sort((a, b) => b.followers - a.followers);
+    else withStats.sort((a, b) => b.totalViews - a.totalViews);
+    return withStats;
+  }
+  async getRankings(limit = 20) {
+    const models = await this.getModels("views");
+    return models.slice(0, limit).map((c) => ({
+      ...c,
+      views: c.totalViews,
+      likes: c.totalLikes,
+      score: c.totalViews + c.totalLikes * 3,
+    }));
   }
 }
