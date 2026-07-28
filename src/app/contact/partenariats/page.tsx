@@ -24,6 +24,7 @@ export default function PartenariatsPage() {
 
       <div className="mt-8">
         <ContactForm
+          kind="partenariats"
           submitLabel="Envoyer ma demande"
           fields={[
             { name: "email", label: "Ton e-mail", type: "email", placeholder: "toi@exemple.com", required: true },

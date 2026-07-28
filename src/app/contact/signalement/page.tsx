@@ -29,6 +29,7 @@ export default function SignalementPage() {
 
       <div className="mt-8">
         <ContactForm
+          kind="signalement"
           submitLabel="Envoyer le signalement"
           fields={[
             { name: "email", label: "Ton e-mail", type: "email", placeholder: "toi@exemple.com", required: true },

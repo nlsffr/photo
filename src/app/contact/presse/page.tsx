@@ -37,6 +37,7 @@ export default function PressePage() {
 
       <div className="mt-8">
         <ContactForm
+          kind="presse"
           submitLabel="Envoyer la demande presse"
           fields={[
             { name: "email", label: "Ton e-mail professionnel", type: "email", placeholder: "toi@media.com", required: true },

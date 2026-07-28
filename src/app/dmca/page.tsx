@@ -72,6 +72,7 @@ export default function DmcaPage() {
 
       <div className="mt-6">
         <ContactForm
+          kind="dmca"
           submitLabel="Envoyer la notification"
           fields={[
             { name: "fullname", label: "Nom complet (signature)", type: "text", placeholder: "Prénom Nom", required: true },

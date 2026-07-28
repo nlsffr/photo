@@ -22,6 +22,7 @@ export default function SupportPage() {
 
       <div className="mt-8">
         <ContactForm
+          kind="support"
           fields={[
             { name: "email", label: "Ton e-mail", type: "email", placeholder: "toi@exemple.com", required: true },
             { name: "page", label: "Page ou URL concernée", type: "text", placeholder: "ex. /feed" },
