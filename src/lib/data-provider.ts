@@ -24,6 +24,7 @@ export interface DataProvider {
     isAi?: boolean;
     cursor?: number;
     limit?: number;
+    seed?: number;
   }): Promise<PhotoPage>;
   getPhoto(id: string): Promise<Photo | undefined>;
   getAllPhotos(): Promise<PhotoView[]>;

@@ -94,12 +94,24 @@ function withCreator(p: Photo): PhotoView {
   };
 }
 
+// Deterministic per-id hash → stable "random" order for a given seed, so
+// pagination never reshuffles between pages. Tiebreak by id everywhere.
+function hashId(id: string, seed: number): number {
+  let h = seed >>> 0;
+  for (let i = 0; i < id.length; i++) {
+    h = Math.imul(h ^ id.charCodeAt(i), 0x01000193) >>> 0;
+  }
+  return h;
+}
+
 const SORTERS: Record<SortKey, (a: Photo, b: Photo) => number> = {
-  recent: (a, b) => a.ageMinutes - b.ageMinutes,
-  trending: (a, b) => b.views + b.likes * 3 - (a.views + a.likes * 3),
-  popular: (a, b) => b.views - a.views,
-  liked: (a, b) => b.likes - a.likes,
-  random: () => rng() - 0.5,
+  recent: (a, b) => a.ageMinutes - b.ageMinutes || (a.id < b.id ? 1 : -1),
+  trending: (a, b) =>
+    b.views + b.likes * 3 - (a.views + a.likes * 3) || (a.id < b.id ? 1 : -1),
+  popular: (a, b) => b.views - a.views || (a.id < b.id ? 1 : -1),
+  liked: (a, b) => b.likes - a.likes || (a.id < b.id ? 1 : -1),
+  // Overridden below when sort === "random" (needs the seed).
+  random: (a, b) => (a.id < b.id ? -1 : 1),
 };
 
 export class DemoProvider implements DataProvider {
@@ -126,6 +138,7 @@ export class DemoProvider implements DataProvider {
     isAi?: boolean;
     cursor?: number;
     limit?: number;
+    seed?: number;
   }): Promise<PhotoPage> {
     let list = PHOTOS.slice();
     if (query.creator) list = list.filter((p) => p.creatorHandle === query.creator);
@@ -142,12 +155,25 @@ export class DemoProvider implements DataProvider {
           (BY_HANDLE.get(p.creatorHandle)?.name.toLowerCase().includes(q) ?? false),
       );
     }
-    list.sort(SORTERS[query.sort ?? "recent"]);
+    const sort = query.sort ?? "recent";
+    const seed =
+      sort === "random"
+        ? Number.isFinite(query.seed)
+          ? (query.seed as number)
+          : 424242
+        : undefined;
+
+    if (sort === "random" && seed !== undefined) {
+      list.sort((a, b) => hashId(a.id, seed) - hashId(b.id, seed));
+    } else {
+      list.sort(SORTERS[sort]);
+    }
+
     const cursor = query.cursor ?? 0;
     const limit = query.limit ?? 30;
     const items = list.slice(cursor, cursor + limit).map(withCreator);
     const nextCursor = cursor + limit < list.length ? cursor + limit : null;
-    return { items, nextCursor, total: list.length };
+    return { items, nextCursor, total: list.length, seed };
   }
   async getPhoto(id: string) {
     return PHOTOS.find((p) => p.id === id);

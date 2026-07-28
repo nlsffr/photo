@@ -28,6 +28,7 @@ export async function getPhotos(query: {
   isAi?: boolean;
   cursor?: number;
   limit?: number;
+  seed?: number;
 }): Promise<PhotoPage> {
   return (await getProvider()).getPhotos(query);
 }

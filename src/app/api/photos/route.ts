@@ -39,6 +39,9 @@ export async function GET(request: Request) {
   const isAi =
     aiParam === "1" ? true : aiParam === "0" ? false : undefined;
 
+  const seedParam = searchParams.get("seed");
+  const seed = seedParam !== null && seedParam !== "" ? Number(seedParam) : undefined;
+
   const page = await getPhotos({
     sort,
     type,
@@ -48,6 +51,7 @@ export async function GET(request: Request) {
     creator: searchParams.get("creator") ?? undefined,
     cursor: Number(searchParams.get("cursor")) || 0,
     limit: Number(searchParams.get("limit")) || undefined,
+    seed: Number.isFinite(seed) ? seed : undefined,
   });
 
   return Response.json(page, {

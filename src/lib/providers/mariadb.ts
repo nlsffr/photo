@@ -94,12 +94,16 @@ function rowToView(row: PhotoRow, tags: string[]): PhotoView {
   };
 }
 
+// A tiebreaker on p.id keeps ordering deterministic when the sort key has
+// ties (e.g. many photos with the same views) — otherwise the DB may return
+// rows in a different order per page, causing duplicates/gaps in pagination.
 const SORT_SQL: Record<SortKey, string> = {
-  recent: "p.created_at DESC",
-  trending: "(p.views_count + p.likes_count * 3) DESC",
-  popular: "p.views_count DESC",
-  liked: "p.likes_count DESC",
-  random: "RAND()",
+  recent: "p.created_at DESC, p.id DESC",
+  trending: "(p.views_count + p.likes_count * 3) DESC, p.id DESC",
+  popular: "p.views_count DESC, p.id DESC",
+  liked: "p.likes_count DESC, p.id DESC",
+  // :seed makes RAND deterministic so every page shares the same shuffle.
+  random: "RAND(:seed)",
 };
 
 const PHOTO_SELECT = `
@@ -203,13 +207,24 @@ export class MariaDBProvider implements DataProvider {
     isAi?: boolean;
     cursor?: number;
     limit?: number;
+    seed?: number;
   }): Promise<PhotoPage> {
     const sort = query.sort ?? "recent";
     const limit = query.limit ?? PAGE_SIZE;
     const cursor = query.cursor ?? 0;
+    // Stable seed for random sort: reuse the one the client sent, else pick a
+    // fixed default. It must NOT depend on the cursor, otherwise each page
+    // would reshuffle. The client echoes page.seed back on later fetches.
+    const seed =
+      sort === "random"
+        ? Number.isFinite(query.seed)
+          ? (query.seed as number)
+          : 424242
+        : undefined;
 
     const where: string[] = [];
     const params: Record<string, unknown> = {};
+    if (seed !== undefined) params.seed = seed;
     if (query.creator) {
       where.push("c.handle = :creator");
       params.creator = query.creator;
@@ -257,7 +272,7 @@ export class MariaDBProvider implements DataProvider {
     const items = photoRows.map((r) => rowToView(r, tagsMap.get(r.id) ?? []));
 
     const nextCursor = cursor + limit < total ? cursor + limit : null;
-    return { items, nextCursor, total };
+    return { items, nextCursor, total, seed };
   }
 
   async getPhoto(id: string): Promise<Photo | undefined> {

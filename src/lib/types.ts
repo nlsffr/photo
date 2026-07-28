@@ -61,6 +61,8 @@ export interface PhotoPage {
   items: PhotoView[];
   nextCursor: number | null;
   total: number;
+  /** Echoed back for random sort so following pages keep the same order. */
+  seed?: number;
 }
 
 export interface PhotoQuery {
@@ -73,6 +75,8 @@ export interface PhotoQuery {
   isAi?: boolean;
   cursor?: number;
   limit?: number;
+  /** Stable seed for random sort, so pagination doesn't re-shuffle each page. */
+  seed?: number;
 }
 
 export interface CreatorWithStats extends Creator {

@@ -20,8 +20,14 @@ interface Props {
 export function InfiniteGallery({ initial, params }: Props) {
   const [items, setItems] = useState<PhotoView[]>(initial.items);
   const [cursor, setCursor] = useState<number | null>(initial.nextCursor);
+  const [errored, setErrored] = useState(false);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const loadingRef = useRef(false);
+  // Every id we've already shown — the ultimate guard against duplicate pages
+  // (e.g. random sort, or new media inserted between two fetches).
+  const seenRef = useRef<Set<string>>(new Set(initial.items.map((i) => i.id)));
+  // Seed for random sort: keep the first page's shuffle stable across pages.
+  const seedRef = useRef<number | undefined>(initial.seed);
 
   const buildUrl = useCallback(
     (c: number) => {
@@ -32,6 +38,7 @@ export function InfiniteGallery({ initial, params }: Props) {
       if (params.creator) sp.set("creator", params.creator);
       if (params.type) sp.set("type", params.type);
       if (params.ai === "0" || params.ai === "1") sp.set("ai", params.ai);
+      if (seedRef.current !== undefined) sp.set("seed", String(seedRef.current));
       sp.set("cursor", String(c));
       return `/api/photos?${sp.toString()}`;
     },
@@ -43,11 +50,28 @@ export function InfiniteGallery({ initial, params }: Props) {
     loadingRef.current = true;
     try {
       const res = await fetch(buildUrl(cursor));
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const page: PhotoPage = await res.json();
-      setItems((prev) => [...prev, ...page.items]);
-      setCursor(page.nextCursor);
+      if (page.seed !== undefined) seedRef.current = page.seed;
+
+      // Keep only media we haven't shown yet — kills infinite duplicate loops.
+      const fresh = page.items.filter((p) => !seenRef.current.has(p.id));
+      for (const p of fresh) seenRef.current.add(p.id);
+      if (fresh.length > 0) {
+        setItems((prev) => [...prev, ...fresh]);
+      }
+
+      // Stop when the server says there's no more, OR when a full page came
+      // back with nothing new (defensive: prevents a stuck sentinel).
+      if (page.nextCursor === null || page.nextCursor === cursor) {
+        setCursor(null);
+      } else {
+        setCursor(page.nextCursor);
+      }
+      setErrored(false);
     } catch {
-      // Leave the sentinel in place so scrolling can retry.
+      // Stop auto-retrying; show a manual "retry" button instead of hammering.
+      setErrored(true);
     } finally {
       loadingRef.current = false;
     }
@@ -55,16 +79,16 @@ export function InfiniteGallery({ initial, params }: Props) {
 
   useEffect(() => {
     const el = sentinelRef.current;
-    if (!el || cursor === null) return;
+    if (!el || cursor === null || errored) return;
     const obs = new IntersectionObserver(
       (entries) => {
         if (entries[0]?.isIntersecting) loadMore();
       },
-      { rootMargin: "1200px 0px" },
+      { rootMargin: "800px 0px" },
     );
     obs.observe(el);
     return () => obs.disconnect();
-  }, [loadMore, cursor]);
+  }, [loadMore, cursor, errored]);
 
   if (items.length === 0) {
     return (
@@ -93,13 +117,31 @@ export function InfiniteGallery({ initial, params }: Props) {
         ))}
       </div>
 
-      {cursor !== null && (
+      {cursor !== null && !errored && (
         <div ref={sentinelRef} className="flex justify-center py-10">
           <span
             className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--color-surface-3)] border-t-[var(--color-accent)]"
             aria-label="Chargement"
             role="status"
           />
+        </div>
+      )}
+
+      {cursor !== null && errored && (
+        <div className="flex flex-col items-center gap-3 py-10">
+          <p className="text-sm text-[var(--color-ink-muted)]">
+            Impossible de charger la suite.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setErrored(false);
+              loadMore();
+            }}
+            className="rounded-full bg-[var(--color-accent)] px-5 py-2 text-sm font-semibold text-white hover:bg-[var(--color-accent-600)]"
+          >
+            Réessayer
+          </button>
         </div>
       )}
 
