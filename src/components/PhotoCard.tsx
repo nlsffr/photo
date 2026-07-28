@@ -1,11 +1,11 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import type { PhotoView } from "@/lib/types";
 import { formatCount, formatDuration } from "@/lib/format";
 import { VerifiedBadge } from "./VerifiedBadge";
 import { useInteractions } from "./Interactions";
+import { MediaImg } from "./MediaImg";
 
 const SIZES =
   "(max-width: 640px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 20vw";
@@ -16,8 +16,6 @@ export function PhotoCard({ photo }: { photo: PhotoView }) {
   const saved = ready && isSaved(photo.id);
   const likeCount = photo.likes + (liked ? 1 : 0);
 
-  // Masonry: use the image's real aspect ratio so cards have varying heights.
-  // Clamp so extreme ratios don't produce absurdly tall/short cards.
   const ratio = photo.width && photo.height ? photo.width / photo.height : 0.8;
   const clamped = Math.min(Math.max(ratio, 0.55), 1.4);
 
@@ -27,7 +25,7 @@ export function PhotoCard({ photo }: { photo: PhotoView }) {
       style={{ aspectRatio: String(clamped) }}
     >
       <Link href={`/photo/${photo.id}`} className="absolute inset-0" aria-label={photo.title}>
-        <Image
+        <MediaImg
           src={photo.imageUrl}
           alt={photo.title}
           fill
@@ -62,13 +60,12 @@ export function PhotoCard({ photo }: { photo: PhotoView }) {
         )}
       </Link>
 
-      {/* Creator badge (top-left) */}
       <Link
         href={`/creator/${photo.creatorHandle}`}
         className="absolute left-2 top-2 z-10 flex max-w-[calc(100%-1rem)] items-center gap-1.5"
       >
-        <Image
-          src={photo.creator.avatarUrl}
+        <MediaImg
+          src={photo.creator.avatarUrl || photo.imageUrl}
           alt={photo.creator.name}
           width={26}
           height={26}
@@ -80,7 +77,6 @@ export function PhotoCard({ photo }: { photo: PhotoView }) {
         </span>
       </Link>
 
-      {/* Interactive action bar (bottom) */}
       <div className="absolute inset-x-0 bottom-0 z-10 flex items-center gap-2.5 p-2.5 opacity-100 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100">
         <button
           type="button"
