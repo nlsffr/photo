@@ -1,19 +1,12 @@
 /**
  * MariaDB / MySQL implementation of DataProvider.
- *
- * Privacy notes:
- *  - The connection uses TLS when DB_SSL=true (encrypted in transit).
- *  - We never store or log visitor IPs here; this layer only reads content.
- *  - Prepared statements everywhere (no SQL injection surface).
- *
- * Activate by calling setDataProvider(new MariaDBProvider()) from a server-only
- * bootstrap when DATABASE_URL is set (see src/lib/bootstrap.ts).
  */
 
 import mysql from "mysql2/promise";
 import type { RowDataPacket } from "mysql2";
 import type {
   Creator,
+  CreatorWithStats,
   MediaType,
   Photo,
   PhotoPage,
@@ -22,10 +15,9 @@ import type {
 } from "../types";
 import type { DataProvider } from "../data-provider";
 
-/** mysql2's named-placeholder params aren't in its public execute() overloads. */
 type Params = Record<string, unknown>;
 
-const PAGE_SIZE = 30;
+const PAGE_SIZE = 24;
 
 function makePool(): mysql.Pool {
   const url = process.env.DATABASE_URL;
@@ -33,14 +25,12 @@ function makePool(): mysql.Pool {
 
   return mysql.createPool({
     uri: url,
-    // Encrypt the DB connection in transit. Point CA at your server's cert.
     ssl:
       process.env.DB_SSL === "true"
         ? { rejectUnauthorized: true, ca: process.env.DB_SSL_CA }
         : undefined,
     connectionLimit: Number(process.env.DB_POOL_SIZE ?? 10),
     waitForConnections: true,
-    // Never log query params (they could include search terms).
     namedPlaceholders: true,
   });
 }
@@ -58,6 +48,7 @@ type PhotoRow = {
   height: number;
   views_count: number;
   likes_count: number;
+  is_ai: number | null;
   created_at: Date;
   creator_handle: string;
   creator_name: string;
@@ -70,6 +61,12 @@ function rowToView(row: PhotoRow, tags: string[]): PhotoView {
     0,
     Math.round((Date.now() - new Date(row.created_at).getTime()) / 60000),
   );
+  const views = Number(row.views_count) || 0;
+  const likes = Number(row.likes_count) || 0;
+  // Simple 0..100-ish score for UI (views + 3*likes, scaled loosely)
+  const raw = views + likes * 3;
+  const trending = Math.min(100, Math.round(Math.log10(raw + 1) * 20));
+
   return {
     id: row.id,
     title: row.title,
@@ -81,10 +78,11 @@ function rowToView(row: PhotoRow, tags: string[]): PhotoView {
     itemCount: row.item_count ?? undefined,
     width: row.width,
     height: row.height,
-    views: row.views_count,
-    likes: row.likes_count,
+    views,
+    likes,
     ageMinutes,
-    trending: 0,
+    trending,
+    isAi: Boolean(row.is_ai),
     creatorHandle: row.creator_handle,
     tags,
     creator: {
@@ -98,11 +96,19 @@ function rowToView(row: PhotoRow, tags: string[]): PhotoView {
 
 const SORT_SQL: Record<SortKey, string> = {
   recent: "p.created_at DESC",
-  trending: "p.views_count + p.likes_count * 3 DESC",
+  trending: "(p.views_count + p.likes_count * 3) DESC",
   popular: "p.views_count DESC",
   liked: "p.likes_count DESC",
   random: "RAND()",
 };
+
+const PHOTO_SELECT = `
+  p.id, p.title, p.image_url, p.video_url, p.external_url, p.type, p.duration_sec, p.item_count,
+  p.width, p.height, p.views_count, p.likes_count, p.created_at,
+  COALESCE(p.is_ai, 0) AS is_ai,
+  c.handle AS creator_handle, c.name AS creator_name,
+  c.avatar_url AS creator_avatar, c.verified AS creator_verified
+`;
 
 export class MariaDBProvider implements DataProvider {
   private pool: mysql.Pool;
@@ -111,15 +117,11 @@ export class MariaDBProvider implements DataProvider {
     this.pool = makePool();
   }
 
-  /** Run a prepared statement with named params, returning typed rows. */
   private async q<T extends RowDataPacket>(
     sql: string,
     params?: Params,
   ): Promise<T[]> {
-    const [rows] = await this.pool.execute<T[]>(
-      sql,
-      (params ?? {}) as never,
-    );
+    const [rows] = await this.pool.execute<T[]>(sql, (params ?? {}) as never);
     return rows;
   }
 
@@ -171,12 +173,34 @@ export class MariaDBProvider implements DataProvider {
     };
   }
 
+  async searchCreators(q: string, limit = 12): Promise<Creator[]> {
+    const term = `%${q.trim()}%`;
+    const rows = await this.q<RowDataPacket>(
+      `SELECT handle, name, avatar_url, bio, location, followers_count, verified
+       FROM creators
+       WHERE name LIKE :q OR handle LIKE :q
+       ORDER BY followers_count DESC
+       LIMIT :limit`,
+      { q: term, limit },
+    );
+    return rows.map((r) => ({
+      handle: r.handle as string,
+      name: r.name as string,
+      avatarUrl: r.avatar_url as string,
+      bio: (r.bio as string) ?? "",
+      location: (r.location as string) ?? "",
+      followers: r.followers_count as number,
+      verified: Boolean(r.verified),
+    }));
+  }
+
   async getPhotos(query: {
     sort?: SortKey;
     tag?: string;
     q?: string;
     creator?: string;
     type?: MediaType;
+    isAi?: boolean;
     cursor?: number;
     limit?: number;
   }): Promise<PhotoPage> {
@@ -194,8 +218,15 @@ export class MariaDBProvider implements DataProvider {
       where.push("p.type = :type");
       params.type = query.type;
     }
+    if (query.isAi === true) {
+      where.push("COALESCE(p.is_ai, 0) = 1");
+    } else if (query.isAi === false) {
+      where.push("COALESCE(p.is_ai, 0) = 0");
+    }
     if (query.q) {
-      where.push("(p.title LIKE :q OR c.name LIKE :q)");
+      where.push(
+        "(p.title LIKE :q OR c.name LIKE :q OR c.handle LIKE :q)",
+      );
       params.q = `%${query.q}%`;
     }
     if (query.tag) {
@@ -213,10 +244,7 @@ export class MariaDBProvider implements DataProvider {
     const total = Number(countRows[0].n);
 
     const rows = await this.q<RowDataPacket>(
-      `SELECT p.id, p.title, p.image_url, p.video_url, p.external_url, p.type, p.duration_sec, p.item_count,
-              p.width, p.height, p.views_count, p.likes_count, p.created_at,
-              c.handle AS creator_handle, c.name AS creator_name,
-              c.avatar_url AS creator_avatar, c.verified AS creator_verified
+      `SELECT ${PHOTO_SELECT}
        FROM photos p JOIN creators c ON c.id = p.creator_id
        ${whereSql}
        ORDER BY ${SORT_SQL[sort]}
@@ -234,10 +262,7 @@ export class MariaDBProvider implements DataProvider {
 
   async getPhoto(id: string): Promise<Photo | undefined> {
     const rows = await this.q<RowDataPacket>(
-      `SELECT p.id, p.title, p.image_url, p.video_url, p.external_url, p.type, p.duration_sec, p.item_count,
-              p.width, p.height, p.views_count, p.likes_count, p.created_at,
-              c.handle AS creator_handle, c.name AS creator_name,
-              c.avatar_url AS creator_avatar, c.verified AS creator_verified
+      `SELECT ${PHOTO_SELECT}
        FROM photos p JOIN creators c ON c.id = p.creator_id
        WHERE p.id = :id LIMIT 1`,
       { id },
@@ -249,17 +274,22 @@ export class MariaDBProvider implements DataProvider {
   }
 
   async getAllPhotos(): Promise<PhotoView[]> {
-    const page = await this.getPhotos({ sort: "recent", limit: 1000 });
+    const page = await this.getPhotos({ sort: "popular", limit: 500 });
     return page.items;
   }
 
   async getRelatedPhotos(photo: Photo, limit = 12): Promise<PhotoView[]> {
-    if (photo.tags.length === 0) return [];
+    if (photo.tags.length === 0) {
+      // Fallback: same creator
+      const page = await this.getPhotos({
+        creator: photo.creatorHandle,
+        sort: "popular",
+        limit,
+      });
+      return page.items.filter((p) => p.id !== photo.id).slice(0, limit);
+    }
     const [rows] = await this.pool.query<RowDataPacket[]>(
-      `SELECT DISTINCT p.id, p.title, p.image_url, p.video_url, p.external_url, p.type, p.duration_sec, p.item_count,
-              p.width, p.height, p.views_count, p.likes_count, p.created_at,
-              c.handle AS creator_handle, c.name AS creator_name,
-              c.avatar_url AS creator_avatar, c.verified AS creator_verified
+      `SELECT DISTINCT ${PHOTO_SELECT}
        FROM photos p
        JOIN creators c ON c.id = p.creator_id
        JOIN photo_tags t ON t.photo_id = p.id
@@ -295,5 +325,71 @@ export class MariaDBProvider implements DataProvider {
       "SELECT tag, COUNT(*) AS n FROM photo_tags GROUP BY tag ORDER BY n DESC LIMIT 40",
     );
     return (rows as unknown as { tag: string }[]).map((r) => r.tag);
+  }
+
+  /** Fast SQL aggregation — no full table scan in JS. */
+  async getModels(sort: "followers" | "views" = "followers"): Promise<CreatorWithStats[]> {
+    const order =
+      sort === "views"
+        ? "totalViews DESC"
+        : "c.followers_count DESC";
+    const rows = await this.q<RowDataPacket>(
+      `SELECT c.handle, c.name, c.avatar_url, c.bio, c.location, c.followers_count, c.verified,
+              COUNT(p.id) AS photoCount,
+              COALESCE(SUM(p.views_count), 0) AS totalViews,
+              COALESCE(SUM(p.likes_count), 0) AS totalLikes,
+              (
+                SELECT p2.image_url FROM photos p2
+                WHERE p2.creator_id = c.id
+                ORDER BY p2.views_count DESC
+                LIMIT 1
+              ) AS coverUrl
+       FROM creators c
+       LEFT JOIN photos p ON p.creator_id = c.id
+       GROUP BY c.id
+       HAVING photoCount > 0
+       ORDER BY ${order}`,
+    );
+    return rows.map((r) => ({
+      handle: r.handle as string,
+      name: r.name as string,
+      avatarUrl: (r.avatar_url as string) || "",
+      bio: (r.bio as string) ?? "",
+      location: (r.location as string) ?? "",
+      followers: Number(r.followers_count) || 0,
+      verified: Boolean(r.verified),
+      photoCount: Number(r.photoCount) || 0,
+      totalViews: Number(r.totalViews) || 0,
+      totalLikes: Number(r.totalLikes) || 0,
+      coverUrl: (r.coverUrl as string) || "",
+    }));
+  }
+
+  async getRankings(limit = 20) {
+    const rows = await this.q<RowDataPacket>(
+      `SELECT c.handle, c.name, c.avatar_url, c.bio, c.location, c.followers_count, c.verified,
+              COALESCE(SUM(p.views_count), 0) AS views,
+              COALESCE(SUM(p.likes_count), 0) AS likes,
+              COALESCE(SUM(p.views_count), 0) + COALESCE(SUM(p.likes_count), 0) * 3 AS score
+       FROM creators c
+       LEFT JOIN photos p ON p.creator_id = c.id
+       GROUP BY c.id
+       HAVING views > 0 OR likes > 0
+       ORDER BY score DESC
+       LIMIT :limit`,
+      { limit },
+    );
+    return rows.map((r) => ({
+      handle: r.handle as string,
+      name: r.name as string,
+      avatarUrl: (r.avatar_url as string) || "",
+      bio: (r.bio as string) ?? "",
+      location: (r.location as string) ?? "",
+      followers: Number(r.followers_count) || 0,
+      verified: Boolean(r.verified),
+      views: Number(r.views) || 0,
+      likes: Number(r.likes) || 0,
+      score: Number(r.score) || 0,
+    }));
   }
 }
