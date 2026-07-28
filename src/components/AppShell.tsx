@@ -28,22 +28,22 @@ const SECTIONS: NavSection[] = [
       { href: "/qu-est-ce-que-lumengallery", label: "Qu’est-ce que LumenGallery", icon: I("M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 16v-4M12 8h.01"), active: (p) => p.startsWith("/qu-est-ce-que-lumengallery") },
       { href: "/recherche", label: "Recherche", icon: I("M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-4.3-4.3"), active: (p) => p.startsWith("/recherche") },
       { href: "/models", label: "Découvrir", icon: I("M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM16.2 7.8l-2.9 6.4-6.4 2.9 2.9-6.4z"), active: (p) => p.startsWith("/models") },
-      { href: "/feed", label: "Publications des utilisateurs", icon: I("M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"), active: (p) => p.startsWith("/feed") },
-      { href: "/feed", label: "Feed", icon: I("M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM10 8l6 4-6 4z"), active: (p) => p === "/feed" },
+      { href: "/feed", label: "Feed", icon: I("M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM10 8l6 4-6 4z"), active: (p) => p.startsWith("/feed") },
+      { href: "/pour-toi", label: "Pour toi", icon: I("M12 21s-7.5-4.6-10-9.3C.4 8.4 2 5 5.4 5c2 0 3.3 1.1 4.6 2.6C11.3 6.1 12.6 5 14.6 5 18 5 19.6 8.4 22 11.7 19.5 16.4 12 21 12 21Z"), active: (p) => p.startsWith("/pour-toi") },
+      { href: "/abonnements", label: "Abonnements", icon: I("M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM16 11l2 2 4-4"), active: (p) => p.startsWith("/abonnements") },
       { href: "/favoris", label: "Enregistrés", icon: I("M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16l-7-4-7 4Z"), active: (p) => p.startsWith("/favoris") },
     ],
   },
   {
     items: [
-      { href: "#", label: "Passer Premium", icon: I("M3 7l4 5 5-7 5 7 4-5v11H3z"), accent: "gold" },
+      { href: "/premium", label: "Passer Premium", icon: I("M3 7l4 5 5-7 5 7 4-5v11H3z"), accent: "gold", active: (p) => p.startsWith("/premium") },
       { href: "/connexion", label: "Connexion", icon: I("M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"), active: (p) => p.startsWith("/connexion") },
       { href: "/inscription", label: "S’inscrire", icon: I("M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6"), accent: "pink", active: (p) => p.startsWith("/inscription") },
     ],
   },
   {
     items: [
-      { href: "#", label: "Commentaires récents", icon: I("M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z") },
-      { href: "/models", label: "Top des profils", icon: I("M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"), active: (p) => p.startsWith("/models") },
+      { href: "/models", label: "Top des profils", icon: I("M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"), active: (p) => p === "/models" },
       { href: "/classements", label: "Classements", icon: I("M8 21V9M16 21V5M4 21v-6M20 21v-10"), active: (p) => p.startsWith("/classements") },
     ],
   },
@@ -270,9 +270,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Link href="/qu-est-ce-que-lumengallery" className="hover:text-[var(--color-ink-muted)]">
                 Qu’est-ce que LumenGallery
               </Link>
-              <span>Conditions</span>
-              <span>Confidentialité</span>
-              <span>Mentions légales</span>
+              <Link href="/conditions" className="hover:text-[var(--color-ink-muted)]">
+                Conditions
+              </Link>
+              <Link href="/confidentialite" className="hover:text-[var(--color-ink-muted)]">
+                Confidentialité
+              </Link>
+              <Link href="/mentions-legales" className="hover:text-[var(--color-ink-muted)]">
+                Mentions légales
+              </Link>
               <Link href="/dmca" className="hover:text-[var(--color-ink-muted)]">
                 DMCA
               </Link>
