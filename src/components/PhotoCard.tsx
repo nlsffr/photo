@@ -18,13 +18,14 @@ export function PhotoCard({ photo }: { photo: PhotoView }) {
 
   const ratio = photo.width && photo.height ? photo.width / photo.height : 0.8;
   const clamped = Math.min(Math.max(ratio, 0.55), 1.4);
+  const href = `/${encodeURIComponent(photo.creatorHandle)}/${encodeURIComponent(photo.id)}`;
 
   return (
     <div
       className="group relative w-full overflow-hidden rounded-xl bg-[var(--color-surface-2)] ring-1 ring-[var(--color-border)]"
       style={{ aspectRatio: String(clamped) }}
     >
-      <Link href={`/photo/${photo.id}`} className="absolute inset-0" aria-label={photo.title}>
+      <Link href={href} className="absolute inset-0" aria-label={photo.title}>
         <MediaImg
           src={photo.imageUrl}
           alt={photo.title}
@@ -75,7 +76,7 @@ export function PhotoCard({ photo }: { photo: PhotoView }) {
           alt={photo.creator.name}
           width={26}
           height={26}
-          className="h-[26px] w-[26px] rounded-full object-cover ring-2 ring-[var(--color-accent)]"
+          className="h-[26px] w-[26px] rounded-full object-cover object-top ring-2 ring-[var(--color-accent)]"
         />
         <span className="flex min-w-0 items-center gap-1 text-sm font-semibold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
           <span className="truncate">{photo.creator.name}</span>
