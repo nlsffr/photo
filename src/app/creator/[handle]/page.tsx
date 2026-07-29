@@ -37,48 +37,62 @@ export default async function CreatorPage({
   const avatarSrc =
     creator.avatarUrl && creator.avatarUrl.trim()
       ? creator.avatarUrl
-      : cover?.imageUrl || "/media/placeholder.jpg";
+      : cover?.imageUrl || "";
 
   return (
     <div>
-      {/* Cover banner */}
-      <div className="relative h-44 w-full overflow-hidden bg-[var(--color-surface-2)] sm:h-56">
-        {cover && (
-          <MediaImg
-            src={cover.imageUrl}
-            alt=""
-            fill
-            sizes="100vw"
-            priority
-            className="object-cover opacity-50"
-          />
+      {/* Compact banner — softer crop, less empty space */}
+      <div className="relative h-28 w-full overflow-hidden bg-[var(--color-surface-2)] sm:h-36">
+        {cover?.imageUrl ? (
+          <>
+            <MediaImg
+              src={cover.imageUrl}
+              alt=""
+              fill
+              sizes="100vw"
+              priority
+              className="scale-110 object-cover object-center blur-sm opacity-60"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-bg)] via-[var(--color-bg)]/70 to-[var(--color-bg)]/20" />
+          </>
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-[var(--color-surface-2)] to-[var(--color-surface)]" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-bg)] via-[var(--color-bg)]/50 to-transparent" />
       </div>
 
       <div className="px-3 sm:px-5">
-        <div className="-mt-14 flex flex-col gap-4 sm:-mt-16 sm:flex-row sm:items-end sm:justify-between">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-            <MediaImg
-              src={avatarSrc}
-              alt={creator.name}
-              width={128}
-              height={128}
-              className="h-28 w-28 rounded-2xl object-cover ring-4 ring-[var(--color-bg)] sm:h-32 sm:w-32"
-            />
-            <div className="pb-1">
-              <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
-                {creator.name}
-                {creator.verified && <VerifiedBadge size={20} />}
+        {/* Avatar overlaps banner lightly */}
+        <div className="-mt-10 flex flex-col gap-4 sm:-mt-12 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex items-end gap-3 sm:gap-4">
+            <div className="relative shrink-0">
+              {avatarSrc ? (
+                <MediaImg
+                  src={avatarSrc}
+                  alt={creator.name}
+                  width={112}
+                  height={112}
+                  className="h-24 w-24 rounded-full object-cover object-top ring-4 ring-[var(--color-bg)] sm:h-28 sm:w-28"
+                />
+              ) : (
+                <div className="grid h-24 w-24 place-items-center rounded-full bg-[var(--color-surface-2)] text-2xl font-bold text-[var(--color-ink-faint)] ring-4 ring-[var(--color-bg)] sm:h-28 sm:w-28">
+                  {creator.name.slice(0, 1).toUpperCase()}
+                </div>
+              )}
+            </div>
+
+            <div className="min-w-0 pb-1">
+              <h1 className="flex flex-wrap items-center gap-2 text-xl font-bold tracking-tight sm:text-2xl">
+                <span className="truncate">{creator.name}</span>
+                {creator.verified && <VerifiedBadge size={18} />}
               </h1>
               {creator.bio ? (
-                <p className="mt-1 max-w-md text-[var(--color-ink-muted)]">
+                <p className="mt-0.5 line-clamp-2 max-w-md text-sm text-[var(--color-ink-muted)]">
                   {creator.bio}
                 </p>
               ) : null}
               {creator.location ? (
-                <p className="mt-1 flex items-center gap-1 text-sm text-[var(--color-ink-faint)]">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                <p className="mt-0.5 flex items-center gap-1 text-xs text-[var(--color-ink-faint)] sm:text-sm">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
                     <path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0Z" />
                     <circle cx="12" cy="10" r="3" />
                   </svg>
@@ -94,7 +108,7 @@ export default async function CreatorPage({
           />
         </div>
 
-        <div className="mt-6 grid max-w-lg grid-cols-3 gap-3">
+        <div className="mt-5 grid max-w-lg grid-cols-3 gap-2 sm:gap-3">
           {[
             { label: "Abonnés", value: formatCount(creator.followers) },
             { label: "Photos", value: String(stats.photoCount) },
@@ -102,10 +116,10 @@ export default async function CreatorPage({
           ].map((s) => (
             <div
               key={s.label}
-              className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-center"
+              className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-3 text-center sm:p-4"
             >
-              <p className="text-xl font-bold">{s.value}</p>
-              <p className="text-xs text-[var(--color-ink-faint)]">{s.label}</p>
+              <p className="text-lg font-bold sm:text-xl">{s.value}</p>
+              <p className="text-[10px] text-[var(--color-ink-faint)] sm:text-xs">{s.label}</p>
             </div>
           ))}
         </div>
