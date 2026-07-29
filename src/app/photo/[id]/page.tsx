@@ -55,10 +55,9 @@ export default async function PhotoPage({
               src={photo.videoUrl}
               poster={photo.imageUrl}
               controls
-              autoPlay
-              muted
-              loop
               playsInline
+              preload="metadata"
+              controlsList="nodownload"
               className="max-h-[80vh] w-full"
             />
           ) : (

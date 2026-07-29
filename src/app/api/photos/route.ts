@@ -4,11 +4,24 @@ import { anonKey, rateLimit, sweep } from "@/lib/ratelimit";
 
 const SORTS: SortKey[] = ["recent", "trending", "popular", "liked", "random"];
 
+function clientKey(request: Request): string {
+  const explicit = request.headers.get("x-ratelimit-bucket");
+  if (explicit) return explicit;
+  const fwd =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    request.headers.get("cf-connecting-ip") ||
+    "";
+  if (fwd) return fwd;
+  // Last resort: do NOT share one global bucket across all visitors
+  return `ua:${request.headers.get("user-agent")?.slice(0, 80) ?? "unknown"}`;
+}
+
 export async function GET(request: Request) {
   sweep();
-  const coarse =
-    request.headers.get("x-ratelimit-bucket") ?? "shared-anonymous-bucket";
-  const { allowed, remaining, resetAt } = rateLimit(anonKey(coarse), 120, 60_000);
+  const coarse = clientKey(request);
+  // 300 req / min per client — infinite scroll + thumbs need headroom
+  const { allowed, remaining, resetAt } = rateLimit(anonKey(coarse), 300, 60_000);
   if (!allowed) {
     return Response.json(
       { error: "rate_limited" },
