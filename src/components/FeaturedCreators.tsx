@@ -14,28 +14,37 @@ export async function FeaturedCreators() {
         Modèles en vedette
       </h2>
       <div className="no-scrollbar -mx-3 flex gap-4 overflow-x-auto px-3 sm:mx-0 sm:px-0">
-        {creators.map((c) => (
-          <Link
-            key={c.handle}
-            href={`/creator/${c.handle}`}
-            className="flex w-16 shrink-0 flex-col items-center gap-1.5"
-          >
-            <span className="rounded-full bg-gradient-to-tr from-[var(--color-accent)] to-orange-500 p-[2px]">
-              <span className="block rounded-full p-[2px]">
-                <MediaImg
-                  src={c.avatarUrl || c.coverUrl}
-                  alt={c.name}
-                  width={58}
-                  height={58}
-                  className="h-[58px] w-[58px] rounded-full object-cover ring-2 ring-[var(--color-bg)]"
-                />
+        {creators.map((c) => {
+          const src = c.avatarUrl || c.coverUrl;
+          return (
+            <Link
+              key={c.handle}
+              href={`/creator/${c.handle}`}
+              className="flex w-16 shrink-0 flex-col items-center gap-1.5"
+            >
+              <span className="rounded-full bg-gradient-to-tr from-[var(--color-accent)] to-orange-500 p-[2px]">
+                <span className="block rounded-full bg-[var(--color-bg)] p-[2px]">
+                  {src ? (
+                    <MediaImg
+                      src={src}
+                      alt={c.name}
+                      width={58}
+                      height={58}
+                      className="h-[58px] w-[58px] rounded-full object-cover object-top ring-2 ring-[var(--color-bg)]"
+                    />
+                  ) : (
+                    <span className="grid h-[58px] w-[58px] place-items-center rounded-full bg-[var(--color-surface-2)] text-sm font-bold text-[var(--color-ink-faint)]">
+                      {c.name.slice(0, 1).toUpperCase()}
+                    </span>
+                  )}
+                </span>
               </span>
-            </span>
-            <span className="w-full truncate text-center text-xs text-[var(--color-ink-muted)]">
-              {c.name.split(" ")[0]}
-            </span>
-          </Link>
-        ))}
+              <span className="w-full truncate text-center text-xs text-[var(--color-ink-muted)]">
+                {c.name.split(" ")[0]}
+              </span>
+            </Link>
+          );
+        })}
       </div>
     </section>
   );
