@@ -37,6 +37,7 @@ function makePool(): mysql.Pool {
 
 type PhotoRow = {
   id: string;
+  source_id: number | string | null;
   title: string;
   image_url: string;
   video_url: string | null;
@@ -63,12 +64,16 @@ function rowToView(row: PhotoRow, tags: string[]): PhotoView {
   );
   const views = Number(row.views_count) || 0;
   const likes = Number(row.likes_count) || 0;
-  // Simple 0..100-ish score for UI (views + 3*likes, scaled loosely)
   const raw = views + likes * 3;
   const trending = Math.min(100, Math.round(Math.log10(raw + 1) * 20));
+  const sid =
+    row.source_id !== null && row.source_id !== undefined
+      ? String(row.source_id)
+      : undefined;
 
   return {
     id: row.id,
+    sourceId: sid,
     title: row.title,
     imageUrl: row.image_url,
     videoUrl: row.video_url ?? undefined,
@@ -94,24 +99,27 @@ function rowToView(row: PhotoRow, tags: string[]): PhotoView {
   };
 }
 
-// A tiebreaker on p.id keeps ordering deterministic when the sort key has
-// ties (e.g. many photos with the same views) — otherwise the DB may return
-// rows in a different order per page, causing duplicates/gaps in pagination.
 const SORT_SQL: Record<SortKey, string> = {
   recent: "p.created_at DESC, p.id DESC",
   trending: "(p.views_count + p.likes_count * 3) DESC, p.id DESC",
   popular: "p.views_count DESC, p.id DESC",
   liked: "p.likes_count DESC, p.id DESC",
-  // :seed makes RAND deterministic so every page shares the same shuffle.
   random: "RAND(:seed)",
 };
 
 const PHOTO_SELECT = `
-  p.id, p.title, p.image_url, p.video_url, p.external_url, p.type, p.duration_sec, p.item_count,
+  p.id, b.source_id AS source_id,
+  p.title, p.image_url, p.video_url, p.external_url, p.type, p.duration_sec, p.item_count,
   p.width, p.height, p.views_count, p.likes_count, p.created_at,
   COALESCE(p.is_ai, 0) AS is_ai,
   c.handle AS creator_handle, c.name AS creator_name,
   c.avatar_url AS creator_avatar, c.verified AS creator_verified
+`;
+
+const PHOTO_FROM = `
+  FROM photos p
+  JOIN creators c ON c.id = p.creator_id
+  LEFT JOIN bot_ingested b ON b.photo_id = p.id
 `;
 
 export class MariaDBProvider implements DataProvider {
@@ -212,9 +220,6 @@ export class MariaDBProvider implements DataProvider {
     const sort = query.sort ?? "recent";
     const limit = query.limit ?? PAGE_SIZE;
     const cursor = query.cursor ?? 0;
-    // Stable seed for random sort: reuse the one the client sent, else pick a
-    // fixed default. It must NOT depend on the cursor, otherwise each page
-    // would reshuffle. The client echoes page.seed back on later fetches.
     const seed =
       sort === "random"
         ? Number.isFinite(query.seed)
@@ -260,7 +265,7 @@ export class MariaDBProvider implements DataProvider {
 
     const rows = await this.q<RowDataPacket>(
       `SELECT ${PHOTO_SELECT}
-       FROM photos p JOIN creators c ON c.id = p.creator_id
+       ${PHOTO_FROM}
        ${whereSql}
        ORDER BY ${SORT_SQL[sort]}
        LIMIT :limit OFFSET :offset`,
@@ -276,11 +281,16 @@ export class MariaDBProvider implements DataProvider {
   }
 
   async getPhoto(id: string): Promise<Photo | undefined> {
+    const isNumeric = /^\d+$/.test(id);
     const rows = await this.q<RowDataPacket>(
-      `SELECT ${PHOTO_SELECT}
-       FROM photos p JOIN creators c ON c.id = p.creator_id
-       WHERE p.id = :id LIMIT 1`,
-      { id },
+      isNumeric
+        ? `SELECT ${PHOTO_SELECT}
+           ${PHOTO_FROM}
+           WHERE b.source_id = :sid LIMIT 1`
+        : `SELECT ${PHOTO_SELECT}
+           ${PHOTO_FROM}
+           WHERE p.id = :id LIMIT 1`,
+      isNumeric ? { sid: Number(id) } : { id },
     );
     const r = (rows as unknown as PhotoRow[])[0];
     if (!r) return undefined;
@@ -295,7 +305,6 @@ export class MariaDBProvider implements DataProvider {
 
   async getRelatedPhotos(photo: Photo, limit = 12): Promise<PhotoView[]> {
     if (photo.tags.length === 0) {
-      // Fallback: same creator
       const page = await this.getPhotos({
         creator: photo.creatorHandle,
         sort: "popular",
@@ -305,8 +314,7 @@ export class MariaDBProvider implements DataProvider {
     }
     const [rows] = await this.pool.query<RowDataPacket[]>(
       `SELECT DISTINCT ${PHOTO_SELECT}
-       FROM photos p
-       JOIN creators c ON c.id = p.creator_id
+       ${PHOTO_FROM}
        JOIN photo_tags t ON t.photo_id = p.id
        WHERE t.tag IN (?) AND p.id <> ?
        ORDER BY p.views_count + p.likes_count * 3 DESC
@@ -342,7 +350,6 @@ export class MariaDBProvider implements DataProvider {
     return (rows as unknown as { tag: string }[]).map((r) => r.tag);
   }
 
-  /** Fast SQL aggregation — no full table scan in JS. */
   async getModels(sort: "followers" | "views" = "followers"): Promise<CreatorWithStats[]> {
     const order =
       sort === "views"

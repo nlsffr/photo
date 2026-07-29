@@ -1,7 +1,8 @@
 import { notFound, redirect } from "next/navigation";
 import { getPhotoById } from "@/lib/photos";
+import { mediaHref } from "@/lib/types";
 
-/** Legacy URL /photo/{id} → canonical /{handle}/{id} */
+/** Legacy URL /photo/{id} → canonical /{handle}/{sourceId|id} */
 export default async function LegacyPhotoRedirect({
   params,
 }: {
@@ -10,5 +11,5 @@ export default async function LegacyPhotoRedirect({
   const { id } = await params;
   const photo = await getPhotoById(id);
   if (!photo) notFound();
-  redirect(`/${encodeURIComponent(photo.creatorHandle)}/${encodeURIComponent(photo.id)}`);
+  redirect(mediaHref(photo));
 }

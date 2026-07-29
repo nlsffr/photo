@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { PhotoView } from "@/lib/types";
+import { mediaHref } from "@/lib/types";
 import { formatCount, formatDuration } from "@/lib/format";
 import { VerifiedBadge } from "./VerifiedBadge";
 import { useInteractions } from "./Interactions";
@@ -18,7 +19,7 @@ export function PhotoCard({ photo }: { photo: PhotoView }) {
 
   const ratio = photo.width && photo.height ? photo.width / photo.height : 0.8;
   const clamped = Math.min(Math.max(ratio, 0.55), 1.4);
-  const href = `/${encodeURIComponent(photo.creatorHandle)}/${encodeURIComponent(photo.id)}`;
+  const href = mediaHref(photo);
 
   return (
     <div

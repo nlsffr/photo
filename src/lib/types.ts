@@ -12,6 +12,8 @@ export type MediaType = "photo" | "video" | "pack";
 
 export interface Photo {
   id: string;
+  /** Numeric id from source (bot_ingested.source_id) — used in public URLs when present. */
+  sourceId?: string;
   title: string;
   imageUrl: string;
   width: number;
@@ -84,4 +86,17 @@ export interface CreatorWithStats extends Creator {
   totalViews: number;
   totalLikes: number;
   coverUrl: string;
+}
+
+/** Public path segment for a media page: numeric source id when available. */
+export function mediaPublicId(photo: Pick<Photo, "id" | "sourceId">): string {
+  return photo.sourceId && /^\d+$/.test(photo.sourceId)
+    ? photo.sourceId
+    : photo.id;
+}
+
+export function mediaHref(
+  photo: Pick<Photo, "id" | "sourceId" | "creatorHandle">,
+): string {
+  return `/${encodeURIComponent(photo.creatorHandle)}/${encodeURIComponent(mediaPublicId(photo))}`;
 }
