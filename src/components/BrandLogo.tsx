@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-/** Official mark: flame + wordmark LeakFanHub */
+/** Official mark: flame + wordmark LeakFanHub — couleurs = accent coral */
 export function BrandLogo({
   href = "/",
   size = "md",
@@ -18,7 +18,7 @@ export function BrandLogo({
   return (
     <Link href={href} className={`inline-flex items-center gap-2 ${className}`}>
       <span
-        className={`relative grid ${box} shrink-0 place-items-center overflow-hidden rounded-lg bg-gradient-to-br from-[var(--color-accent)] to-fuchsia-700 shadow-md shadow-[var(--color-accent)]/25`}
+        className={`relative grid ${box} shrink-0 place-items-center overflow-hidden rounded-lg bg-gradient-to-br from-[var(--color-accent)] to-[var(--color-accent-600)] shadow-md shadow-[var(--color-accent)]/30`}
         aria-hidden
       >
         <svg viewBox="0 0 32 32" className="h-[70%] w-[70%]" fill="none">
@@ -30,7 +30,7 @@ export function BrandLogo({
         </svg>
       </span>
       {showWord && (
-        <span className={`${text} font-black tracking-tight`}>
+        <span className={`${text} font-black tracking-tight text-[var(--color-ink)]`}>
           Leak<span className="text-[var(--color-accent)]">FanHub</span>
         </span>
       )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, Fragment } from "react";
 import { PhotoCard } from "./PhotoCard";
 import { AdSlot } from "./AdSlot";
 import type { MediaType, PhotoPage, PhotoView, SortKey } from "@/lib/types";
@@ -18,7 +18,7 @@ interface Props {
   premium?: boolean;
 }
 
-const AD_EVERY = 18;
+const AD_EVERY = 24;
 
 export function InfiniteGallery({ initial, params, premium = false }: Props) {
   const [items, setItems] = useState<PhotoView[]>(initial.items);
@@ -31,7 +31,6 @@ export function InfiniteGallery({ initial, params, premium = false }: Props) {
   const seedRef = useRef<number | undefined>(initial.seed);
   const cursorRef = useRef<number | null>(initial.nextCursor);
 
-  // Reset only when query identity changes (parent should set key)
   useEffect(() => {
     setItems(initial.items);
     setCursor(initial.nextCursor);
@@ -102,7 +101,6 @@ export function InfiniteGallery({ initial, params, premium = false }: Props) {
       (entries) => {
         if (entries[0]?.isIntersecting && !errored) void loadMore();
       },
-      // Smaller margin = less aggressive preload = less jank
       { root: null, rootMargin: "400px 0px", threshold: 0 },
     );
     obs.observe(el);
@@ -122,16 +120,22 @@ export function InfiniteGallery({ initial, params, premium = false }: Props) {
 
   return (
     <>
+      {/*
+        Grille pure de médias. Les pubs sont en col-span-full
+        pour ne plus créer de "trous" dans les colonnes.
+      */}
       <div className="media-grid">
         {items.map((p, i) => (
-          <div key={p.id} className="min-w-0">
-            <PhotoCard photo={p} />
+          <Fragment key={p.id}>
+            <div className="min-w-0">
+              <PhotoCard photo={p} />
+            </div>
             {!premium && (i + 1) % AD_EVERY === 0 ? (
-              <div className="mt-2">
+              <div className="col-span-full my-1">
                 <AdSlot variant="interstitial" />
               </div>
             ) : null}
-          </div>
+          </Fragment>
         ))}
       </div>
 
