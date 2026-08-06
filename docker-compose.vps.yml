@@ -15,7 +15,7 @@ services:
       - edge-net
 
   app:
-    image: lumengallery:latest
+    image: leakfanhub:latest
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -50,7 +50,7 @@ services:
     restart: unless-stopped
     environment:
       MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
-      MARIADB_DATABASE: ${DB_NAME:-lumengallery}
+      MARIADB_DATABASE: ${DB_NAME:-leakfanhub}
       MARIADB_USER: ${DB_USER}
       MARIADB_PASSWORD: ${DB_PASSWORD}
     command:

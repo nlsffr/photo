@@ -25,11 +25,15 @@ const I = (d: string) => (
 const SECTIONS: NavSection[] = [
   {
     items: [
-      { href: "/", label: "Bienvenue", icon: I("M3 11l9-8 9 8M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"), active: (p) => p === "/" },
-      { href: "/qu-est-ce-que-lumengallery", label: "Qu’est-ce que LumenGallery", icon: I("M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 16v-4M12 8h.01"), active: (p) => p.startsWith("/qu-est-ce-que-lumengallery") },
+      { href: "/", label: "Accueil", icon: I("M3 11l9-8 9 8M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"), active: (p) => p === "/" },
+      { href: "/welcome", label: "Bienvenue", icon: I("M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 16v-4M12 8h.01"), active: (p) => p.startsWith("/welcome") },
       { href: "/recherche", label: "Recherche", icon: I("M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-4.3-4.3"), active: (p) => p.startsWith("/recherche") },
       { href: "/models", label: "Découvrir", icon: I("M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM16.2 7.8l-2.9 6.4-6.4 2.9 2.9-6.4z"), active: (p) => p.startsWith("/models") },
       { href: "/feed", label: "Feed", icon: I("M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM10 8l6 4-6 4z"), active: (p) => p.startsWith("/feed") },
+      { href: "/tiktok", label: "TikTok", icon: I("M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM10 8l6 4-6 4z"), active: (p) => p.startsWith("/tiktok") },
+      { href: "/trending-medias", label: "Trending", icon: I("M5 17l6-6 4 4 8-8M21 7v6h-6"), active: (p) => p.startsWith("/trending-medias") },
+      { href: "/most-liked", label: "Most liked", icon: I("M12 21s-7.5-4.6-10-9.3C.4 8.4 2 5 5.4 5c2 0 3.3 1.1 4.6 2.6C11.3 6.1 12.6 5 14.6 5 18 5 19.6 8.4 22 11.7 19.5 16.4 12 21 12 21Z"), active: (p) => p.startsWith("/most-liked") },
+      { href: "/random/medias", label: "Random", icon: I("M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"), active: (p) => p.startsWith("/random") },
       { href: "/pour-toi", label: "Pour toi", icon: I("M12 21s-7.5-4.6-10-9.3C.4 8.4 2 5 5.4 5c2 0 3.3 1.1 4.6 2.6C11.3 6.1 12.6 5 14.6 5 18 5 19.6 8.4 22 11.7 19.5 16.4 12 21 12 21Z"), active: (p) => p.startsWith("/pour-toi") },
       { href: "/abonnements", label: "Abonnements", icon: I("M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM16 11l2 2 4-4"), active: (p) => p.startsWith("/abonnements") },
       { href: "/favoris", label: "Enregistrés", icon: I("M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16l-7-4-7 4Z"), active: (p) => p.startsWith("/favoris") },
@@ -49,19 +53,11 @@ const SECTIONS: NavSection[] = [
     ],
   },
   {
-    title: "Tendances 🔥",
-    items: [
-      { href: "/?sort=trending", label: "Publications tendances", icon: I("M5 17l6-6 4 4 8-8M21 7v6h-6") },
-      { href: "/influenceuses-tendances", label: "Influenceuses tendances", icon: I("M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87"), active: (p) => p.startsWith("/influenceuses-tendances") },
-      { href: "/?sort=liked", label: "Les plus aimées", icon: I("M12 21s-7.5-4.6-10-9.3C.4 8.4 2 5 5.4 5c2 0 3.3 1.1 4.6 2.6C11.3 6.1 12.6 5 14.6 5 18 5 19.6 8.4 22 11.7 19.5 16.4 12 21 12 21Z") },
-      { href: "/?sort=random", label: "Aléatoire", icon: I("M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5") },
-    ],
-  },
-  {
     title: "Aide",
     items: [
       { href: "/contact", label: "Contact", icon: I("M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM22 6l-10 7L2 6"), active: (p) => p.startsWith("/contact") },
       { href: "/dmca", label: "DMCA", icon: I("M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"), active: (p) => p.startsWith("/dmca") },
+      { href: "/trust-and-safety", label: "Trust & Safety", icon: I("M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"), active: (p) => p.startsWith("/trust-and-safety") },
     ],
   },
 ];
@@ -143,10 +139,22 @@ function BottomTabs() {
   );
 }
 
+function BrandMark({ className = "" }: { className?: string }) {
+  return (
+    <span className={`flex items-center gap-2 ${className}`}>
+      <span className="grid h-8 w-8 place-items-center rounded-md bg-[var(--color-accent)] text-xs font-black tracking-tighter text-white">
+        LF
+      </span>
+      <span className="text-lg font-black tracking-tight">
+        Leak<span className="text-[var(--color-accent)]">FanHub</span>
+      </span>
+    </span>
+  );
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
 
-  // Lock background scroll while the mobile drawer is open.
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
@@ -158,7 +166,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen flex-col">
-      {/* Top bar */}
       <header className="sticky top-0 z-40 flex min-h-14 items-center gap-2 border-b border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-bg)_90%,transparent)] px-3 pt-[env(safe-area-inset-top)] backdrop-blur-xl sm:gap-3 sm:px-4">
         <button
           type="button"
@@ -171,13 +178,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </svg>
         </button>
 
-        <Link href="/" className="flex shrink-0 items-center gap-2">
-          <span className="grid h-8 w-8 place-items-center rounded-md bg-[var(--color-accent)] text-lg font-black text-white">
-            L
-          </span>
-          <span className="text-lg font-black tracking-tight">
-            Lumen<span className="text-[var(--color-accent)]">gallery</span>
-          </span>
+        <Link href="/" className="shrink-0">
+          <BrandMark />
         </Link>
 
         <div className="ml-auto hidden min-w-0 max-w-xs flex-1 sm:block md:max-w-sm">
@@ -202,7 +204,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </header>
 
       <div className="flex flex-1">
-        {/* Desktop left rail */}
         <aside className="hidden w-60 shrink-0 border-r border-[var(--color-border)] lg:block">
           <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] max-h-[calc(100dvh-3.5rem-env(safe-area-inset-top))] overflow-y-auto p-3">
             <NavContent />
@@ -214,19 +215,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
 
-      {/* Mobile drawer */}
       {open && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          <div
-            className="absolute inset-0 bg-black/60"
-            onClick={() => setOpen(false)}
-            aria-hidden
-          />
+          <div className="absolute inset-0 bg-black/60" onClick={() => setOpen(false)} aria-hidden />
           <div className="absolute left-0 top-0 flex h-full w-72 flex-col overflow-y-auto overscroll-contain border-r border-[var(--color-border)] bg-[var(--color-bg)] p-3">
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-lg font-black tracking-tight">
-                Lumen<span className="text-[var(--color-accent)]">gallery</span>
-              </span>
+              <BrandMark />
               <button
                 onClick={() => setOpen(false)}
                 aria-label="Fermer"
@@ -242,19 +236,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      {/* Mobile bottom tab bar */}
       <BottomTabs />
 
-      {/* Footer */}
       <footer className="border-t border-[var(--color-border)] bg-[var(--color-surface)] pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0">
         <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <span className="text-base font-black tracking-tight">
-              Lumen<span className="text-[var(--color-accent)]">gallery</span>
-            </span>
+            <BrandMark />
             <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-[var(--color-ink-faint)]">
-              <Link href="/qu-est-ce-que-lumengallery" className="hover:text-[var(--color-ink-muted)]">
-                Qu’est-ce que LumenGallery
+              <Link href="/welcome" className="hover:text-[var(--color-ink-muted)]">
+                Bienvenue
               </Link>
               <Link href="/conditions" className="hover:text-[var(--color-ink-muted)]">
                 Conditions
@@ -262,8 +252,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Link href="/confidentialite" className="hover:text-[var(--color-ink-muted)]">
                 Confidentialité
               </Link>
-              <Link href="/mentions-legales" className="hover:text-[var(--color-ink-muted)]">
-                Mentions légales
+              <Link href="/trust-and-safety" className="hover:text-[var(--color-ink-muted)]">
+                Trust & Safety
               </Link>
               <Link href="/dmca" className="hover:text-[var(--color-ink-muted)]">
                 DMCA
@@ -274,7 +264,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           <p className="mt-4 text-xs text-[var(--color-ink-faint)]">
-            © 2026 Lumengallery. Tous droits réservés.
+            © 2026 LeakFanHub. 18+ only. Tous droits réservés.
           </p>
         </div>
       </footer>

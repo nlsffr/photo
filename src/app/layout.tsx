@@ -8,11 +8,11 @@ import { AgeGate } from "@/components/AgeGate";
 
 export const metadata: Metadata = {
   title: {
-    default: "LumenGallery — galerie de photographes",
-    template: "%s · LumenGallery",
+    default: "LeakFanHub — photos & vidéos",
+    template: "%s · LeakFanHub",
   },
   description:
-    "LumenGallery — galerie de photographie communautaire : portraits, mode et éditorial.",
+    "LeakFanHub — découverte de photos et vidéos. Feed, créateurs, tags.",
 };
 
 export const viewport: Viewport = {
