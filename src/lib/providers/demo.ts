@@ -36,7 +36,7 @@ const CREATORS: Creator[] = Array.from({ length: 24 }).map((_, i) => {
     handle,
     name,
     avatarUrl: `https://i.pravatar.cc/150?img=${(i % 70) + 1}`,
-    bio: "Créateur·rice sur LumenGallery.",
+    bio: "Créateur·rice sur LeakFanHub.",
     location: ["Paris", "Berlin", "Tokyo", "Milan", "Lisbonne"][i % 5],
     followers: Math.floor(rng() * 90000) + 500,
     verified: rng() < 0.4,
@@ -61,7 +61,7 @@ const PHOTOS: Photo[] = Array.from({ length: 140 }).map((_, i) => {
   return {
     id: `demo-${i}`,
     title: ["Séance studio", "Portrait naturel", "Éditorial mode", "En extérieur", "Backstage"][i % 5],
-    imageUrl: `https://picsum.photos/seed/lumen${i}/${w}/${h}`,
+    imageUrl: `https://picsum.photos/seed/leak${i}/${w}/${h}`,
     width: w,
     height: h,
     creatorHandle: creator.handle,
@@ -94,8 +94,6 @@ function withCreator(p: Photo): PhotoView {
   };
 }
 
-// Deterministic per-id hash → stable "random" order for a given seed, so
-// pagination never reshuffles between pages. Tiebreak by id everywhere.
 function hashId(id: string, seed: number): number {
   let h = seed >>> 0;
   for (let i = 0; i < id.length; i++) {
@@ -110,7 +108,8 @@ const SORTERS: Record<SortKey, (a: Photo, b: Photo) => number> = {
     b.views + b.likes * 3 - (a.views + a.likes * 3) || (a.id < b.id ? 1 : -1),
   popular: (a, b) => b.views - a.views || (a.id < b.id ? 1 : -1),
   liked: (a, b) => b.likes - a.likes || (a.id < b.id ? 1 : -1),
-  // Overridden below when sort === "random" (needs the seed).
+  longest: (a, b) =>
+    (b.durationSec ?? 0) - (a.durationSec ?? 0) || (a.id < b.id ? 1 : -1),
   random: (a, b) => (a.id < b.id ? -1 : 1),
 };
 
