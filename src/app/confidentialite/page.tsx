@@ -8,16 +8,16 @@ export default function ConfidentialitePage() {
   return (
     <LegalPage
       title="Politique de confidentialité"
-      updated="28 juillet 2026"
-      intro="LumenGallery est conçu « privacy by default ». Voici, concrètement, ce que nous faisons — et surtout ce que nous ne faisons pas — de tes données."
+      updated="6 août 2026"
+      intro="LeakFanHub est conçu « privacy by default ». Voici, concrètement, ce que nous faisons — et surtout ce que nous ne faisons pas — de tes données."
       sections={[
         {
           heading: "Ce que nous NE collectons pas",
           body: (
             <ul className="list-disc space-y-1.5 pl-5">
-              <li>Aucun cookie publicitaire.</li>
-              <li>Aucun traceur ni analytics tiers (pas de Google Analytics, etc.).</li>
-              <li>Aucune conservation d’adresses IP à des fins de suivi.</li>
+              <li>Aucun cookie publicitaire (sauf si tu n’es pas Premium et que des pubs partenaires s’affichent).</li>
+              <li>Aucun analytics tiers de type Google Analytics.</li>
+              <li>Aucune conservation d’adresses IP à des fins de suivi marketing.</li>
               <li>Aucun « fingerprinting » du navigateur.</li>
             </ul>
           ),
@@ -28,8 +28,8 @@ export default function ConfidentialitePage() {
             <p>
               Tes likes, enregistrements et modèles suivis sont stockés{" "}
               <strong>localement dans ton navigateur</strong> (localStorage), pas
-              sur nos serveurs. Ils ne quittent pas ton appareil tant que tu ne
-              crées pas de compte pour les synchroniser.
+              sur nos serveurs, tant que tu ne crées pas de compte pour les
+              synchroniser.
             </p>
           ),
         },
@@ -37,7 +37,7 @@ export default function ConfidentialitePage() {
           heading: "Identité anonyme",
           body: (
             <p>
-              Tu peux utiliser LumenGallery avec une{" "}
+              Tu peux utiliser LeakFanHub avec une{" "}
               <Link href="/identite" className="text-[var(--color-accent)] hover:underline">
                 identité anonyme
               </Link>{" "}
@@ -56,12 +56,11 @@ export default function ConfidentialitePage() {
           ),
         },
         {
-          heading: "Tes droits",
+          heading: "Tes droits (RGPD)",
           body: (
             <p>
-              Tu peux à tout moment effacer tes données locales (bouton « oublier
-              » sur la page identité, ou en vidant le stockage du site) et, si tu
-              as un compte, demander sa suppression via la page{" "}
+              Tu peux à tout moment effacer tes données locales et, si tu as un
+              compte, demander sa suppression via la page{" "}
               <Link href="/contact" className="text-[var(--color-accent)] hover:underline">
                 Contact
               </Link>

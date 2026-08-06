@@ -8,13 +8,13 @@ export default function MentionsLegalesPage() {
   return (
     <LegalPage
       title="Mentions légales"
-      updated="28 juillet 2026"
+      updated="6 août 2026"
       sections={[
         {
           heading: "Éditeur du site",
           body: (
             <p>
-              LumenGallery est un projet indépendant. Les informations légales de
+              LeakFanHub est un projet indépendant. Les informations légales de
               l’éditeur (raison sociale, adresse, contact du responsable de
               publication) sont à compléter selon le statut choisi pour
               l’exploitation du site.
@@ -25,9 +25,9 @@ export default function MentionsLegalesPage() {
           heading: "Hébergement",
           body: (
             <p>
-              Le site est hébergé par un prestataire d’hébergement web. Les
-              coordonnées de l’hébergeur seront précisées ici une fois
-              l’infrastructure de production définitive en place.
+              Le site est hébergé sur un VPS dédié. Les coordonnées détaillées de
+              l’hébergeur seront précisées ici selon l’infrastructure en
+              production.
             </p>
           ),
         },

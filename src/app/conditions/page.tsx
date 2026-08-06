@@ -8,17 +8,18 @@ export default function ConditionsPage() {
   return (
     <LegalPage
       title="Conditions d’utilisation"
-      updated="28 juillet 2026"
-      intro="En accédant à LumenGallery, tu acceptes les conditions ci-dessous. Lis-les attentivement."
+      updated="6 août 2026"
+      intro="En accédant à LeakFanHub, tu acceptes les conditions ci-dessous. Lis-les attentivement."
       sections={[
         {
           heading: "Accès au service",
           body: (
             <p>
-              LumenGallery est une galerie de photos et de vidéos accessible
+              LeakFanHub est une galerie de photos et de vidéos accessible
               gratuitement. L’accès en simple consultation ne nécessite pas de
               compte. Certaines fonctionnalités (enregistrements, abonnements)
-              peuvent nécessiter une identité, anonyme ou avec e-mail.
+              peuvent nécessiter une identité, anonyme ou avec e-mail. Contenu
+              réservé aux adultes (18+).
             </p>
           ),
         },
@@ -42,8 +43,9 @@ export default function ConditionsPage() {
           body: (
             <p>
               Sont interdits : le harcèlement, l’usurpation d’identité, la
-              publication de contenu illégal ou non consenti, le contournement
-              des mesures de sécurité et l’usage automatisé abusif du service.
+              publication de contenu illégal ou non consenti, le contenu
+              impliquant des mineurs, le contournement des mesures de sécurité et
+              l’usage automatisé abusif du service.
             </p>
           ),
         },
@@ -53,7 +55,8 @@ export default function ConditionsPage() {
             <p>
               Le service est fourni « en l’état ». Nous nous efforçons d’assurer
               sa disponibilité et sa sécurité sans pouvoir la garantir de manière
-              absolue.
+              absolue. LeakFanHub est une plateforme d’hébergement ; le contenu
+              est fourni par des tiers.
             </p>
           ),
         },

@@ -26,7 +26,7 @@ export default function AboutPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
       <h1 className="text-3xl font-black tracking-tight">
-        À propos de Lumen<span className="text-[var(--color-accent)]">Gallery</span>
+        À propos de Leak<span className="text-[var(--color-accent)]">FanHub</span>
       </h1>
       <p className="mt-3 text-lg text-[var(--color-ink-muted)]">
         Une galerie de photographie moderne, pensée pour la découverte : dense,
@@ -50,7 +50,7 @@ export default function AboutPage() {
       <div className="mt-8 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
         <h2 className="font-bold">Confidentialité par défaut</h2>
         <p className="mt-1.5 text-sm text-[var(--color-ink-muted)]">
-          LumenGallery ne trace pas ses visiteurs : aucun cookie publicitaire,
+          LeakFanHub ne trace pas ses visiteurs : aucun cookie publicitaire,
           aucun service tiers, aucune conservation d’adresses IP. Tu peux même
           utiliser une identité anonyme, sans e-mail.
         </p>

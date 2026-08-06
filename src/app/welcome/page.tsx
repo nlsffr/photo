@@ -3,14 +3,14 @@ import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Bienvenue",
-  description: "Découvre LumenGallery — photos et vidéos adultes",
+  description: "Découvre LeakFanHub — photos et vidéos",
 };
 
 export default function WelcomePage() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-16 text-center">
       <h1 className="text-4xl font-black tracking-tight">
-        Lumen<span className="text-[var(--color-accent)]">gallery</span>
+        Leak<span className="text-[var(--color-accent)]">FanHub</span>
       </h1>
       <p className="mt-4 text-lg text-[var(--color-ink-muted)]">
         Plateforme de découverte photo & vidéo. Feed masonry, mode vertical type

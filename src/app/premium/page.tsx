@@ -40,8 +40,8 @@ export default function PremiumPage() {
           Passe à la vitesse supérieure
         </h1>
         <p className="mx-auto mt-3 max-w-xl text-lg text-[var(--color-ink-muted)]">
-          Une expérience LumenGallery sans compromis — plus rapide, plus
-          personnalisée, et qui soutient directement les créateurs.
+          Une expérience LeakFanHub sans compromis — plus rapide, plus
+          personnalisée, et qui soutient directement les créateurs. $4.99/mois.
         </p>
       </div>
 

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-export const metadata: Metadata = { title: "Qu’est-ce que LumenGallery ?" };
+export const metadata: Metadata = { title: "Qu’est-ce que LeakFanHub ?" };
 
 const STEPS = [
   {
@@ -22,7 +22,7 @@ const STEPS = [
   {
     n: "04",
     title: "Reste anonyme",
-    body: "Aucun cookie publicitaire, aucun tracker tiers, aucune conservation d’IP. Tu peux naviguer avec une identité anonyme, sans e-mail.",
+    body: "Aucun cookie publicitaire forcé, aucun tracker tiers, aucune conservation d’IP marketing. Tu peux naviguer avec une identité anonyme.",
   },
 ];
 
@@ -33,15 +33,15 @@ const FAQ = [
   },
   {
     q: "C’est gratuit ?",
-    a: "Oui, l’accès à la galerie est gratuit. Certaines fonctionnalités avancées pourront être proposées en option à l’avenir.",
+    a: "Oui, l’accès à la galerie est gratuit. Premium ($4.99/mois) offrira des options avancées sans pubs.",
   },
   {
     q: "D’où vient le contenu ?",
-    a: "Le contenu est publié par les modèles et créateurs de la communauté, ou par l’équipe, à partir de médias dont les droits sont détenus. Un signalement DMCA est disponible pour tout retrait.",
+    a: "Le contenu est agrégé / publié dans le cadre de la plateforme. Un signalement DMCA est disponible pour tout retrait légitime.",
   },
   {
     q: "Mes données sont-elles suivies ?",
-    a: "Non. LumenGallery est conçu « privacy by default » : pas de pub, pas d’analytics tiers, pas de fingerprinting. Voir la page Confidentialité.",
+    a: "LeakFanHub est conçu « privacy by default ». Voir la page Confidentialité.",
   },
 ];
 
@@ -52,13 +52,13 @@ export default function WhatIsPage() {
         Bienvenue
       </p>
       <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">
-        Qu’est-ce que Lumen
-        <span className="text-[var(--color-accent)]">Gallery</span> ?
+        Qu’est-ce que Leak
+        <span className="text-[var(--color-accent)]">FanHub</span> ?
       </h1>
       <p className="mt-3 text-lg text-[var(--color-ink-muted)]">
-        LumenGallery est une galerie communautaire de photos et de vidéos, pensée
+        LeakFanHub est une galerie communautaire de photos et de vidéos, pensée
         pour la découverte : dense, rapide, en défilement infini — et respectueuse
-        de ta vie privée.
+        de ta vie privée. 18+ uniquement.
       </p>
 
       <div className="mt-8 flex flex-col gap-3">

@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: "DMCA — Retrait de contenu" };
 
 const STEPS = [
   "Identifie l’œuvre protégée dont tu es titulaire des droits.",
-  "Indique l’URL exacte du contenu à retirer sur LumenGallery.",
+  "Indique l’URL exacte du contenu à retirer sur LeakFanHub.",
   "Confirme, de bonne foi, que cet usage n’est pas autorisé.",
   "Fournis tes coordonnées et une signature (ton nom complet).",
 ];
@@ -18,7 +18,7 @@ export default function DmcaPage() {
         DMCA — Retrait de contenu
       </h1>
       <p className="mt-3 text-lg text-[var(--color-ink-muted)]">
-        LumenGallery respecte les droits de propriété intellectuelle. Si un
+        LeakFanHub respecte les droits de propriété intellectuelle. Si un
         contenu publié enfreint tes droits d’auteur, tu peux en demander le
         retrait. Nous traitons chaque demande valide dans les meilleurs délais.
       </p>
@@ -52,11 +52,6 @@ export default function DmcaPage() {
           </li>
           <li>Tes coordonnées et ta signature électronique (nom complet).</li>
         </ul>
-        <p className="mt-4">
-          Toute demande abusive ou de mauvaise foi peut engager ta responsabilité.
-          Un contenu retiré peut faire l’objet d’une contre-notification par la
-          personne qui l’a publié.
-        </p>
       </div>
 
       <h2 className="mt-10 text-2xl font-bold tracking-tight">
@@ -64,9 +59,7 @@ export default function DmcaPage() {
       </h2>
       <p className="mt-2 text-sm text-[var(--color-ink-muted)]">
         Remplis ce formulaire ou envoie ta notification à{" "}
-        <span className="font-mono text-[var(--color-ink)]">
-          dmca@lumengallery.example
-        </span>
+        <span className="font-mono text-[var(--color-ink)]">dmca@leakfanhub.com</span>
         .
       </p>
 
@@ -78,7 +71,7 @@ export default function DmcaPage() {
             { name: "fullname", label: "Nom complet (signature)", type: "text", placeholder: "Prénom Nom", required: true },
             { name: "email", label: "E-mail de contact", type: "email", placeholder: "toi@exemple.com", required: true },
             { name: "work", label: "Œuvre protégée concernée", type: "text", placeholder: "Décris ou lie l’original", required: true },
-            { name: "url", label: "URL du contenu à retirer", type: "url", placeholder: "https://lumengallery.example/photo/…", required: true },
+            { name: "url", label: "URL du contenu à retirer", type: "url", placeholder: "https://leakfanhub.com/...", required: true },
           ]}
           reasons={[
             "Je suis le titulaire des droits",
