@@ -4,7 +4,7 @@ import { FeedViewer } from "@/components/FeedViewer";
 
 export const metadata: Metadata = {
   title: "Feed vertical",
-  description: "Scroll vertical — vidéos en plein écran, ordre unique chaque jour",
+  description: "Scroll vertical — vidéos en plein écran, ordre unique à chaque visite",
 };
 
 export const dynamic = "force-dynamic";
@@ -14,10 +14,9 @@ function first(v?: string | string[]): string | undefined {
   return Array.isArray(v) ? v[0] : v;
 }
 
-/** Seed change every day → feed order ≠ home popular order */
-function daySeed() {
-  const d = new Date();
-  return d.getUTCFullYear() * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate();
+/** Nouveau seed à chaque chargement de page → ordre vraiment différent */
+function randomSeed() {
+  return Math.floor(Math.random() * 2_147_483_647);
 }
 
 export default async function FeedPage({
@@ -28,9 +27,8 @@ export default async function FeedPage({
   const sp = await searchParams;
   const aiRaw = first(sp.ai);
   const isAi = aiRaw === "1" ? true : aiRaw === "0" ? false : undefined;
-  const seed = daySeed();
+  const seed = randomSeed();
 
-  // Feed = vidéos only, ordre random stable du jour (≠ home popular / ≠ trending)
   let page = await getPhotos({
     sort: "random",
     type: "video",
@@ -40,7 +38,12 @@ export default async function FeedPage({
   });
 
   if (page.items.length < 5) {
-    page = await getPhotos({ sort: "random", isAi, seed: seed + 7, limit: 40 });
+    page = await getPhotos({
+      sort: "random",
+      isAi,
+      seed: randomSeed(),
+      limit: 40,
+    });
   }
   if (page.items.length < 3) {
     page = await getPhotos({ sort: "recent", type: "video", isAi, limit: 40 });
