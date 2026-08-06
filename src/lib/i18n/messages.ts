@@ -2,7 +2,7 @@ export type Locale = "fr" | "en" | "it" | "es" | "de" | "pt" | "nl" | "pl";
 
 export const LOCALES: Locale[] = ["fr", "en", "it", "es", "de", "pt", "nl", "pl"];
 
-export const messages: Record<Locale, Record<string, string>> = {
+const base = {
   fr: {
     home: "Accueil",
     search: "Recherche",
@@ -14,6 +14,7 @@ export const messages: Record<Locale, Record<string, string>> = {
     forYou: "Pour toi",
     following: "Abonnements",
     saved: "Enregistrés",
+    add: "Ajouter",
     premium: "Premium",
     login: "Connexion",
     signup: "S’inscrire",
@@ -37,6 +38,7 @@ export const messages: Record<Locale, Record<string, string>> = {
     forYou: "For you",
     following: "Following",
     saved: "Saved",
+    add: "Add",
     premium: "Premium",
     login: "Log in",
     signup: "Sign up",
@@ -60,6 +62,7 @@ export const messages: Record<Locale, Record<string, string>> = {
     forYou: "Per te",
     following: "Seguiti",
     saved: "Salvati",
+    add: "Aggiungi",
     premium: "Premium",
     login: "Accedi",
     signup: "Registrati",
@@ -83,6 +86,7 @@ export const messages: Record<Locale, Record<string, string>> = {
     forYou: "Para ti",
     following: "Siguiendo",
     saved: "Guardados",
+    add: "Añadir",
     premium: "Premium",
     login: "Entrar",
     signup: "Registrarse",
@@ -106,6 +110,7 @@ export const messages: Record<Locale, Record<string, string>> = {
     forYou: "Für dich",
     following: "Abos",
     saved: "Gespeichert",
+    add: "Hinzufügen",
     premium: "Premium",
     login: "Anmelden",
     signup: "Registrieren",
@@ -129,6 +134,7 @@ export const messages: Record<Locale, Record<string, string>> = {
     forYou: "Para você",
     following: "Seguindo",
     saved: "Salvos",
+    add: "Adicionar",
     premium: "Premium",
     login: "Entrar",
     signup: "Cadastrar",
@@ -139,7 +145,7 @@ export const messages: Record<Locale, Record<string, string>> = {
     trust: "Trust & Safety",
     featured: "Modelos em destaque",
     welcome: "Bem-vindo",
-    help: "Ajuda",
+    help: "Help",
   },
   nl: {
     home: "Home",
@@ -152,6 +158,7 @@ export const messages: Record<Locale, Record<string, string>> = {
     forYou: "Voor jou",
     following: "Volgend",
     saved: "Opgeslagen",
+    add: "Toevoegen",
     premium: "Premium",
     login: "Inloggen",
     signup: "Registreren",
@@ -175,6 +182,7 @@ export const messages: Record<Locale, Record<string, string>> = {
     forYou: "Dla ciebie",
     following: "Obserwowane",
     saved: "Zapisane",
+    add: "Dodaj",
     premium: "Premium",
     login: "Zaloguj",
     signup: "Rejestracja",
@@ -187,7 +195,9 @@ export const messages: Record<Locale, Record<string, string>> = {
     welcome: "Witaj",
     help: "Pomoc",
   },
-};
+} as const;
+
+export const messages: Record<Locale, Record<string, string>> = base;
 
 export function detectLocale(acceptLanguage?: string | null): Locale {
   if (!acceptLanguage) return "en";
