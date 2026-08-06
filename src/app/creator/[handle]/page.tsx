@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Suspense } from "react";
 import { getCreator, getCreatorStats, getPhotos } from "@/lib/photos";
 import { formatCount } from "@/lib/format";
 import type { MediaType, SortKey } from "@/lib/types";
@@ -9,8 +8,6 @@ import { InfiniteGallery } from "@/components/InfiniteGallery";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { FollowButton } from "@/components/Interactions";
 import { MediaImg } from "@/components/MediaImg";
-import { MediaTypeTabs } from "@/components/MediaTypeTabs";
-import { SortTabs } from "@/components/SortTabs";
 import { BackLink } from "@/components/BackLink";
 
 export const dynamic = "force-dynamic";
@@ -56,7 +53,7 @@ export default async function CreatorPage({
   const sortRaw = first(sp.sort);
   const sort: SortKey = VALID_SORTS.includes(sortRaw as SortKey)
     ? (sortRaw as SortKey)
-    : "recent";
+    : "popular";
 
   const stats = await getCreatorStats(handle);
   const page = await getPhotos({ creator: handle, sort, type, limit: 30 });
@@ -64,13 +61,29 @@ export default async function CreatorPage({
   const coverFromDb = creator.coverUrl?.trim();
   const coverFallback = page.items[0]?.imageUrl;
   const coverSrc = coverFromDb || coverFallback || "";
-
   const avatarSrc =
     creator.avatarUrl && creator.avatarUrl.trim()
       ? creator.avatarUrl
       : coverFallback || "";
 
-  const basePath = `/creator/${encodeURIComponent(handle)}`;
+  const base = `/creator/${encodeURIComponent(handle)}`;
+  const q = (opts: { type?: string | null; sort?: string }) => {
+    const p = new URLSearchParams();
+    if (opts.type) p.set("type", opts.type);
+    if (opts.sort && opts.sort !== "popular") p.set("sort", opts.sort);
+    const qs = p.toString();
+    return qs ? `${base}?${qs}` : base;
+  };
+
+  // UNE seule rangée — pas de doublon MediaTypeTabs + SortTabs
+  const chips = [
+    { label: "Tout", href: q({ sort }), active: !type },
+    { label: "Photos", href: q({ type: "photo", sort }), active: type === "photo" },
+    { label: "Vidéos", href: q({ type: "video", sort }), active: type === "video" },
+    { label: "Top", href: q({ type, sort: "popular" }), active: sort === "popular" },
+    { label: "Récents", href: q({ type, sort: "recent" }), active: sort === "recent" },
+  ];
+
   const queryKey = `${handle}|${sort}|${type ?? ""}`;
 
   return (
@@ -79,7 +92,7 @@ export default async function CreatorPage({
         <BackLink fallback="/" label="Retour" />
       </div>
 
-      <div className="relative mt-2 h-36 w-full overflow-hidden bg-[var(--color-surface-2)] sm:h-48">
+      <div className="relative mt-2 h-32 w-full overflow-hidden bg-[var(--color-surface-2)] sm:h-44">
         {coverSrc ? (
           <>
             <MediaImg
@@ -90,7 +103,7 @@ export default async function CreatorPage({
               priority
               className="object-cover object-center"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-bg)] via-[var(--color-bg)]/50 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-bg)] via-[var(--color-bg)]/40 to-transparent" />
           </>
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-[var(--color-surface-2)] to-[var(--color-surface)]" />
@@ -98,111 +111,72 @@ export default async function CreatorPage({
       </div>
 
       <div className="px-3 sm:px-5">
-        <div className="-mt-12 flex flex-col gap-4 sm:-mt-14 sm:flex-row sm:items-end sm:justify-between">
-          <div className="flex items-end gap-3 sm:gap-4">
-            <div className="relative shrink-0">
-              {avatarSrc ? (
-                <MediaImg
-                  src={avatarSrc}
-                  alt={creator.name}
-                  width={120}
-                  height={120}
-                  className={`h-24 w-24 rounded-full object-cover object-top ring-4 ring-[var(--color-bg)] sm:h-28 sm:w-28 ${
-                    creator.verified ? "ring-[var(--color-accent)]" : ""
-                  }`}
-                />
-              ) : (
-                <div className="grid h-24 w-24 place-items-center rounded-full bg-[var(--color-surface-2)] text-2xl font-bold text-[var(--color-ink-faint)] ring-4 ring-[var(--color-bg)] sm:h-28 sm:w-28">
-                  {creator.name.slice(0, 1).toUpperCase()}
-                </div>
-              )}
+        <div className="-mt-10 flex items-end gap-3 sm:-mt-12 sm:gap-4">
+          {avatarSrc ? (
+            <MediaImg
+              src={avatarSrc}
+              alt={creator.name}
+              width={112}
+              height={112}
+              className="h-20 w-20 shrink-0 rounded-full object-cover object-top ring-4 ring-[var(--color-bg)] sm:h-28 sm:w-28"
+            />
+          ) : (
+            <div className="grid h-20 w-20 shrink-0 place-items-center rounded-full bg-[var(--color-surface-2)] text-xl font-bold ring-4 ring-[var(--color-bg)] sm:h-28 sm:w-28">
+              {creator.name.slice(0, 1).toUpperCase()}
             </div>
+          )}
 
-            <div className="min-w-0 pb-1">
-              <h1 className="flex flex-wrap items-center gap-2 text-xl font-bold tracking-tight sm:text-2xl">
-                <span className="truncate">{creator.name}</span>
-                {creator.verified && <VerifiedBadge size={18} />}
-              </h1>
-              <p className="text-sm text-[var(--color-ink-faint)]">@{creator.handle}</p>
-              {creator.bio ? (
-                <p className="mt-1 line-clamp-3 max-w-lg text-sm text-[var(--color-ink-muted)]">
-                  {creator.bio}
-                </p>
-              ) : null}
-              {creator.location ? (
-                <p className="mt-0.5 text-xs text-[var(--color-ink-faint)] sm:text-sm">
-                  {creator.location}
-                </p>
-              ) : null}
-            </div>
+          <div className="min-w-0 flex-1 pb-1">
+            <h1 className="flex flex-wrap items-center gap-1.5 text-lg font-bold sm:text-2xl">
+              <span className="truncate">{creator.name}</span>
+              {creator.verified && <VerifiedBadge size={16} />}
+            </h1>
+            <p className="text-sm text-[var(--color-ink-faint)]">@{creator.handle}</p>
           </div>
 
-          <FollowButton
-            handle={creator.handle}
-            className="self-start px-6 py-2.5 sm:self-auto"
-          />
+          <FollowButton handle={creator.handle} className="mb-1 shrink-0" />
         </div>
 
-        <div className="mt-5 grid max-w-lg grid-cols-3 gap-2 sm:gap-3">
-          {[
-            { label: "Abonnés", value: formatCount(creator.followers) },
-            { label: "Médias", value: String(stats.photoCount) },
-            { label: "Vues", value: formatCount(stats.totalViews) },
-          ].map((s) => (
-            <div
-              key={s.label}
-              className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-3 text-center sm:p-4"
+        {creator.bio ? (
+          <p className="mt-3 line-clamp-3 text-sm text-[var(--color-ink-muted)]">
+            {creator.bio}
+          </p>
+        ) : null}
+
+        <div className="mt-4 flex gap-4 text-sm">
+          <span>
+            <strong>{formatCount(creator.followers)}</strong>{" "}
+            <span className="text-[var(--color-ink-faint)]">abonnés</span>
+          </span>
+          <span>
+            <strong>{stats.photoCount}</strong>{" "}
+            <span className="text-[var(--color-ink-faint)]">médias</span>
+          </span>
+          <span>
+            <strong>{formatCount(stats.totalViews)}</strong>{" "}
+            <span className="text-[var(--color-ink-faint)]">vues</span>
+          </span>
+        </div>
+
+        {/* UNE seule barre de filtres */}
+        <div className="no-scrollbar mt-4 flex gap-2 overflow-x-auto border-b border-[var(--color-border)] pb-3">
+          {chips.map((c) => (
+            <Link
+              key={c.label}
+              href={c.href}
+              scroll={false}
+              className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold ${
+                c.active
+                  ? "bg-[var(--color-accent)] text-white"
+                  : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]"
+              }`}
             >
-              <p className="text-lg font-bold sm:text-xl">{s.value}</p>
-              <p className="text-[10px] text-[var(--color-ink-faint)] sm:text-xs">{s.label}</p>
-            </div>
+              {c.label}
+            </Link>
           ))}
         </div>
 
-        <div className="mt-6 flex flex-col gap-3 border-b border-[var(--color-border)] pb-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <nav className="flex gap-1 rounded-full bg-[var(--color-surface-2)] p-1 text-sm">
-              {(
-                [
-                  { label: "Tout", href: basePath },
-                  { label: "Photos", href: `${basePath}?type=photo` },
-                  { label: "Vidéos", href: `${basePath}?type=video` },
-                ] as const
-              ).map((t) => {
-                const active =
-                  (t.label === "Tout" && !type) ||
-                  (t.label === "Photos" && type === "photo") ||
-                  (t.label === "Vidéos" && type === "video");
-                return (
-                  <Link
-                    key={t.label}
-                    href={
-                      t.href +
-                      (sort !== "recent"
-                        ? `${t.href.includes("?") ? "&" : "?"}sort=${sort}`
-                        : "")
-                    }
-                    className={`rounded-full px-3 py-1.5 font-medium transition ${
-                      active
-                        ? "bg-[var(--color-accent)] text-white"
-                        : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
-                    }`}
-                  >
-                    {t.label}
-                  </Link>
-                );
-              })}
-            </nav>
-            <Suspense fallback={<div className="h-9 w-40" />}>
-              <MediaTypeTabs basePath={basePath} />
-            </Suspense>
-          </div>
-          <Suspense fallback={<div className="h-9" />}>
-            <SortTabs basePath={basePath} />
-          </Suspense>
-        </div>
-
-        <section className="mt-4 pb-4">
+        <section className="mt-4 pb-6">
           <InfiniteGallery
             key={queryKey}
             initial={page}

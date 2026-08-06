@@ -5,9 +5,6 @@ import type { MediaType, SortKey } from "@/lib/types";
 import { InfiniteGallery } from "@/components/InfiniteGallery";
 import { FeaturedCreators } from "@/components/FeaturedCreators";
 import { TagChips } from "@/components/TagChips";
-import { MediaTypeTabs } from "@/components/MediaTypeTabs";
-import { SortTabs } from "@/components/SortTabs";
-import { AiFilterTabs } from "@/components/AiFilterTabs";
 import { AdSlot } from "@/components/AdSlot";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +21,19 @@ const VALID_SORTS: SortKey[] = [
 
 function first(v?: string | string[]): string | undefined {
   return Array.isArray(v) ? v[0] : v;
+}
+
+function hrefFor(opts: {
+  sort?: string;
+  type?: string | null;
+  tag?: string;
+}) {
+  const p = new URLSearchParams();
+  if (opts.sort && opts.sort !== "popular") p.set("sort", opts.sort);
+  if (opts.type) p.set("type", opts.type);
+  if (opts.tag) p.set("tag", opts.tag);
+  const qs = p.toString();
+  return qs ? `/?${qs}` : "/";
 }
 
 export default async function Home({
@@ -44,100 +54,72 @@ export default async function Home({
     ? (sortRaw as SortKey)
     : "popular";
 
-  const aiRaw = first(sp.ai);
-  const ai = aiRaw === "0" || aiRaw === "1" ? aiRaw : undefined;
-  const isAi = ai === "1" ? true : ai === "0" ? false : undefined;
-
-  const page = await getPhotos({ sort, tag, type, isAi });
+  const page = await getPhotos({ sort, tag, type });
   const allTags = await getAllTags();
-  const queryKey = `${sort}|${tag ?? ""}|${type ?? ""}|${ai ?? ""}`;
+  const queryKey = `${sort}|${tag ?? ""}|${type ?? ""}`;
 
-  const heading = tag
-    ? `#${tag}`
-    : ai === "1"
-      ? "Contenu IA"
-      : ai === "0"
-        ? "Contenu réel"
-        : sort === "random"
-          ? "Aléatoire"
-          : "Tendances";
+  // Une seule rangée de chips : type + sort mélangés proprement
+  const chips: { label: string; href: string; active: boolean }[] = [
+    { label: "Top", href: hrefFor({ type }), active: sort === "popular" && !type },
+    {
+      label: "Vidéos",
+      href: hrefFor({ type: "video", sort }),
+      active: type === "video",
+    },
+    {
+      label: "Photos",
+      href: hrefFor({ type: "photo", sort }),
+      active: type === "photo",
+    },
+    {
+      label: "Récents",
+      href: hrefFor({ type, sort: "recent" }),
+      active: sort === "recent",
+    },
+    {
+      label: "Tendances",
+      href: hrefFor({ type, sort: "trending" }),
+      active: sort === "trending",
+    },
+  ];
 
   return (
     <div className="px-2 py-3 sm:px-5 sm:py-4">
       <AdSlot variant="banner" />
       <FeaturedCreators />
 
-      {/* Tags: hide on very small to reduce noise — show from sm */}
-      <div className="hidden sm:block">
+      <div className="mb-3 hidden sm:block">
         <TagChips tags={allTags} activeTag={tag} />
       </div>
 
-      <div className="mb-3 flex flex-col gap-2.5">
-        <div className="flex items-center justify-between gap-2">
-          <h1 className="text-lg font-bold tracking-tight sm:text-2xl">
-            {heading}
-          </h1>
-          {/* Desktop only extra actions */}
-          <div className="hidden flex-wrap items-center gap-2 sm:flex">
-            <Link
-              href="/?sort=random"
-              className="rounded-full border border-[var(--color-border)] px-3 py-1.5 text-sm font-semibold text-[var(--color-ink-muted)]"
-            >
-              Aléatoire
-            </Link>
-            <Link
-              href="/feed"
-              className="rounded-full bg-[var(--color-accent)] px-3 py-1.5 text-sm font-semibold text-white"
-            >
-              Feed
-            </Link>
-            <Suspense fallback={null}>
-              <AiFilterTabs basePath="/" />
-            </Suspense>
-            <Suspense fallback={null}>
-              <MediaTypeTabs basePath="/" />
-            </Suspense>
-          </div>
-        </div>
-
-        {/* Mobile: type toggle simple (Tout / Photos / Vidéos) */}
-        <div className="flex gap-2 sm:hidden">
-          {(
-            [
-              { label: "Tout", href: "/" },
-              { label: "Photos", href: "/?type=photo" },
-              { label: "Vidéos", href: "/?type=video" },
-            ] as const
-          ).map((t) => {
-            const active =
-              (t.label === "Tout" && !type) ||
-              (t.label === "Photos" && type === "photo") ||
-              (t.label === "Vidéos" && type === "video");
-            return (
-              <Link
-                key={t.label}
-                href={t.href}
-                className={`flex-1 rounded-full py-2 text-center text-sm font-semibold ${
-                  active
-                    ? "bg-[var(--color-accent)] text-white"
-                    : "border border-[var(--color-border)] text-[var(--color-ink-muted)]"
-                }`}
-              >
-                {t.label}
-              </Link>
-            );
-          })}
-        </div>
-
-        <Suspense fallback={<div className="h-9" />}>
-          <SortTabs basePath="/" />
-        </Suspense>
+      {/* Une seule barre de filtres — mobile & desktop */}
+      <div className="no-scrollbar mb-3 flex gap-2 overflow-x-auto pb-0.5">
+        {chips.map((c) => (
+          <Link
+            key={c.label}
+            href={c.href}
+            scroll={false}
+            className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition ${
+              c.active
+                ? "bg-[var(--color-accent)] text-white shadow-sm shadow-[var(--color-accent)]/30"
+                : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]"
+            }`}
+          >
+            {c.label}
+          </Link>
+        ))}
+        <Link
+          href="/feed"
+          className="ml-auto shrink-0 rounded-full border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-ink-muted)]"
+        >
+          Feed ↗
+        </Link>
       </div>
 
       <InfiniteGallery
         key={queryKey}
         initial={page}
-        params={{ sort, tag, type, ai }}
+        params={{ sort, tag, type }}
       />
     </div>
   );
