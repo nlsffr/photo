@@ -1,0 +1,22 @@
+import { NextResponse } from "next/server";
+import { getProvider } from "@/lib/photos";
+
+export async function GET(request: Request) {
+  const q = new URL(request.url).searchParams.get("q")?.trim() ?? "";
+  if (q.length < 1) {
+    return NextResponse.json({ items: [] });
+  }
+  try {
+    const provider = getProvider();
+    const items = await provider.searchCreators(q, 12);
+    return NextResponse.json({
+      items: items.map((c) => ({
+        handle: c.handle,
+        name: c.name,
+        avatarUrl: c.avatarUrl,
+      })),
+    });
+  } catch {
+    return NextResponse.json({ items: [] });
+  }
+}

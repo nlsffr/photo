@@ -11,12 +11,33 @@ import {
 import {
   LOCALES,
   detectLocale,
-  messages,
   type Locale,
   t as translate,
 } from "@/lib/i18n/messages";
 
 const COOKIE = "lfh_locale";
+
+const FLAGS: Record<Locale, string> = {
+  fr: "🇫🇷",
+  en: "🇬🇧",
+  it: "🇮🇹",
+  es: "🇪🇸",
+  de: "🇩🇪",
+  pt: "🇵🇹",
+  nl: "🇳🇱",
+  pl: "🇵🇱",
+};
+
+const NAMES: Record<Locale, string> = {
+  fr: "Français",
+  en: "English",
+  it: "Italiano",
+  es: "Español",
+  de: "Deutsch",
+  pt: "Português",
+  nl: "Nederlands",
+  pl: "Polski",
+};
 
 interface LocaleCtx {
   locale: Locale;
@@ -40,18 +61,15 @@ function writeCookie(l: Locale) {
 
 export function LocaleProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>("en");
-  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const fromCookie = readCookie();
-    if (fromCookie) {
-      setLocaleState(fromCookie);
-    } else {
+    if (fromCookie) setLocaleState(fromCookie);
+    else {
       const detected = detectLocale(navigator.language || navigator.languages?.[0]);
       setLocaleState(detected);
       writeCookie(detected);
     }
-    setReady(true);
   }, []);
 
   const setLocale = useCallback((l: Locale) => {
@@ -71,10 +89,6 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
     [locale, setLocale, t],
   );
 
-  // Avoid flash: still render children
-  void ready;
-  void messages;
-
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
@@ -93,18 +107,45 @@ export function useLocale(): LocaleCtx {
 
 export function LanguageSwitcher({ className = "" }: { className?: string }) {
   const { locale, setLocale, locales } = useLocale();
+  const [open, setOpen] = useState(false);
+
   return (
-    <select
-      value={locale}
-      onChange={(e) => setLocale(e.target.value as Locale)}
-      aria-label="Language"
-      className={`rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1.5 text-xs font-semibold text-[var(--color-ink-muted)] ${className}`}
-    >
-      {locales.map((l) => (
-        <option key={l} value={l}>
-          {l.toUpperCase()}
-        </option>
-      ))}
-    </select>
+    <div className={`relative ${className}`}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex h-9 items-center gap-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-sm"
+        aria-label="Language"
+      >
+        <span className="text-base leading-none">{FLAGS[locale]}</span>
+        <span className="hidden text-xs font-semibold uppercase text-[var(--color-ink-muted)] sm:inline">
+          {locale}
+        </span>
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} aria-hidden />
+          <ul className="absolute right-0 z-50 mt-1 max-h-64 w-44 overflow-auto rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] py-1 shadow-xl">
+            {locales.map((l) => (
+              <li key={l}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLocale(l);
+                    setOpen(false);
+                  }}
+                  className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-[var(--color-surface-2)] ${
+                    l === locale ? "text-[var(--color-accent)]" : ""
+                  }`}
+                >
+                  <span>{FLAGS[l]}</span>
+                  <span>{NAMES[l]}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
   );
 }
