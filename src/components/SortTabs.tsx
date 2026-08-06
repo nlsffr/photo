@@ -8,6 +8,7 @@ const TABS: { key: string; label: string }[] = [
   { key: "recent", label: "Récents" },
   { key: "trending", label: "Tendances" },
   { key: "liked", label: "Plus aimés" },
+  { key: "longest", label: "Plus longs" },
 ];
 
 export function SortTabs({ basePath = "/" }: { basePath?: string }) {
