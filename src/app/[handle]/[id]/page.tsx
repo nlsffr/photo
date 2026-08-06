@@ -12,8 +12,8 @@ import { PhotoCard } from "@/components/PhotoCard";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { FollowButton, PostActions } from "@/components/Interactions";
 import { MediaImg } from "@/components/MediaImg";
+import { VideoPlayer } from "@/components/VideoPlayer";
 
-/** Root segments that already have their own routes — never treat as creator handles. */
 const RESERVED = new Set([
   "api",
   "creator",
@@ -51,6 +51,7 @@ export async function generateMetadata({
     openGraph: {
       title,
       images: photo.imageUrl ? [{ url: photo.imageUrl }] : [],
+      ...(photo.videoUrl ? { videos: [{ url: photo.videoUrl }] } : {}),
     },
   };
 }
@@ -72,39 +73,37 @@ export default async function MediaByHandlePage({
   const related = await getRelatedPhotos(raw);
 
   return (
-    <div className="mx-auto max-w-[1600px] px-4 sm:px-6 py-6">
+    <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6">
       <Link
         href="/"
         className="mb-4 inline-flex items-center gap-1.5 text-sm text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <path d="M19 12H5M12 19l-7-7 7-7" />
-        </svg>
-        Retour à la galerie
+        ← Retour à la galerie
       </Link>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="flex items-center justify-center overflow-hidden rounded-2xl bg-black ring-1 ring-[var(--color-border)]">
-          {photo.type === "video" ? (
-            <video
+        <div className="overflow-hidden rounded-2xl bg-black ring-1 ring-[var(--color-border)]">
+          {photo.type === "video" && photo.videoUrl ? (
+            <VideoPlayer
               src={photo.videoUrl}
               poster={photo.imageUrl}
-              controls
-              playsInline
-              preload="metadata"
-              controlsList="nodownload"
-              className="max-h-[80vh] w-full"
+              title={photo.title}
+              views={photo.views}
+              likes={photo.likes}
+              className="min-h-[40vh] max-h-[80vh]"
             />
           ) : (
-            <MediaImg
-              src={photo.imageUrl}
-              alt={photo.title}
-              width={photo.width}
-              height={photo.height}
-              sizes="(max-width: 1024px) 100vw, 70vw"
-              priority
-              className="max-h-[80vh] w-auto object-contain"
-            />
+            <div className="flex items-center justify-center">
+              <MediaImg
+                src={photo.imageUrl}
+                alt={photo.title}
+                width={photo.width}
+                height={photo.height}
+                sizes="(max-width: 1024px) 100vw, 70vw"
+                priority
+                className="max-h-[80vh] w-auto object-contain"
+              />
+            </div>
           )}
         </div>
 
@@ -193,7 +192,7 @@ export default async function MediaByHandlePage({
 
       {related.length > 0 && (
         <section className="mt-12">
-          <h2 className="mb-4 text-lg font-bold">Photos similaires</h2>
+          <h2 className="mb-4 text-lg font-bold">Médias similaires</h2>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
             {related.map((p) => (
               <PhotoCard key={p.id} photo={p} />

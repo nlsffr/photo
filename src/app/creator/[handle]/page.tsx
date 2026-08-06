@@ -1,11 +1,24 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { getCreator, getCreatorStats, getPhotos } from "@/lib/photos";
 import { formatCount } from "@/lib/format";
+import type { MediaType, SortKey } from "@/lib/types";
 import { InfiniteGallery } from "@/components/InfiniteGallery";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { FollowButton } from "@/components/Interactions";
 import { MediaImg } from "@/components/MediaImg";
+import { MediaTypeTabs } from "@/components/MediaTypeTabs";
+import { SortTabs } from "@/components/SortTabs";
+
+export const dynamic = "force-dynamic";
+
+const VALID_SORTS: SortKey[] = ["recent", "popular", "liked", "trending", "longest"];
+
+function first(v?: string | string[]): string | undefined {
+  return Array.isArray(v) ? v[0] : v;
+}
 
 export async function generateMetadata({
   params,
@@ -14,46 +27,65 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { handle } = await params;
   const creator = await getCreator(handle);
-  return { title: creator ? creator.name : "Profil introuvable" };
+  if (!creator) return { title: "Profil introuvable" };
+  return {
+    title: `${creator.name} (@${creator.handle})`,
+    description: creator.bio || `Profil de ${creator.name} sur LumenGallery`,
+  };
 }
 
 export default async function CreatorPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ handle: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const { handle } = await params;
+  const sp = await searchParams;
   const creator = await getCreator(handle);
   if (!creator) notFound();
 
+  const typeRaw = first(sp.type);
+  const type: MediaType | undefined =
+    typeRaw === "photo" || typeRaw === "video" || typeRaw === "pack"
+      ? typeRaw
+      : undefined;
+
+  const sortRaw = first(sp.sort);
+  const sort: SortKey = VALID_SORTS.includes(sortRaw as SortKey)
+    ? (sortRaw as SortKey)
+    : "recent";
+
   const stats = await getCreatorStats(handle);
-  const page = await getPhotos({ creator: handle, sort: "recent", limit: 30 });
-  const coverPage = await getPhotos({
-    creator: handle,
-    sort: "trending",
-    limit: 1,
-  });
-  const cover = coverPage.items[0];
+  const page = await getPhotos({ creator: handle, sort, type, limit: 30 });
+
+  const coverFromDb = creator.coverUrl?.trim();
+  const coverFallback = page.items[0]?.imageUrl;
+  const coverSrc = coverFromDb || coverFallback || "";
+
   const avatarSrc =
     creator.avatarUrl && creator.avatarUrl.trim()
       ? creator.avatarUrl
-      : cover?.imageUrl || "";
+      : coverFallback || "";
+
+  const basePath = `/creator/${encodeURIComponent(handle)}`;
+  const queryKey = `${handle}|${sort}|${type ?? ""}`;
 
   return (
     <div>
-      {/* Compact banner — softer crop, less empty space */}
-      <div className="relative h-28 w-full overflow-hidden bg-[var(--color-surface-2)] sm:h-36">
-        {cover?.imageUrl ? (
+      <div className="relative h-36 w-full overflow-hidden bg-[var(--color-surface-2)] sm:h-48">
+        {coverSrc ? (
           <>
             <MediaImg
-              src={cover.imageUrl}
+              src={coverSrc}
               alt=""
               fill
               sizes="100vw"
               priority
-              className="scale-110 object-cover object-center blur-sm opacity-60"
+              className="object-cover object-center"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-bg)] via-[var(--color-bg)]/70 to-[var(--color-bg)]/20" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-bg)] via-[var(--color-bg)]/50 to-transparent" />
           </>
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-[var(--color-surface-2)] to-[var(--color-surface)]" />
@@ -61,17 +93,18 @@ export default async function CreatorPage({
       </div>
 
       <div className="px-3 sm:px-5">
-        {/* Avatar overlaps banner lightly */}
-        <div className="-mt-10 flex flex-col gap-4 sm:-mt-12 sm:flex-row sm:items-end sm:justify-between">
+        <div className="-mt-12 flex flex-col gap-4 sm:-mt-14 sm:flex-row sm:items-end sm:justify-between">
           <div className="flex items-end gap-3 sm:gap-4">
             <div className="relative shrink-0">
               {avatarSrc ? (
                 <MediaImg
                   src={avatarSrc}
                   alt={creator.name}
-                  width={112}
-                  height={112}
-                  className="h-24 w-24 rounded-full object-cover object-top ring-4 ring-[var(--color-bg)] sm:h-28 sm:w-28"
+                  width={120}
+                  height={120}
+                  className={`h-24 w-24 rounded-full object-cover object-top ring-4 ring-[var(--color-bg)] sm:h-28 sm:w-28 ${
+                    creator.verified ? "ring-[var(--color-accent)]" : ""
+                  }`}
                 />
               ) : (
                 <div className="grid h-24 w-24 place-items-center rounded-full bg-[var(--color-surface-2)] text-2xl font-bold text-[var(--color-ink-faint)] ring-4 ring-[var(--color-bg)] sm:h-28 sm:w-28">
@@ -85,17 +118,14 @@ export default async function CreatorPage({
                 <span className="truncate">{creator.name}</span>
                 {creator.verified && <VerifiedBadge size={18} />}
               </h1>
+              <p className="text-sm text-[var(--color-ink-faint)]">@{creator.handle}</p>
               {creator.bio ? (
-                <p className="mt-0.5 line-clamp-2 max-w-md text-sm text-[var(--color-ink-muted)]">
+                <p className="mt-1 line-clamp-3 max-w-lg text-sm text-[var(--color-ink-muted)]">
                   {creator.bio}
                 </p>
               ) : null}
               {creator.location ? (
                 <p className="mt-0.5 flex items-center gap-1 text-xs text-[var(--color-ink-faint)] sm:text-sm">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                    <path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0Z" />
-                    <circle cx="12" cy="10" r="3" />
-                  </svg>
                   {creator.location}
                 </p>
               ) : null}
@@ -111,8 +141,8 @@ export default async function CreatorPage({
         <div className="mt-5 grid max-w-lg grid-cols-3 gap-2 sm:gap-3">
           {[
             { label: "Abonnés", value: formatCount(creator.followers) },
-            { label: "Photos", value: String(stats.photoCount) },
-            { label: "Vues totales", value: formatCount(stats.totalViews) },
+            { label: "Médias", value: String(stats.photoCount) },
+            { label: "Vues", value: formatCount(stats.totalViews) },
           ].map((s) => (
             <div
               key={s.label}
@@ -124,12 +154,49 @@ export default async function CreatorPage({
           ))}
         </div>
 
-        <section className="mt-8 pb-4">
-          <h2 className="mb-3 text-lg font-bold">Galerie</h2>
+        <div className="mt-6 flex flex-col gap-3 border-b border-[var(--color-border)] pb-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <nav className="flex gap-1 rounded-full bg-[var(--color-surface-2)] p-1 text-sm">
+              {(
+                [
+                  { label: "Tout", href: basePath },
+                  { label: "Photos", href: `${basePath}?type=photo` },
+                  { label: "Vidéos", href: `${basePath}?type=video` },
+                ] as const
+              ).map((t) => {
+                const active =
+                  (t.label === "Tout" && !type) ||
+                  (t.label === "Photos" && type === "photo") ||
+                  (t.label === "Vidéos" && type === "video");
+                return (
+                  <Link
+                    key={t.label}
+                    href={t.href + (sort !== "recent" ? `${t.href.includes("?") ? "&" : "?"}sort=${sort}` : "")}
+                    className={`rounded-full px-3 py-1.5 font-medium transition ${
+                      active
+                        ? "bg-[var(--color-accent)] text-white"
+                        : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+                    }`}
+                  >
+                    {t.label}
+                  </Link>
+                );
+              })}
+            </nav>
+            <Suspense fallback={<div className="h-9 w-40" />}>
+              <MediaTypeTabs basePath={basePath} />
+            </Suspense>
+          </div>
+          <Suspense fallback={<div className="h-9" />}>
+            <SortTabs basePath={basePath} />
+          </Suspense>
+        </div>
+
+        <section className="mt-4 pb-4">
           <InfiniteGallery
-            key={handle}
+            key={queryKey}
             initial={page}
-            params={{ sort: "recent", creator: handle }}
+            params={{ sort, creator: handle, type }}
           />
         </section>
       </div>

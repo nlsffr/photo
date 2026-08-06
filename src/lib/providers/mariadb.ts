@@ -105,6 +105,7 @@ const SORT_SQL: Record<SortKey, string> = {
   popular: "p.views_count DESC, p.id DESC",
   liked: "p.likes_count DESC, p.id DESC",
   random: "RAND(:seed)",
+  longest: "COALESCE(p.duration_sec, 0) DESC, p.id DESC",
 };
 
 const PHOTO_SELECT = `
@@ -154,12 +155,13 @@ export class MariaDBProvider implements DataProvider {
 
   async getCreators(): Promise<Creator[]> {
     const rows = await this.q<RowDataPacket>(
-      "SELECT handle, name, avatar_url, bio, location, followers_count, verified FROM creators",
+      "SELECT handle, name, avatar_url, cover_url, bio, location, followers_count, verified FROM creators",
     );
     return rows.map((r) => ({
       handle: r.handle as string,
       name: r.name as string,
       avatarUrl: r.avatar_url as string,
+      coverUrl: (r.cover_url as string) || undefined,
       bio: (r.bio as string) ?? "",
       location: (r.location as string) ?? "",
       followers: r.followers_count as number,
@@ -169,7 +171,7 @@ export class MariaDBProvider implements DataProvider {
 
   async getCreator(handle: string): Promise<Creator | undefined> {
     const rows = await this.q<RowDataPacket>(
-      "SELECT handle, name, avatar_url, bio, location, followers_count, verified FROM creators WHERE handle = :handle LIMIT 1",
+      "SELECT handle, name, avatar_url, cover_url, bio, location, followers_count, verified FROM creators WHERE handle = :handle LIMIT 1",
       { handle },
     );
     const r = rows[0];
@@ -178,6 +180,7 @@ export class MariaDBProvider implements DataProvider {
       handle: r.handle as string,
       name: r.name as string,
       avatarUrl: r.avatar_url as string,
+      coverUrl: (r.cover_url as string) || undefined,
       bio: (r.bio as string) ?? "",
       location: (r.location as string) ?? "",
       followers: r.followers_count as number,
@@ -188,7 +191,7 @@ export class MariaDBProvider implements DataProvider {
   async searchCreators(q: string, limit = 12): Promise<Creator[]> {
     const term = `%${q.trim()}%`;
     const rows = await this.q<RowDataPacket>(
-      `SELECT handle, name, avatar_url, bio, location, followers_count, verified
+      `SELECT handle, name, avatar_url, cover_url, bio, location, followers_count, verified
        FROM creators
        WHERE name LIKE :q OR handle LIKE :q
        ORDER BY followers_count DESC
@@ -199,6 +202,7 @@ export class MariaDBProvider implements DataProvider {
       handle: r.handle as string,
       name: r.name as string,
       avatarUrl: r.avatar_url as string,
+      coverUrl: (r.cover_url as string) || undefined,
       bio: (r.bio as string) ?? "",
       location: (r.location as string) ?? "",
       followers: r.followers_count as number,
@@ -356,15 +360,18 @@ export class MariaDBProvider implements DataProvider {
         ? "totalViews DESC"
         : "c.followers_count DESC";
     const rows = await this.q<RowDataPacket>(
-      `SELECT c.handle, c.name, c.avatar_url, c.bio, c.location, c.followers_count, c.verified,
+      `SELECT c.handle, c.name, c.avatar_url, c.cover_url, c.bio, c.location, c.followers_count, c.verified,
               COUNT(p.id) AS photoCount,
               COALESCE(SUM(p.views_count), 0) AS totalViews,
               COALESCE(SUM(p.likes_count), 0) AS totalLikes,
-              (
-                SELECT p2.image_url FROM photos p2
-                WHERE p2.creator_id = c.id
-                ORDER BY p2.views_count DESC
-                LIMIT 1
+              COALESCE(
+                NULLIF(c.cover_url, ''),
+                (
+                  SELECT p2.image_url FROM photos p2
+                  WHERE p2.creator_id = c.id
+                  ORDER BY p2.views_count DESC
+                  LIMIT 1
+                )
               ) AS coverUrl
        FROM creators c
        LEFT JOIN photos p ON p.creator_id = c.id
