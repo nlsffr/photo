@@ -58,18 +58,10 @@ export default async function CreatorPage({
   const stats = await getCreatorStats(handle);
   const page = await getPhotos({ creator: handle, sort, type, limit: 30 });
 
-  const coverFromDb = creator.coverUrl?.trim() || "";
-  // Prefer a real photo (less watermark noise) over first video thumb
-  const photoCover =
-    page.items.find((i) => i.type === "photo" && i.imageUrl)?.imageUrl || "";
   const avatarSrc =
     creator.avatarUrl && creator.avatarUrl.trim()
       ? creator.avatarUrl
       : page.items[0]?.imageUrl || "";
-
-  // Never use a random video thumb as banner (often competitor watermark)
-  const coverSrc = coverFromDb || photoCover || "";
-  const useAvatarBlur = !coverSrc && !!avatarSrc;
 
   const base = `/creator/${encodeURIComponent(handle)}`;
   const q = (opts: { type?: string | null; sort?: string }) => {
@@ -96,54 +88,24 @@ export default async function CreatorPage({
         <BackLink fallback="/" label="Retour" />
       </div>
 
-      {/* Banner: clean photo OR blurred avatar OR solid gradient — no watermarked video thumbs */}
-      <div className="relative mt-2 h-36 w-full overflow-hidden bg-[var(--color-surface-2)] sm:h-48">
-        {coverSrc ? (
-          <>
-            <MediaImg
-              src={coverSrc}
-              alt=""
-              fill
-              sizes="100vw"
-              priority
-              className="object-cover object-center"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-bg)] via-[var(--color-bg)]/50 to-black/20" />
-          </>
-        ) : useAvatarBlur ? (
-          <>
-            <MediaImg
-              src={avatarSrc}
-              alt=""
-              fill
-              sizes="100vw"
-              priority
-              className="scale-110 object-cover object-top blur-2xl brightness-75"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-bg)] via-[var(--color-bg)]/60 to-[var(--color-accent)]/20" />
-          </>
-        ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-[var(--color-surface-3)] via-[var(--color-surface)] to-[var(--color-accent)]/30" />
-        )}
-      </div>
-
-      <div className="px-3 sm:px-5">
-        <div className="-mt-12 flex items-end gap-3 sm:-mt-14 sm:gap-4">
+      {/* Pas de bannière — avatar entier, jamais coupé */}
+      <div className="px-3 pt-4 sm:px-5">
+        <div className="flex items-center gap-3 sm:gap-4">
           {avatarSrc ? (
             <MediaImg
               src={avatarSrc}
               alt={creator.name}
               width={112}
               height={112}
-              className="h-22 w-22 h-[5.5rem] w-[5.5rem] shrink-0 rounded-full object-cover object-top ring-4 ring-[var(--color-bg)] sm:h-28 sm:w-28"
+              className="h-20 w-20 shrink-0 rounded-full object-cover object-top ring-2 ring-[var(--color-border)] sm:h-24 sm:w-24"
             />
           ) : (
-            <div className="grid h-[5.5rem] w-[5.5rem] shrink-0 place-items-center rounded-full bg-[var(--color-surface-2)] text-xl font-bold ring-4 ring-[var(--color-bg)] sm:h-28 sm:w-28">
+            <div className="grid h-20 w-20 shrink-0 place-items-center rounded-full bg-[var(--color-surface-2)] text-xl font-bold ring-2 ring-[var(--color-border)] sm:h-24 sm:w-24">
               {creator.name.slice(0, 1).toUpperCase()}
             </div>
           )}
 
-          <div className="min-w-0 flex-1 pb-1">
+          <div className="min-w-0 flex-1">
             <h1 className="flex flex-wrap items-center gap-1.5 text-lg font-bold sm:text-2xl">
               <span className="truncate">{creator.name}</span>
               {creator.verified && <VerifiedBadge size={16} />}
@@ -151,7 +113,7 @@ export default async function CreatorPage({
             <p className="text-sm text-[var(--color-ink-faint)]">@{creator.handle}</p>
           </div>
 
-          <FollowButton handle={creator.handle} className="mb-1 shrink-0" />
+          <FollowButton handle={creator.handle} className="shrink-0" />
         </div>
 
         {creator.bio ? (
