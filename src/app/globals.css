@@ -6,19 +6,20 @@
     "Segoe UI Emoji";
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  --color-bg: #0d0d0f;
-  --color-surface: #161618;
-  --color-surface-2: #1e1e21;
-  --color-surface-3: #2a2a2f;
-  --color-border: #2c2c31;
+  --color-bg: #0a0a0c;
+  --color-surface: #141417;
+  --color-surface-2: #1c1c21;
+  --color-surface-3: #2a2a32;
+  --color-border: #2e2e36;
 
-  --color-ink: #f3f3f5;
-  --color-ink-muted: #a6a6b0;
-  --color-ink-faint: #6c6c76;
+  --color-ink: #f4f4f6;
+  --color-ink-muted: #a8a8b3;
+  --color-ink-faint: #6e6e7a;
 
-  --color-accent: #ec3f8f;
-  --color-accent-600: #d81f77;
-  --color-accent-soft: #ec3f8f22;
+  /* Distinct brand: hot rose-red (not copy-site magenta) */
+  --color-accent: #ff3d71;
+  --color-accent-600: #e0245e;
+  --color-accent-soft: #ff3d7122;
 }
 
 html {
@@ -35,7 +36,6 @@ body {
   overflow-x: hidden;
 }
 
-/* Mobile: consistent gutters */
 @supports (padding: max(0px)) {
   body {
     padding-left: env(safe-area-inset-left);
@@ -60,15 +60,13 @@ body {
 @keyframes fade-in {
   from {
     opacity: 0;
-    transform: scale(1.02);
   }
   to {
     opacity: 1;
-    transform: scale(1);
   }
 }
 .animate-fade-in {
-  animation: fade-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: fade-in 0.35s ease both;
 }
 
 @keyframes shimmer {
@@ -109,27 +107,36 @@ body {
   scrollbar-width: none;
 }
 
-/* Masonry columns — even gaps on mobile */
-.gallery-cols {
-  column-gap: 0.625rem;
+/* Stable grid — no CSS-columns reflow when items append */
+.media-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
 }
 @media (min-width: 640px) {
-  .gallery-cols {
-    column-gap: 0.75rem;
+  .media-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
   }
 }
-.gallery-cols > * {
-  break-inside: avoid;
-  margin-bottom: 0.625rem;
+@media (min-width: 1024px) {
+  .media-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
-@media (min-width: 640px) {
-  .gallery-cols > * {
-    margin-bottom: 0.75rem;
+@media (min-width: 1280px) {
+  .media-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
 
-/* Round media consistently */
 img,
 video {
   max-width: 100%;
+}
+
+/* Hide native search clear (we use our own) */
+input[type="search"]::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
 }

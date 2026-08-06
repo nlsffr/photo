@@ -11,6 +11,7 @@ import { FollowButton } from "@/components/Interactions";
 import { MediaImg } from "@/components/MediaImg";
 import { MediaTypeTabs } from "@/components/MediaTypeTabs";
 import { SortTabs } from "@/components/SortTabs";
+import { BackLink } from "@/components/BackLink";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,7 @@ export async function generateMetadata({
   if (!creator) return { title: "Profil introuvable" };
   return {
     title: `${creator.name} (@${creator.handle})`,
-    description: creator.bio || `Profil de ${creator.name} sur LumenGallery`,
+    description: creator.bio || `Profil de ${creator.name} sur LeakFanHub`,
   };
 }
 
@@ -74,7 +75,11 @@ export default async function CreatorPage({
 
   return (
     <div>
-      <div className="relative h-36 w-full overflow-hidden bg-[var(--color-surface-2)] sm:h-48">
+      <div className="px-3 pt-3 sm:px-5">
+        <BackLink fallback="/" label="Retour" />
+      </div>
+
+      <div className="relative mt-2 h-36 w-full overflow-hidden bg-[var(--color-surface-2)] sm:h-48">
         {coverSrc ? (
           <>
             <MediaImg
@@ -125,7 +130,7 @@ export default async function CreatorPage({
                 </p>
               ) : null}
               {creator.location ? (
-                <p className="mt-0.5 flex items-center gap-1 text-xs text-[var(--color-ink-faint)] sm:text-sm">
+                <p className="mt-0.5 text-xs text-[var(--color-ink-faint)] sm:text-sm">
                   {creator.location}
                 </p>
               ) : null}
@@ -171,7 +176,12 @@ export default async function CreatorPage({
                 return (
                   <Link
                     key={t.label}
-                    href={t.href + (sort !== "recent" ? `${t.href.includes("?") ? "&" : "?"}sort=${sort}` : "")}
+                    href={
+                      t.href +
+                      (sort !== "recent"
+                        ? `${t.href.includes("?") ? "&" : "?"}sort=${sort}`
+                        : "")
+                    }
                     className={`rounded-full px-3 py-1.5 font-medium transition ${
                       active
                         ? "bg-[var(--color-accent)] text-white"

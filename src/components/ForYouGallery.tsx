@@ -9,7 +9,7 @@ import { useInteractions } from "./Interactions";
 
 export function ForYouGallery({
   items,
-  limit = 60,
+  limit = 80,
 }: {
   items: PhotoView[];
   limit?: number;
@@ -22,7 +22,6 @@ export function ForYouGallery({
     const followed = new Set(followedHandles);
     const { list, hasTaste } = personalizeFeed(items, liked, saved, followed);
 
-    // Top taste signals for the subtitle.
     const engaged = new Set([...likedIds, ...savedIds]);
     const tagCount = new Map<string, number>();
     for (const p of items) {
@@ -43,7 +42,7 @@ export function ForYouGallery({
 
   if (!ready) {
     return (
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+      <div className="media-grid">
         {Array.from({ length: 10 }).map((_, i) => (
           <div key={i} className="aspect-[4/5] skeleton rounded-xl" />
         ))}
@@ -55,11 +54,10 @@ export function ForYouGallery({
     <>
       {!hasTaste ? (
         <div className="mb-5 rounded-2xl border border-[var(--color-border)] bg-gradient-to-br from-[var(--color-accent-soft)] to-transparent p-5">
-          <p className="text-lg font-bold">Ton feed, rien qu’à toi ✨</p>
+          <p className="text-lg font-bold">Ton feed, rien qu’à toi</p>
           <p className="mt-1 max-w-lg text-sm text-[var(--color-ink-muted)]">
-            Aime des photos ❤️ et suis des modèles 👤 : « Pour toi »
-            apprend tes goûts et te propose du contenu de plus en plus pertinent.
-            En attendant, voici les tendances.
+            Aime des photos et suis des modèles : « Pour toi » apprend tes goûts.
+            En attendant, voici une sélection tendance.
           </p>
           <Link
             href="/"
@@ -79,16 +77,19 @@ export function ForYouGallery({
         )
       )}
 
-      <div className="columns-2 gap-3 sm:columns-3 lg:columns-4 xl:columns-5">
-        {list.map(({ photo, reason }) => (
-          <div key={photo.id} className="mb-3 break-inside-avoid">
-            <PhotoCard photo={photo} />
-            <p className="mt-1 h-4 truncate text-xs text-[var(--color-accent)]">
-              {hasTaste ? (reason ?? "") : ""}
-            </p>
-          </div>
-        ))}
-      </div>
+      {list.length === 0 ? (
+        <p className="py-16 text-center text-sm text-[var(--color-ink-muted)]">
+          Pas encore de médias — reviens après l’import du bot.
+        </p>
+      ) : (
+        <div className="media-grid">
+          {list.map(({ photo }) => (
+            <div key={photo.id} className="min-w-0">
+              <PhotoCard photo={photo} />
+            </div>
+          ))}
+        </div>
+      )}
     </>
   );
 }

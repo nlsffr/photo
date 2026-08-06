@@ -15,11 +15,10 @@ interface Props {
     type?: MediaType;
     ai?: string;
   };
-  /** Hide ads for premium */
   premium?: boolean;
 }
 
-const AD_EVERY = 15;
+const AD_EVERY = 18;
 
 export function InfiniteGallery({ initial, params, premium = false }: Props) {
   const [items, setItems] = useState<PhotoView[]>(initial.items);
@@ -31,6 +30,16 @@ export function InfiniteGallery({ initial, params, premium = false }: Props) {
   const seenRef = useRef<Set<string>>(new Set(initial.items.map((i) => i.id)));
   const seedRef = useRef<number | undefined>(initial.seed);
   const cursorRef = useRef<number | null>(initial.nextCursor);
+
+  // Reset only when query identity changes (parent should set key)
+  useEffect(() => {
+    setItems(initial.items);
+    setCursor(initial.nextCursor);
+    cursorRef.current = initial.nextCursor;
+    seedRef.current = initial.seed;
+    seenRef.current = new Set(initial.items.map((i) => i.id));
+    setErrored(false);
+  }, [initial]);
 
   useEffect(() => {
     cursorRef.current = cursor;
@@ -47,6 +56,7 @@ export function InfiniteGallery({ initial, params, premium = false }: Props) {
       if (params.ai === "0" || params.ai === "1") sp.set("ai", params.ai);
       if (seedRef.current !== undefined) sp.set("seed", String(seedRef.current));
       sp.set("cursor", String(c));
+      sp.set("limit", "30");
       return `/api/photos?${sp.toString()}`;
     },
     [params.sort, params.tag, params.q, params.creator, params.type, params.ai],
@@ -69,7 +79,7 @@ export function InfiniteGallery({ initial, params, premium = false }: Props) {
         setItems((prev) => [...prev, ...fresh]);
       }
 
-      if (page.nextCursor === null || page.nextCursor === c) {
+      if (page.nextCursor === null || page.nextCursor === c || fresh.length === 0) {
         setCursor(null);
         cursorRef.current = null;
       } else {
@@ -90,15 +100,14 @@ export function InfiniteGallery({ initial, params, premium = false }: Props) {
     if (!el || cursor === null) return;
     const obs = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting && !errored) {
-          void loadMore();
-        }
+        if (entries[0]?.isIntersecting && !errored) void loadMore();
       },
-      { root: null, rootMargin: "1200px 0px", threshold: 0 },
+      // Smaller margin = less aggressive preload = less jank
+      { root: null, rootMargin: "400px 0px", threshold: 0 },
     );
     obs.observe(el);
     return () => obs.disconnect();
-  }, [loadMore, cursor, errored, items.length]);
+  }, [loadMore, cursor, errored]);
 
   if (items.length === 0) {
     return (
@@ -113,15 +122,15 @@ export function InfiniteGallery({ initial, params, premium = false }: Props) {
 
   return (
     <>
-      <div className="columns-2 gap-2.5 sm:columns-3 sm:gap-3 lg:columns-4 xl:columns-5">
+      <div className="media-grid">
         {items.map((p, i) => (
-          <div key={p.id} className="mb-2.5 break-inside-avoid sm:mb-3">
+          <div key={p.id} className="min-w-0">
             <PhotoCard photo={p} />
-            {!premium && (i + 1) % AD_EVERY === 0 && (
-              <div className="mt-2.5 break-inside-avoid">
+            {!premium && (i + 1) % AD_EVERY === 0 ? (
+              <div className="mt-2">
                 <AdSlot variant="interstitial" />
               </div>
-            )}
+            ) : null}
           </div>
         ))}
       </div>
