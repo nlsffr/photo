@@ -9,7 +9,7 @@ interface Props {
   title?: string;
   views?: number;
   likes?: number;
-  /** Original media dimensions — used to size the player correctly */
+  /** Original media dimensions from DB */
   width?: number;
   height?: number;
   autoPlay?: boolean;
@@ -47,10 +47,10 @@ export function VideoPlayer({
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [current, setCurrent] = useState(0);
-  const [natural, setNatural] = useState({ w: width ?? 0, h: height ?? 0 });
-
-  const isVertical =
-    natural.w > 0 && natural.h > 0 ? natural.h > natural.w : (height ?? 16) > (width ?? 9);
+  const [ratio, setRatio] = useState<number | null>(() => {
+    if (width && height && width > 0 && height > 0) return width / height;
+    return null;
+  });
 
   const togglePlay = useCallback(() => {
     const v = videoRef.current;
@@ -119,25 +119,17 @@ export function VideoPlayer({
     if (autoPlay) void v.play().catch(() => setPlaying(false));
   }, [autoPlay, muted, src]);
 
-  // Vertical on desktop: centered column max ~min(80vh, 420px wide)
-  // Horizontal: full width, max 80vh
-  const frameClass = isVertical
-    ? "mx-auto flex w-full max-w-[min(100%,420px)] items-center justify-center"
-    : "w-full";
+  // Native aspect only — no forced 9:16 or 16:9 box
+  const aspectStyle =
+    ratio && ratio > 0
+      ? { aspectRatio: String(ratio), maxHeight: "85vh" }
+      : { maxHeight: "85vh" };
 
   return (
     <div
       ref={shellRef}
-      className={`group relative overflow-hidden rounded-2xl bg-black ${frameClass} ${className}`}
-      style={{
-        aspectRatio:
-          natural.w > 0 && natural.h > 0
-            ? `${natural.w} / ${natural.h}`
-            : isVertical
-              ? "9 / 16"
-              : "16 / 9",
-        maxHeight: "min(80vh, 900px)",
-      }}
+      className={`group relative mx-auto w-full overflow-hidden rounded-2xl bg-black ${className}`}
+      style={aspectStyle}
     >
       <video
         ref={videoRef}
@@ -151,17 +143,16 @@ export function VideoPlayer({
           const v = videoRef.current;
           if (!v) return;
           setDuration(v.duration || 0);
-          if (v.videoWidth && v.videoHeight) {
-            setNatural({ w: v.videoWidth, h: v.videoHeight });
+          if (v.videoWidth > 0 && v.videoHeight > 0) {
+            setRatio(v.videoWidth / v.videoHeight);
           }
         }}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
         onClick={togglePlay}
-        className="absolute inset-0 h-full w-full object-contain bg-black"
+        className="absolute inset-0 h-full w-full object-contain"
       />
 
-      {/* Big center play when paused */}
       {!playing && (
         <button
           type="button"
