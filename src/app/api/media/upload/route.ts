@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
+import { getCreator } from "@/lib/photos";
 
-/**
- * User media upload — validates creator exists in DB.
- * Full MinIO/B2 storage can be wired when credentials are ready.
- * For now: accept metadata + reject unknown creators.
- */
 export async function POST(request: Request) {
   try {
     const form = await request.formData();
@@ -19,13 +15,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Fichier requis" }, { status: 400 });
     }
     if (file.size > 500 * 1024 * 1024) {
-      return NextResponse.json({ error: "Fichier trop volumineux (max 500 Mo)" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Fichier trop volumineux (max 500 Mo)" },
+        { status: 400 },
+      );
     }
 
-    // Verify creator exists
-    const { getProvider } = await import("@/lib/photos");
-    const provider = getProvider();
-    const found = await provider.getCreator(creator);
+    const found = await getCreator(creator);
     if (!found) {
       return NextResponse.json(
         { error: "Créateur inconnu — choisis un handle existant" },
@@ -33,7 +29,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Placeholder: real upload to B2/MinIO + INSERT photos comes next
     console.info("[upload]", {
       creator,
       title,

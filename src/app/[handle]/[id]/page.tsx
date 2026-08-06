@@ -15,6 +15,7 @@ import { MediaImg } from "@/components/MediaImg";
 import { VideoPlayer } from "@/components/VideoPlayer";
 import { Comments } from "@/components/Comments";
 import { JsonLd } from "@/components/JsonLd";
+import { BackLink } from "@/components/BackLink";
 
 const RESERVED = new Set([
   "api",
@@ -36,6 +37,8 @@ const RESERVED = new Set([
   "trust-and-safety",
   "welcome",
   "tag",
+  "add",
+  "premium",
 ]);
 
 export async function generateMetadata({
@@ -90,9 +93,7 @@ export default async function MediaByHandlePage({
           thumbnailUrl: photo.imageUrl,
           contentUrl: photo.videoUrl,
           uploadDate: new Date(Date.now() - photo.ageMinutes * 60_000).toISOString(),
-          duration: photo.durationSec
-            ? `PT${photo.durationSec}S`
-            : undefined,
+          duration: photo.durationSec ? `PT${photo.durationSec}S` : undefined,
           interactionStatistic: {
             "@type": "InteractionCounter",
             interactionType: "https://schema.org/WatchAction",
@@ -111,15 +112,14 @@ export default async function MediaByHandlePage({
   return (
     <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6">
       <JsonLd data={schema} />
-      <Link
-        href="/"
-        className="mb-4 inline-flex items-center gap-1.5 text-sm text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
-      >
-        ← Retour à la galerie
-      </Link>
+      <BackLink
+        fallback={`/creator/${photo.creatorHandle}`}
+        label="Retour"
+        className="mb-4"
+      />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="overflow-hidden rounded-2xl bg-black ring-1 ring-[var(--color-border)]">
+        <div className="flex items-center justify-center overflow-hidden rounded-2xl bg-black ring-1 ring-[var(--color-border)]">
           {photo.type === "video" && photo.videoUrl ? (
             <VideoPlayer
               src={photo.videoUrl}
@@ -127,10 +127,12 @@ export default async function MediaByHandlePage({
               title={photo.title}
               views={photo.views}
               likes={photo.likes}
-              className="min-h-[40vh] max-h-[80vh]"
+              width={photo.width}
+              height={photo.height}
+              className="w-full"
             />
           ) : (
-            <div className="flex items-center justify-center">
+            <div className="flex w-full items-center justify-center p-1">
               <MediaImg
                 src={photo.imageUrl}
                 alt={photo.title}
