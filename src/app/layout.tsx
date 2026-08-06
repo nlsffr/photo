@@ -5,6 +5,9 @@ import { InteractionsProvider } from "@/components/Interactions";
 import { AnonIdentityProvider } from "@/components/AnonIdentity";
 import { SessionProvider } from "@/components/Session";
 import { AgeGate } from "@/components/AgeGate";
+import { LocaleProvider } from "@/components/LocaleProvider";
+import { PremiumProvider } from "@/components/Premium";
+import { CookieBanner } from "@/components/CookieBanner";
 
 export const metadata: Metadata = {
   title: {
@@ -12,7 +15,7 @@ export const metadata: Metadata = {
     template: "%s · LeakFanHub",
   },
   description:
-    "LeakFanHub — découverte de photos et vidéos. Feed, créateurs, tags.",
+    "LeakFanHub — découverte de photos et vidéos. Feed, créateurs, tags. 18+.",
 };
 
 export const viewport: Viewport = {
@@ -27,16 +30,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fr" className="h-full antialiased">
+    <html lang="en" className="h-full antialiased">
       <body className="min-h-full">
-        <SessionProvider>
-          <AnonIdentityProvider>
-            <InteractionsProvider>
-              <AgeGate />
-              <AppShell>{children}</AppShell>
-            </InteractionsProvider>
-          </AnonIdentityProvider>
-        </SessionProvider>
+        <LocaleProvider>
+          <SessionProvider>
+            <PremiumProvider>
+              <AnonIdentityProvider>
+                <InteractionsProvider>
+                  <AgeGate />
+                  <AppShell>{children}</AppShell>
+                  <CookieBanner />
+                </InteractionsProvider>
+              </AnonIdentityProvider>
+            </PremiumProvider>
+          </SessionProvider>
+        </LocaleProvider>
       </body>
     </html>
   );
