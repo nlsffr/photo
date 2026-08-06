@@ -58,13 +58,18 @@ export default async function CreatorPage({
   const stats = await getCreatorStats(handle);
   const page = await getPhotos({ creator: handle, sort, type, limit: 30 });
 
-  const coverFromDb = creator.coverUrl?.trim();
-  const coverFallback = page.items[0]?.imageUrl;
-  const coverSrc = coverFromDb || coverFallback || "";
+  const coverFromDb = creator.coverUrl?.trim() || "";
+  // Prefer a real photo (less watermark noise) over first video thumb
+  const photoCover =
+    page.items.find((i) => i.type === "photo" && i.imageUrl)?.imageUrl || "";
   const avatarSrc =
     creator.avatarUrl && creator.avatarUrl.trim()
       ? creator.avatarUrl
-      : coverFallback || "";
+      : page.items[0]?.imageUrl || "";
+
+  // Never use a random video thumb as banner (often competitor watermark)
+  const coverSrc = coverFromDb || photoCover || "";
+  const useAvatarBlur = !coverSrc && !!avatarSrc;
 
   const base = `/creator/${encodeURIComponent(handle)}`;
   const q = (opts: { type?: string | null; sort?: string }) => {
@@ -75,7 +80,6 @@ export default async function CreatorPage({
     return qs ? `${base}?${qs}` : base;
   };
 
-  // UNE seule rangée — pas de doublon MediaTypeTabs + SortTabs
   const chips = [
     { label: "Tout", href: q({ sort }), active: !type },
     { label: "Photos", href: q({ type: "photo", sort }), active: type === "photo" },
@@ -87,12 +91,13 @@ export default async function CreatorPage({
   const queryKey = `${handle}|${sort}|${type ?? ""}`;
 
   return (
-    <div>
+    <div className="pb-4">
       <div className="px-3 pt-3 sm:px-5">
         <BackLink fallback="/" label="Retour" />
       </div>
 
-      <div className="relative mt-2 h-32 w-full overflow-hidden bg-[var(--color-surface-2)] sm:h-44">
+      {/* Banner: clean photo OR blurred avatar OR solid gradient — no watermarked video thumbs */}
+      <div className="relative mt-2 h-36 w-full overflow-hidden bg-[var(--color-surface-2)] sm:h-48">
         {coverSrc ? (
           <>
             <MediaImg
@@ -103,25 +108,37 @@ export default async function CreatorPage({
               priority
               className="object-cover object-center"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-bg)] via-[var(--color-bg)]/40 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-bg)] via-[var(--color-bg)]/50 to-black/20" />
+          </>
+        ) : useAvatarBlur ? (
+          <>
+            <MediaImg
+              src={avatarSrc}
+              alt=""
+              fill
+              sizes="100vw"
+              priority
+              className="scale-110 object-cover object-top blur-2xl brightness-75"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-bg)] via-[var(--color-bg)]/60 to-[var(--color-accent)]/20" />
           </>
         ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-[var(--color-surface-2)] to-[var(--color-surface)]" />
+          <div className="absolute inset-0 bg-gradient-to-br from-[var(--color-surface-3)] via-[var(--color-surface)] to-[var(--color-accent)]/30" />
         )}
       </div>
 
       <div className="px-3 sm:px-5">
-        <div className="-mt-10 flex items-end gap-3 sm:-mt-12 sm:gap-4">
+        <div className="-mt-12 flex items-end gap-3 sm:-mt-14 sm:gap-4">
           {avatarSrc ? (
             <MediaImg
               src={avatarSrc}
               alt={creator.name}
               width={112}
               height={112}
-              className="h-20 w-20 shrink-0 rounded-full object-cover object-top ring-4 ring-[var(--color-bg)] sm:h-28 sm:w-28"
+              className="h-22 w-22 h-[5.5rem] w-[5.5rem] shrink-0 rounded-full object-cover object-top ring-4 ring-[var(--color-bg)] sm:h-28 sm:w-28"
             />
           ) : (
-            <div className="grid h-20 w-20 shrink-0 place-items-center rounded-full bg-[var(--color-surface-2)] text-xl font-bold ring-4 ring-[var(--color-bg)] sm:h-28 sm:w-28">
+            <div className="grid h-[5.5rem] w-[5.5rem] shrink-0 place-items-center rounded-full bg-[var(--color-surface-2)] text-xl font-bold ring-4 ring-[var(--color-bg)] sm:h-28 sm:w-28">
               {creator.name.slice(0, 1).toUpperCase()}
             </div>
           )}
@@ -143,7 +160,7 @@ export default async function CreatorPage({
           </p>
         ) : null}
 
-        <div className="mt-4 flex gap-4 text-sm">
+        <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm">
           <span>
             <strong>{formatCount(creator.followers)}</strong>{" "}
             <span className="text-[var(--color-ink-faint)]">abonnés</span>
@@ -158,7 +175,6 @@ export default async function CreatorPage({
           </span>
         </div>
 
-        {/* UNE seule barre de filtres */}
         <div className="no-scrollbar mt-4 flex gap-2 overflow-x-auto border-b border-[var(--color-border)] pb-3">
           {chips.map((c) => (
             <Link
