@@ -14,14 +14,15 @@ const SIZES =
 
 const PREVIEW_MAX_SEC = 8;
 
+/** Format unique pour toute la grille → plus de trous entre colonnes */
+const CARD_RATIO = "4 / 5";
+
 export function PhotoCard({ photo }: { photo: PhotoView }) {
   const { isLiked, isSaved, toggleLike, toggleSave, ready } = useInteractions();
   const liked = ready && isLiked(photo.id);
   const saved = ready && isSaved(photo.id);
   const likeCount = photo.likes + (liked ? 1 : 0);
 
-  const ratio = photo.width && photo.height ? photo.width / photo.height : 0.8;
-  const clamped = Math.min(Math.max(ratio, 0.55), 1.4);
   const href = mediaHref(photo);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -55,7 +56,7 @@ export function PhotoCard({ photo }: { photo: PhotoView }) {
   return (
     <div
       className="group relative isolate w-full overflow-hidden rounded-xl bg-[var(--color-surface-2)]"
-      style={{ aspectRatio: String(clamped) }}
+      style={{ aspectRatio: CARD_RATIO }}
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
     >
@@ -65,7 +66,7 @@ export function PhotoCard({ photo }: { photo: PhotoView }) {
           alt={photo.title}
           fill
           sizes={SIZES}
-          className={`animate-fade-in object-cover transition-opacity duration-300 ${hovering && isVideo ? "opacity-0" : "opacity-100"}`}
+          className={`animate-fade-in object-cover object-center transition-opacity duration-300 ${hovering && isVideo ? "opacity-0" : "opacity-100"}`}
         />
 
         {isVideo && (
@@ -77,7 +78,7 @@ export function PhotoCard({ photo }: { photo: PhotoView }) {
             preload="none"
             loop
             onTimeUpdate={onTimeUpdate}
-            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${hovering ? "opacity-100" : "opacity-0"}`}
+            className={`absolute inset-0 h-full w-full object-cover object-center transition-opacity duration-300 ${hovering ? "opacity-100" : "opacity-0"}`}
           />
         )}
 

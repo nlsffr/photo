@@ -16,7 +16,6 @@
   --color-ink-muted: #a8a8b0;
   --color-ink-faint: #6f6f78;
 
-  /* Warm coral — distinct from competitor magenta & previous violet */
   --color-accent: #ff5c6c;
   --color-accent-600: #e84555;
   --color-accent-soft: #ff5c6c24;
@@ -84,15 +83,17 @@ body {
   scrollbar-width: none;
 }
 
+/* Grille uniforme — toutes les cellules même largeur, cartes 4:5 */
 .media-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.4rem;
+  gap: 0.5rem;
+  align-items: start;
 }
 @media (min-width: 640px) {
   .media-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.65rem;
+    gap: 0.75rem;
   }
 }
 @media (min-width: 1024px) {
