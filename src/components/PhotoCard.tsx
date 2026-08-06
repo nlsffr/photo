@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRef, useState } from "react";
 import type { PhotoView } from "@/lib/types";
 import { mediaHref } from "@/lib/types";
 import { formatCount, formatDuration } from "@/lib/format";
@@ -10,6 +11,9 @@ import { MediaImg } from "./MediaImg";
 
 const SIZES =
   "(max-width: 640px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 20vw";
+
+/** Hover preview: play muted clip for ~8s then loop from start. */
+const PREVIEW_MAX_SEC = 8;
 
 export function PhotoCard({ photo }: { photo: PhotoView }) {
   const { isLiked, isSaved, toggleLike, toggleSave, ready } = useInteractions();
@@ -21,10 +25,43 @@ export function PhotoCard({ photo }: { photo: PhotoView }) {
   const clamped = Math.min(Math.max(ratio, 0.55), 1.4);
   const href = mediaHref(photo);
 
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [hovering, setHovering] = useState(false);
+  const isVideo = photo.type === "video" && !!photo.videoUrl;
+
+  const onEnter = () => {
+    if (!isVideo) return;
+    setHovering(true);
+    const v = videoRef.current;
+    if (!v) return;
+    v.currentTime = 0;
+    v.muted = true;
+    void v.play().catch(() => undefined);
+  };
+
+  const onLeave = () => {
+    setHovering(false);
+    const v = videoRef.current;
+    if (!v) return;
+    v.pause();
+    v.currentTime = 0;
+  };
+
+  const onTimeUpdate = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.currentTime >= PREVIEW_MAX_SEC) {
+      v.currentTime = 0;
+    }
+  };
+
   return (
     <div
       className="group relative w-full overflow-hidden rounded-xl bg-[var(--color-surface-2)] ring-1 ring-[var(--color-border)]"
       style={{ aspectRatio: String(clamped) }}
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}
+      onTouchStart={onEnter}
     >
       <Link href={href} className="absolute inset-0" aria-label={photo.title}>
         <MediaImg
@@ -32,18 +69,32 @@ export function PhotoCard({ photo }: { photo: PhotoView }) {
           alt={photo.title}
           fill
           sizes={SIZES}
-          className="animate-fade-in object-cover transition-transform duration-500 group-hover:scale-105"
+          className={`animate-fade-in object-cover transition-opacity duration-300 ${hovering && isVideo ? "opacity-0" : "opacity-100"}`}
         />
+
+        {isVideo && (
+          <video
+            ref={videoRef}
+            src={photo.videoUrl}
+            muted
+            playsInline
+            preload="none"
+            loop
+            onTimeUpdate={onTimeUpdate}
+            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${hovering ? "opacity-100" : "opacity-0"}`}
+          />
+        )}
+
         <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/60 to-transparent" />
         <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/75 to-transparent opacity-100 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100" />
 
         {photo.isAi && (
-          <span className="absolute left-2 bottom-14 z-[5] rounded bg-purple-600/90 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+          <span className="absolute bottom-14 left-2 z-[5] rounded bg-purple-600/90 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
             IA
           </span>
         )}
 
-        {photo.type === "video" && (
+        {isVideo && !hovering && (
           <>
             <span className="absolute inset-0 grid place-items-center">
               <span className="grid h-11 w-11 place-items-center rounded-full bg-black/45 ring-1 ring-white/40 backdrop-blur-sm transition-transform duration-200 group-hover:scale-110">
@@ -60,9 +111,6 @@ export function PhotoCard({ photo }: { photo: PhotoView }) {
 
         {photo.type === "pack" && (
           <span className="absolute right-2 top-2 flex items-center gap-1 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-medium text-white">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-              <path d="M4 7h16M4 12h16M4 17h16" />
-            </svg>
             Pack{photo.itemCount ? ` · ${photo.itemCount}` : ""}
           </span>
         )}
