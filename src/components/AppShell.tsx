@@ -120,7 +120,7 @@ function BottomTabs() {
   const pathname = usePathname();
   const { t } = useLocale();
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 flex h-[calc(3.75rem+env(safe-area-inset-bottom))] items-stretch border-t border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-bg)_92%,transparent)] pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-50 flex h-[calc(3.75rem+env(safe-area-inset-bottom))] items-stretch border-t border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-bg)_92%,transparent)] pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden">
       {TABS.map((tab) => {
         const active = tab.active(pathname);
         return (
@@ -145,7 +145,8 @@ function BottomTabs() {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
-  const hideChrome = pathname.startsWith("/feed") || pathname.startsWith("/tiktok");
+  // Feed immersive: hide footer only — ALWAYS keep bottom tabs so user can leave
+  const isFeed = pathname.startsWith("/feed") || pathname.startsWith("/tiktok");
 
   useEffect(() => {
     if (!open) return;
@@ -248,9 +249,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      {!hideChrome && <BottomTabs />}
+      {/* Always visible — user must be able to leave /feed */}
+      <BottomTabs />
 
-      {!hideChrome && (
+      {!isFeed && (
         <footer className="mt-auto border-t border-[var(--color-border)] bg-[var(--color-surface)] pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-6">
           <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

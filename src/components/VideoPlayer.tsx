@@ -9,7 +9,6 @@ interface Props {
   title?: string;
   views?: number;
   likes?: number;
-  /** Original media dimensions from DB */
   width?: number;
   height?: number;
   autoPlay?: boolean;
@@ -106,10 +105,34 @@ export function VideoPlayer({
     }
   }, []);
 
+  /** iOS Safari = webkitEnterFullscreen on <video>; Android/desktop = Fullscreen API */
   const enterFs = useCallback(() => {
-    const el = shellRef.current ?? videoRef.current;
-    if (!el) return;
-    if (el.requestFullscreen) void el.requestFullscreen();
+    const v = videoRef.current;
+    if (!v) return;
+    const anyV = v as HTMLVideoElement & {
+      webkitEnterFullscreen?: () => void;
+      webkitRequestFullscreen?: () => void;
+    };
+    try {
+      if (typeof anyV.webkitEnterFullscreen === "function") {
+        anyV.webkitEnterFullscreen();
+        return;
+      }
+      const shell = shellRef.current as (HTMLElement & {
+        webkitRequestFullscreen?: () => void;
+        msRequestFullscreen?: () => void;
+      }) | null;
+      const target = shell ?? v;
+      if (target.requestFullscreen) {
+        void target.requestFullscreen();
+      } else if (typeof (target as typeof anyV).webkitRequestFullscreen === "function") {
+        (target as typeof anyV).webkitRequestFullscreen?.();
+      } else if (shell?.msRequestFullscreen) {
+        shell.msRequestFullscreen();
+      }
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   useEffect(() => {
@@ -119,7 +142,6 @@ export function VideoPlayer({
     if (autoPlay) void v.play().catch(() => setPlaying(false));
   }, [autoPlay, muted, src]);
 
-  // Native aspect only — no forced 9:16 or 16:9 box
   const aspectStyle =
     ratio && ratio > 0
       ? { aspectRatio: String(ratio), maxHeight: "85vh" }
