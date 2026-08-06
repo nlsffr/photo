@@ -40,7 +40,16 @@ function RailButton({
   );
 }
 
-function FeedSlide({ item, muted }: { item: PhotoView; muted: boolean }) {
+function FeedSlide({
+  item,
+  muted,
+  preload,
+}: {
+  item: PhotoView;
+  muted: boolean;
+  /** auto = full buffer for current/next slides */
+  preload: "auto" | "metadata" | "none";
+}) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [progress, setProgress] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -54,6 +63,7 @@ function FeedSlide({ item, muted }: { item: PhotoView; muted: boolean }) {
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
+    el.preload = preload;
     const obs = new IntersectionObserver(
       (entries) => {
         const e = entries[0];
@@ -68,7 +78,7 @@ function FeedSlide({ item, muted }: { item: PhotoView; muted: boolean }) {
     );
     obs.observe(el);
     return () => obs.disconnect();
-  }, [item.id]);
+  }, [item.id, preload]);
 
   function togglePlay() {
     const el = videoRef.current;
@@ -91,7 +101,7 @@ function FeedSlide({ item, muted }: { item: PhotoView; muted: boolean }) {
           muted={muted}
           loop
           playsInline
-          preload="metadata"
+          preload={preload}
           onTimeUpdate={(e) => {
             const v = e.currentTarget;
             if (v.duration) setProgress(v.currentTime / v.duration);
@@ -147,16 +157,7 @@ function FeedSlide({ item, muted }: { item: PhotoView; muted: boolean }) {
             </Link>
             <FollowPill handle={item.creatorHandle} />
           </div>
-          <p className="mt-2 line-clamp-2 text-sm text-white/90 drop-shadow">
-            {item.title}
-          </p>
-          {item.tags.length > 0 && (
-            <div className="mt-1 flex flex-wrap gap-x-2 text-sm font-medium text-white/80">
-              {item.tags.slice(0, 4).map((t) => (
-                <span key={t}>#{t}</span>
-              ))}
-            </div>
-          )}
+          <p className="mt-2 line-clamp-2 text-sm text-white/90 drop-shadow">{item.title}</p>
         </div>
 
         <div className="flex shrink-0 flex-col items-center gap-3 pb-1 pointer-events-auto">
@@ -172,9 +173,7 @@ function FeedSlide({ item, muted }: { item: PhotoView; muted: boolean }) {
                 </svg>
               }
             />
-            <span className="text-xs font-semibold text-white drop-shadow">
-              {formatCount(likeCount)}
-            </span>
+            <span className="text-xs font-semibold text-white drop-shadow">{formatCount(likeCount)}</span>
           </div>
           <div className="flex flex-col items-center gap-1">
             <RailButton
@@ -188,22 +187,14 @@ function FeedSlide({ item, muted }: { item: PhotoView; muted: boolean }) {
                 </svg>
               }
             />
-            <span className="text-xs font-semibold text-white drop-shadow">
-              {saved ? "Enregistré" : "Enreg."}
-            </span>
           </div>
-          <span className="text-xs font-medium text-white/70">
-            {formatCount(item.views)} vues
-          </span>
+          <span className="text-xs font-medium text-white/70">{formatCount(item.views)} vues</span>
         </div>
       </div>
 
       {isVideo && (
         <div className="absolute inset-x-0 bottom-0 z-20 h-1 bg-white/20">
-          <div
-            className="h-full bg-[var(--color-accent)]"
-            style={{ width: `${Math.round(progress * 100)}%` }}
-          />
+          <div className="h-full bg-[var(--color-accent)]" style={{ width: `${Math.round(progress * 100)}%` }} />
         </div>
       )}
     </section>
@@ -219,11 +210,33 @@ export function FeedViewer({
 }) {
   const [muted, setMuted] = useState(true);
   const [items, setItems] = useState<PhotoView[]>(initial);
+  const [active, setActive] = useState(0);
   const [cursor, setCursor] = useState<number | null>(
     initial.length >= 20 ? initial.length : null,
   );
   const loadingRef = useRef(false);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+
+  // Preload next videos via hidden <link> (browser cache)
+  useEffect(() => {
+    const urls = items
+      .slice(active, active + 4)
+      .map((i) => i.videoUrl)
+      .filter(Boolean) as string[];
+    const links: HTMLLinkElement[] = [];
+    for (const href of urls) {
+      const l = document.createElement("link");
+      l.rel = "preload";
+      l.as = "video";
+      l.href = href;
+      document.head.appendChild(l);
+      links.push(l);
+    }
+    return () => {
+      for (const l of links) l.remove();
+    };
+  }, [active, items]);
 
   const loadMore = useCallback(async () => {
     if (loadingRef.current || cursor === null) return;
@@ -260,24 +273,38 @@ export function FeedViewer({
       (entries) => {
         if (entries[0]?.isIntersecting) loadMore();
       },
-      { rootMargin: "200% 0px" },
+      { rootMargin: "300% 0px" },
     );
     obs.observe(el);
     return () => obs.disconnect();
   }, [loadMore, cursor]);
 
+  // Track which slide is active for preload priority
+  useEffect(() => {
+    const root = scrollerRef.current;
+    if (!root) return;
+    const slides = root.querySelectorAll("[data-feed-idx]");
+    const obs = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting && e.intersectionRatio > 0.5) {
+            const idx = Number((e.target as HTMLElement).dataset.feedIdx);
+            if (!Number.isNaN(idx)) setActive(idx);
+          }
+        }
+      },
+      { root, threshold: 0.5 },
+    );
+    slides.forEach((s) => obs.observe(s));
+    return () => obs.disconnect();
+  }, [items.length]);
+
   if (items.length === 0) {
     return (
       <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 top-[calc(3.5rem+env(safe-area-inset-top))] z-30 flex flex-col items-center justify-center gap-3 bg-black px-6 text-center lg:bottom-0 lg:left-60 lg:top-14">
         <p className="text-lg font-semibold text-white">Feed vide</p>
-        <p className="max-w-sm text-sm text-white/60">
-          Le bot est encore en train d’importer des vidéos. Reviens dans quelques minutes.
-        </p>
-        <Link
-          href="/"
-          className="mt-2 rounded-full bg-[var(--color-accent)] px-6 py-2.5 text-sm font-semibold text-white"
-        >
-          Voir la galerie
+        <Link href="/" className="mt-2 rounded-full bg-[var(--color-accent)] px-6 py-2.5 text-sm font-semibold text-white">
+          Accueil
         </Link>
       </div>
     );
@@ -285,6 +312,16 @@ export function FeedViewer({
 
   return (
     <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 top-[calc(3.5rem+env(safe-area-inset-top))] z-30 bg-black lg:bottom-0 lg:left-60 lg:top-14">
+      <Link
+        href="/"
+        className="absolute left-3 top-3 z-30 grid h-10 w-10 place-items-center rounded-full bg-black/50 text-white backdrop-blur-sm"
+        aria-label="Fermer le feed"
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
+          <path d="M18 6 6 18M6 6l12 12" />
+        </svg>
+      </Link>
+
       <button
         type="button"
         onClick={() => setMuted((m) => !m)}
@@ -302,12 +339,21 @@ export function FeedViewer({
         )}
       </button>
 
-      <div className="no-scrollbar mx-auto h-full max-w-[500px] snap-y snap-mandatory overflow-y-scroll overscroll-y-contain">
-        {items.map((item) => (
-          <div key={item.id} className="h-full w-full">
-            <FeedSlide item={item} muted={muted} />
-          </div>
-        ))}
+      <div
+        ref={scrollerRef}
+        className="no-scrollbar mx-auto h-full max-w-[500px] snap-y snap-mandatory overflow-y-scroll overscroll-y-contain"
+      >
+        {items.map((item, idx) => {
+          // Current + next 3 fully preloaded
+          const dist = idx - active;
+          const preload: "auto" | "metadata" | "none" =
+            dist >= 0 && dist <= 3 ? "auto" : dist === -1 ? "metadata" : "none";
+          return (
+            <div key={item.id} data-feed-idx={idx} className="h-full w-full">
+              <FeedSlide item={item} muted={muted} preload={preload} />
+            </div>
+          );
+        })}
         {cursor !== null && (
           <div ref={sentinelRef} className="flex h-24 items-center justify-center">
             <span className="h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-white" />
