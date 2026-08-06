@@ -13,6 +13,8 @@ import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { FollowButton, PostActions } from "@/components/Interactions";
 import { MediaImg } from "@/components/MediaImg";
 import { VideoPlayer } from "@/components/VideoPlayer";
+import { Comments } from "@/components/Comments";
+import { JsonLd } from "@/components/JsonLd";
 
 const RESERVED = new Set([
   "api",
@@ -27,6 +29,13 @@ const RESERVED = new Set([
   "saved",
   "liked",
   "search",
+  "trending-medias",
+  "most-liked",
+  "random",
+  "tiktok",
+  "trust-and-safety",
+  "welcome",
+  "tag",
 ]);
 
 export async function generateMetadata({
@@ -72,8 +81,36 @@ export default async function MediaByHandlePage({
   const photo = withCreator(raw, creator);
   const related = await getRelatedPhotos(raw);
 
+  const schema =
+    photo.type === "video" && photo.videoUrl
+      ? {
+          "@context": "https://schema.org",
+          "@type": "VideoObject",
+          name: photo.title,
+          thumbnailUrl: photo.imageUrl,
+          contentUrl: photo.videoUrl,
+          uploadDate: new Date(Date.now() - photo.ageMinutes * 60_000).toISOString(),
+          duration: photo.durationSec
+            ? `PT${photo.durationSec}S`
+            : undefined,
+          interactionStatistic: {
+            "@type": "InteractionCounter",
+            interactionType: "https://schema.org/WatchAction",
+            userInteractionCount: photo.views,
+          },
+        }
+      : {
+          "@context": "https://schema.org",
+          "@type": "ImageObject",
+          name: photo.title,
+          contentUrl: photo.imageUrl,
+          width: photo.width,
+          height: photo.height,
+        };
+
   return (
     <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6">
+      <JsonLd data={schema} />
       <Link
         href="/"
         className="mb-4 inline-flex items-center gap-1.5 text-sm text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
@@ -166,7 +203,7 @@ export default async function MediaByHandlePage({
               {photo.tags.map((tag) => (
                 <Link
                   key={tag}
-                  href={`/?tag=${encodeURIComponent(tag)}`}
+                  href={`/tag/${encodeURIComponent(tag)}`}
                   className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-sm capitalize text-[var(--color-ink-muted)] transition-colors hover:text-[var(--color-ink)]"
                 >
                   #{tag}
@@ -175,18 +212,16 @@ export default async function MediaByHandlePage({
             </div>
           )}
 
-          {photo.externalUrl && (
-            <a
-              href={photo.externalUrl}
-              target="_blank"
-              rel="noopener noreferrer nofollow"
-              className="flex items-center justify-center gap-2 rounded-xl bg-[var(--color-accent)] py-3 text-sm font-bold text-white transition-colors hover:bg-[var(--color-accent-600)]"
-            >
-              Voir le contenu
-            </a>
-          )}
-
           <PostActions id={photo.id} baseLikes={photo.likes} />
+
+          <Link
+            href={`/dmca?photo=${encodeURIComponent(photo.id)}`}
+            className="text-center text-xs text-[var(--color-ink-faint)] underline"
+          >
+            Signaler / DMCA
+          </Link>
+
+          <Comments photoId={photo.id} />
         </aside>
       </div>
 

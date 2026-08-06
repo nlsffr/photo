@@ -4,11 +4,7 @@ import { AppShell } from "@/components/AppShell";
 import { InteractionsProvider } from "@/components/Interactions";
 import { AnonIdentityProvider } from "@/components/AnonIdentity";
 import { SessionProvider } from "@/components/Session";
-
-// No external font provider: we use the OS's own font stack (defined in
-// globals.css). This means ZERO network contact with any font CDN — not at
-// build time, not at runtime — so nothing about the visitor is ever sent to
-// a third party for fonts. It's also faster (no font download at all).
+import { AgeGate } from "@/components/AgeGate";
 
 export const metadata: Metadata = {
   title: {
@@ -19,8 +15,6 @@ export const metadata: Metadata = {
     "LumenGallery — galerie de photographie communautaire : portraits, mode et éditorial.",
 };
 
-// Plain website viewport. viewport-fit=cover just lets us respect the iPhone
-// notch/safe-areas in Safari — it does NOT make this an installable app.
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
@@ -38,6 +32,7 @@ export default function RootLayout({
         <SessionProvider>
           <AnonIdentityProvider>
             <InteractionsProvider>
+              <AgeGate />
               <AppShell>{children}</AppShell>
             </InteractionsProvider>
           </AnonIdentityProvider>

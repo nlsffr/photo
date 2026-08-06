@@ -2,7 +2,14 @@ import { getPhotos } from "@/lib/photos";
 import type { MediaType, SortKey } from "@/lib/types";
 import { anonKey, rateLimit, sweep } from "@/lib/ratelimit";
 
-const SORTS: SortKey[] = ["recent", "trending", "popular", "liked", "random"];
+const SORTS: SortKey[] = [
+  "recent",
+  "trending",
+  "popular",
+  "liked",
+  "random",
+  "longest",
+];
 
 function clientKey(request: Request): string {
   const explicit = request.headers.get("x-ratelimit-bucket");
@@ -13,14 +20,12 @@ function clientKey(request: Request): string {
     request.headers.get("cf-connecting-ip") ||
     "";
   if (fwd) return fwd;
-  // Last resort: do NOT share one global bucket across all visitors
   return `ua:${request.headers.get("user-agent")?.slice(0, 80) ?? "unknown"}`;
 }
 
 export async function GET(request: Request) {
   sweep();
   const coarse = clientKey(request);
-  // 300 req / min per client — infinite scroll + thumbs need headroom
   const { allowed, remaining, resetAt } = rateLimit(anonKey(coarse), 300, 60_000);
   if (!allowed) {
     return Response.json(
