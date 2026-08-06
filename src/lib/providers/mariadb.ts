@@ -189,14 +189,16 @@ export class MariaDBProvider implements DataProvider {
   }
 
   async searchCreators(q: string, limit = 12): Promise<Creator[]> {
-    const term = `%${q.trim()}%`;
+    const term = `${q.trim()}%`; // prefix match = faster + better UX
+    const lim = Math.min(Math.max(Number(limit) || 12, 1), 30);
+    // LIMIT must be literal — named placeholders often break with mysql2
     const rows = await this.q<RowDataPacket>(
       `SELECT handle, name, avatar_url, cover_url, bio, location, followers_count, verified
        FROM creators
-       WHERE name LIKE :q OR handle LIKE :q
+       WHERE handle LIKE :q OR name LIKE :q OR handle LIKE :q2 OR name LIKE :q2
        ORDER BY followers_count DESC
-       LIMIT :limit`,
-      { q: term, limit },
+       LIMIT ${lim}`,
+      { q: term, q2: `%${q.trim()}%` },
     );
     return rows.map((r) => ({
       handle: r.handle as string,
@@ -267,20 +269,23 @@ export class MariaDBProvider implements DataProvider {
     );
     const total = Number(countRows[0].n);
 
+    const lim = Math.min(Math.max(Number(limit) || PAGE_SIZE, 1), 100);
+    const off = Math.max(Number(cursor) || 0, 0);
+
     const rows = await this.q<RowDataPacket>(
       `SELECT ${PHOTO_SELECT}
        ${PHOTO_FROM}
        ${whereSql}
        ORDER BY ${SORT_SQL[sort]}
-       LIMIT :limit OFFSET :offset`,
-      { ...params, limit, offset: cursor },
+       LIMIT ${lim} OFFSET ${off}`,
+      params,
     );
 
     const photoRows = rows as unknown as PhotoRow[];
     const tagsMap = await this.tagsFor(photoRows.map((r) => r.id));
     const items = photoRows.map((r) => rowToView(r, tagsMap.get(r.id) ?? []));
 
-    const nextCursor = cursor + limit < total ? cursor + limit : null;
+    const nextCursor = off + lim < total ? off + lim : null;
     return { items, nextCursor, total, seed };
   }
 
@@ -395,6 +400,7 @@ export class MariaDBProvider implements DataProvider {
   }
 
   async getRankings(limit = 20) {
+    const lim = Math.min(Math.max(Number(limit) || 20, 1), 100);
     const rows = await this.q<RowDataPacket>(
       `SELECT c.handle, c.name, c.avatar_url, c.bio, c.location, c.followers_count, c.verified,
               COALESCE(SUM(p.views_count), 0) AS views,
@@ -405,8 +411,7 @@ export class MariaDBProvider implements DataProvider {
        GROUP BY c.id
        HAVING views > 0 OR likes > 0
        ORDER BY score DESC
-       LIMIT :limit`,
-      { limit },
+       LIMIT ${lim}`,
     );
     return rows.map((r) => ({
       handle: r.handle as string,

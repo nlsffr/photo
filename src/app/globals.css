@@ -6,20 +6,20 @@
     "Segoe UI Emoji";
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  --color-bg: #0a0a0c;
-  --color-surface: #141417;
-  --color-surface-2: #1c1c21;
-  --color-surface-3: #2a2a32;
-  --color-border: #2e2e36;
+  --color-bg: #09090b;
+  --color-surface: #121216;
+  --color-surface-2: #1a1a20;
+  --color-surface-3: #28282f;
+  --color-border: #2c2c34;
 
-  --color-ink: #f4f4f6;
-  --color-ink-muted: #a8a8b3;
-  --color-ink-faint: #6e6e7a;
+  --color-ink: #fafafa;
+  --color-ink-muted: #a1a1aa;
+  --color-ink-faint: #71717a;
 
-  /* Distinct brand: hot rose-red (not copy-site magenta) */
-  --color-accent: #ff3d71;
-  --color-accent-600: #e0245e;
-  --color-accent-soft: #ff3d7122;
+  /* Distinct identity: violet-fuchsia (not competitor magenta) */
+  --color-accent: #d946ef;
+  --color-accent-600: #c026d3;
+  --color-accent-soft: #d946ef28;
 }
 
 html {
@@ -47,32 +47,17 @@ body {
   scrollbar-width: thin;
   scrollbar-color: var(--color-surface-3) transparent;
 }
-*::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-*::-webkit-scrollbar-thumb {
-  background: var(--color-surface-3);
-  border-radius: 9999px;
-  border: 3px solid var(--color-bg);
-}
 
 @keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 .animate-fade-in {
-  animation: fade-in 0.35s ease both;
+  animation: fade-in 0.3s ease both;
 }
 
 @keyframes shimmer {
-  100% {
-    transform: translateX(100%);
-  }
+  100% { transform: translateX(100%); }
 }
 .skeleton {
   position: relative;
@@ -87,36 +72,27 @@ body {
   background: linear-gradient(
     90deg,
     transparent,
-    color-mix(in srgb, var(--color-surface-3) 60%, transparent),
+    color-mix(in srgb, var(--color-surface-3) 55%, transparent),
     transparent
   );
   animation: shimmer 1.4s infinite;
 }
-@media (prefers-reduced-motion: reduce) {
-  .animate-fade-in,
-  .skeleton::after {
-    animation: none;
-  }
-}
 
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
+.no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
 
-/* Stable grid — no CSS-columns reflow when items append */
 .media-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.5rem;
+  gap: 0.4rem;
 }
 @media (min-width: 640px) {
   .media-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.75rem;
+    gap: 0.65rem;
   }
 }
 @media (min-width: 1024px) {
@@ -130,13 +106,12 @@ body {
   }
 }
 
-img,
-video {
-  max-width: 100%;
+/* Mobile: larger tap targets */
+@media (max-width: 639px) {
+  .tap-lg {
+    min-height: 44px;
+    min-width: 44px;
+  }
 }
 
-/* Hide native search clear (we use our own) */
-input[type="search"]::-webkit-search-cancel-button {
-  -webkit-appearance: none;
-  appearance: none;
-}
+img, video { max-width: 100%; }

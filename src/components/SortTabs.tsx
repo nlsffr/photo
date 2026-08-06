@@ -3,7 +3,14 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
-const TABS: { key: string; label: string }[] = [
+/** Mobile: 3 essentiels. Desktop: tous. */
+const TABS_MOBILE: { key: string; label: string }[] = [
+  { key: "popular", label: "Top" },
+  { key: "recent", label: "Récents" },
+  { key: "trending", label: "Tendances" },
+];
+
+const TABS_DESKTOP: { key: string; label: string }[] = [
   { key: "popular", label: "Plus vus" },
   { key: "recent", label: "Récents" },
   { key: "trending", label: "Tendances" },
@@ -25,24 +32,47 @@ export function SortTabs({ basePath = "/" }: { basePath?: string }) {
   }
 
   return (
-    <div className="no-scrollbar -mx-3 flex gap-2 overflow-x-auto px-3 sm:mx-0 sm:px-0">
-      {TABS.map((t) => {
-        const isActive = t.key === active;
-        return (
-          <Link
-            key={t.key}
-            href={hrefFor(t.key)}
-            scroll={false}
-            className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-semibold transition-colors ${
-              isActive
-                ? "bg-[var(--color-accent)] text-white"
-                : "border border-[var(--color-border)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
-            }`}
-          >
-            {t.label}
-          </Link>
-        );
-      })}
-    </div>
+    <>
+      {/* Mobile simplified */}
+      <div className="no-scrollbar flex gap-2 overflow-x-auto sm:hidden">
+        {TABS_MOBILE.map((t) => {
+          const isActive = t.key === active;
+          return (
+            <Link
+              key={t.key}
+              href={hrefFor(t.key)}
+              scroll={false}
+              className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold ${
+                isActive
+                  ? "bg-[var(--color-accent)] text-white"
+                  : "border border-[var(--color-border)] text-[var(--color-ink-muted)]"
+              }`}
+            >
+              {t.label}
+            </Link>
+          );
+        })}
+      </div>
+      {/* Desktop full */}
+      <div className="no-scrollbar hidden gap-2 overflow-x-auto sm:flex">
+        {TABS_DESKTOP.map((t) => {
+          const isActive = t.key === active;
+          return (
+            <Link
+              key={t.key}
+              href={hrefFor(t.key)}
+              scroll={false}
+              className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-semibold ${
+                isActive
+                  ? "bg-[var(--color-accent)] text-white"
+                  : "border border-[var(--color-border)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+              }`}
+            >
+              {t.label}
+            </Link>
+          );
+        })}
+      </div>
+    </>
   );
 }

@@ -55,46 +55,80 @@ export default async function Home({
   const heading = tag
     ? `#${tag}`
     : ai === "1"
-      ? "🤖 Contenu IA"
+      ? "Contenu IA"
       : ai === "0"
-        ? "✨ Contenu réel"
+        ? "Contenu réel"
         : sort === "random"
-          ? "🎲 Aléatoire"
-          : "🔥 Tendances du moment";
+          ? "Aléatoire"
+          : "Tendances";
 
   return (
-    <div className="px-3 py-4 sm:px-5">
+    <div className="px-2 py-3 sm:px-5 sm:py-4">
       <AdSlot variant="banner" />
       <FeaturedCreators />
 
-      <TagChips tags={allTags} activeTag={tag} />
+      {/* Tags: hide on very small to reduce noise — show from sm */}
+      <div className="hidden sm:block">
+        <TagChips tags={allTags} activeTag={tag} />
+      </div>
 
-      <div className="mb-3 flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
+      <div className="mb-3 flex flex-col gap-2.5">
+        <div className="flex items-center justify-between gap-2">
+          <h1 className="text-lg font-bold tracking-tight sm:text-2xl">
             {heading}
           </h1>
-          <div className="flex flex-wrap items-center gap-2">
+          {/* Desktop only extra actions */}
+          <div className="hidden flex-wrap items-center gap-2 sm:flex">
             <Link
               href="/?sort=random"
-              className="rounded-full border border-[var(--color-border)] px-3 py-1.5 text-sm font-semibold text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+              className="rounded-full border border-[var(--color-border)] px-3 py-1.5 text-sm font-semibold text-[var(--color-ink-muted)]"
             >
-              🎲 Aléatoire
+              Aléatoire
             </Link>
             <Link
               href="/feed"
               className="rounded-full bg-[var(--color-accent)] px-3 py-1.5 text-sm font-semibold text-white"
             >
-              Feed vertical
+              Feed
             </Link>
-            <Suspense fallback={<div className="h-9 w-28" />}>
+            <Suspense fallback={null}>
               <AiFilterTabs basePath="/" />
             </Suspense>
-            <Suspense fallback={<div className="h-9 w-52" />}>
+            <Suspense fallback={null}>
               <MediaTypeTabs basePath="/" />
             </Suspense>
           </div>
         </div>
+
+        {/* Mobile: type toggle simple (Tout / Photos / Vidéos) */}
+        <div className="flex gap-2 sm:hidden">
+          {(
+            [
+              { label: "Tout", href: "/" },
+              { label: "Photos", href: "/?type=photo" },
+              { label: "Vidéos", href: "/?type=video" },
+            ] as const
+          ).map((t) => {
+            const active =
+              (t.label === "Tout" && !type) ||
+              (t.label === "Photos" && type === "photo") ||
+              (t.label === "Vidéos" && type === "video");
+            return (
+              <Link
+                key={t.label}
+                href={t.href}
+                className={`flex-1 rounded-full py-2 text-center text-sm font-semibold ${
+                  active
+                    ? "bg-[var(--color-accent)] text-white"
+                    : "border border-[var(--color-border)] text-[var(--color-ink-muted)]"
+                }`}
+              >
+                {t.label}
+              </Link>
+            );
+          })}
+        </div>
+
         <Suspense fallback={<div className="h-9" />}>
           <SortTabs basePath="/" />
         </Suspense>
