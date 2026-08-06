@@ -2,22 +2,21 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { getPhotos } from "@/lib/photos";
 import { InfiniteGallery } from "@/components/InfiniteGallery";
-import { SortTabs } from "@/components/SortTabs";
 import { MediaTypeTabs } from "@/components/MediaTypeTabs";
 import { AiFilterTabs } from "@/components/AiFilterTabs";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Trending medias",
-  description: "Médias en tendance — vues, likes et récence",
+  title: "Tendances",
+  description: "Score trending (vues + likes) — distinct de popular et most liked",
 };
 
 const WINDOWS = [
-  { key: "hour", label: "Last hour", minutes: 60 },
-  { key: "day", label: "Day", minutes: 60 * 24 },
-  { key: "week", label: "Week", minutes: 60 * 24 * 7 },
-  { key: "month", label: "Month", minutes: 60 * 24 * 30 },
+  { key: "day", label: "24 h", minutes: 60 * 24 },
+  { key: "week", label: "7 jours", minutes: 60 * 24 * 7 },
+  { key: "month", label: "30 jours", minutes: 60 * 24 * 30 },
+  { key: "all", label: "Tout", minutes: 60 * 24 * 365 * 10 },
 ] as const;
 
 function first(v?: string | string[]) {
@@ -31,23 +30,23 @@ export default async function TrendingMediasPage({
 }) {
   const sp = await searchParams;
   const win = first(sp.window) ?? "week";
-  const page = await getPhotos({ sort: "trending", limit: 30 });
+  const typeRaw = first(sp.type);
+  const type =
+    typeRaw === "photo" || typeRaw === "video" || typeRaw === "pack"
+      ? typeRaw
+      : undefined;
 
-  // Client-side window filter approximation on already scored trending list
-  const windowDef = WINDOWS.find((w) => w.key === win) ?? WINDOWS[2];
-  const filtered = {
-    ...page,
-    items: page.items.filter((p) => p.ageMinutes <= windowDef.minutes),
-  };
-  if (filtered.items.length < 8) {
-    filtered.items = page.items;
-  }
+  const page = await getPhotos({ sort: "trending", type, limit: 30 });
+  const windowDef = WINDOWS.find((w) => w.key === win) ?? WINDOWS[1];
+  let items = page.items.filter((p) => p.ageMinutes <= windowDef.minutes);
+  if (items.length < 8) items = page.items;
 
   return (
     <div className="px-3 py-4 sm:px-5">
-      <h1 className="mb-2 text-2xl font-bold">Trending medias</h1>
+      <h1 className="mb-1 text-2xl font-bold">Tendances</h1>
       <p className="mb-4 text-sm text-[var(--color-ink-muted)]">
-        Classement par score (vues + likes × 3), fenêtre temporelle approximative.
+        Classement par score (vues + likes × 3), pas le même ordre que l’accueil
+        (popular) ni Most liked.
       </p>
       <div className="mb-4 flex flex-wrap gap-2">
         {WINDOWS.map((w) => (
@@ -72,16 +71,11 @@ export default async function TrendingMediasPage({
           <MediaTypeTabs basePath="/trending-medias" />
         </Suspense>
       </div>
-      <Suspense>
-        <SortTabs basePath="/trending-medias" />
-      </Suspense>
-      <div className="mt-4">
-        <InfiniteGallery
-          key={`tr-${win}`}
-          initial={filtered}
-          params={{ sort: "trending" }}
-        />
-      </div>
+      <InfiniteGallery
+        key={`tr-${win}-${type ?? ""}`}
+        initial={{ ...page, items }}
+        params={{ sort: "trending", type }}
+      />
     </div>
   );
 }

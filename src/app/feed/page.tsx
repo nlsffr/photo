@@ -4,7 +4,7 @@ import { FeedViewer } from "@/components/FeedViewer";
 
 export const metadata: Metadata = {
   title: "Feed vertical",
-  description: "Scroll vertical type TikTok — vidéos en plein écran",
+  description: "Scroll vertical — vidéos en plein écran, ordre unique chaque jour",
 };
 
 export const dynamic = "force-dynamic";
@@ -12,6 +12,12 @@ export const revalidate = 0;
 
 function first(v?: string | string[]): string | undefined {
   return Array.isArray(v) ? v[0] : v;
+}
+
+/** Seed change every day → feed order ≠ home popular order */
+function daySeed() {
+  const d = new Date();
+  return d.getUTCFullYear() * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate();
 }
 
 export default async function FeedPage({
@@ -22,23 +28,23 @@ export default async function FeedPage({
   const sp = await searchParams;
   const aiRaw = first(sp.ai);
   const isAi = aiRaw === "1" ? true : aiRaw === "0" ? false : undefined;
+  const seed = daySeed();
 
-  const videos = await getPhotos({
-    sort: "trending",
+  // Feed = vidéos only, ordre random stable du jour (≠ home popular / ≠ trending)
+  let page = await getPhotos({
+    sort: "random",
     type: "video",
     isAi,
+    seed,
     limit: 40,
   });
 
-  let items = videos.items;
-  if (items.length < 3) {
-    const all = await getPhotos({ sort: "trending", isAi, limit: 40 });
-    items = all.items;
+  if (page.items.length < 5) {
+    page = await getPhotos({ sort: "random", isAi, seed: seed + 7, limit: 40 });
   }
-  if (items.length < 3) {
-    const popular = await getPhotos({ sort: "popular", isAi, limit: 40 });
-    items = popular.items;
+  if (page.items.length < 3) {
+    page = await getPhotos({ sort: "recent", type: "video", isAi, limit: 40 });
   }
 
-  return <FeedViewer initial={items} preferVideo={videos.total >= 5} />;
+  return <FeedViewer initial={page.items} preferVideo />;
 }

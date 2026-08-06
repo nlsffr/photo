@@ -12,7 +12,6 @@ import { MediaImg } from "./MediaImg";
 const SIZES =
   "(max-width: 640px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 20vw";
 
-/** Hover preview: play muted clip for ~8s then loop from start. */
 const PREVIEW_MAX_SEC = 8;
 
 export function PhotoCard({ photo }: { photo: PhotoView }) {
@@ -50,20 +49,17 @@ export function PhotoCard({ photo }: { photo: PhotoView }) {
   const onTimeUpdate = () => {
     const v = videoRef.current;
     if (!v) return;
-    if (v.currentTime >= PREVIEW_MAX_SEC) {
-      v.currentTime = 0;
-    }
+    if (v.currentTime >= PREVIEW_MAX_SEC) v.currentTime = 0;
   };
 
   return (
     <div
-      className="group relative w-full overflow-hidden rounded-xl bg-[var(--color-surface-2)] ring-1 ring-[var(--color-border)]"
+      className="group relative isolate w-full overflow-hidden rounded-xl bg-[var(--color-surface-2)]"
       style={{ aspectRatio: String(clamped) }}
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
-      onTouchStart={onEnter}
     >
-      <Link href={href} className="absolute inset-0" aria-label={photo.title}>
+      <Link href={href} className="absolute inset-0 overflow-hidden rounded-xl" aria-label={photo.title}>
         <MediaImg
           src={photo.imageUrl}
           alt={photo.title}
@@ -85,11 +81,11 @@ export function PhotoCard({ photo }: { photo: PhotoView }) {
           />
         )}
 
-        <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/60 to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/75 to-transparent opacity-100 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/55 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/70 to-transparent sm:opacity-0 sm:group-hover:opacity-100" />
 
         {photo.isAi && (
-          <span className="absolute bottom-14 left-2 z-[5] rounded bg-purple-600/90 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+          <span className="absolute bottom-12 left-2 z-[5] rounded bg-purple-600/90 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">
             IA
           </span>
         )}
@@ -97,8 +93,8 @@ export function PhotoCard({ photo }: { photo: PhotoView }) {
         {isVideo && !hovering && (
           <>
             <span className="absolute inset-0 grid place-items-center">
-              <span className="grid h-11 w-11 place-items-center rounded-full bg-black/45 ring-1 ring-white/40 backdrop-blur-sm transition-transform duration-200 group-hover:scale-110">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="white" aria-hidden>
+              <span className="grid h-10 w-10 place-items-center rounded-full bg-black/45 ring-1 ring-white/35 backdrop-blur-sm">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="white" aria-hidden>
                   <path d="M8 5v14l11-7z" />
                 </svg>
               </span>
@@ -110,7 +106,7 @@ export function PhotoCard({ photo }: { photo: PhotoView }) {
         )}
 
         {photo.type === "pack" && (
-          <span className="absolute right-2 top-2 flex items-center gap-1 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-medium text-white">
+          <span className="absolute right-2 top-2 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-medium text-white">
             Pack{photo.itemCount ? ` · ${photo.itemCount}` : ""}
           </span>
         )}
@@ -118,37 +114,37 @@ export function PhotoCard({ photo }: { photo: PhotoView }) {
 
       <Link
         href={`/creator/${photo.creatorHandle}`}
-        className="absolute left-2 top-2 z-10 flex max-w-[calc(100%-1rem)] items-center gap-1.5"
+        className="absolute left-2 top-2 z-10 flex max-w-[calc(100%-0.75rem)] items-center gap-1.5"
       >
         <MediaImg
           src={photo.creator.avatarUrl || photo.imageUrl}
           alt={photo.creator.name}
-          width={26}
-          height={26}
-          className="h-[26px] w-[26px] rounded-full object-cover object-top ring-2 ring-[var(--color-accent)]"
+          width={24}
+          height={24}
+          className="h-6 w-6 rounded-full object-cover object-top ring-2 ring-white/80"
         />
-        <span className="flex min-w-0 items-center gap-1 text-sm font-semibold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+        <span className="flex min-w-0 items-center gap-1 text-xs font-semibold text-white drop-shadow">
           <span className="truncate">{photo.creator.name}</span>
-          {photo.creator.verified && <VerifiedBadge size={12} />}
+          {photo.creator.verified && <VerifiedBadge size={11} />}
         </span>
       </Link>
 
-      <div className="absolute inset-x-0 bottom-0 z-10 flex items-center gap-2.5 p-2.5 opacity-100 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100">
+      <div className="absolute inset-x-0 bottom-0 z-10 flex items-center gap-2 p-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
         <button
           type="button"
           onClick={() => toggleLike(photo.id)}
           aria-pressed={liked}
           aria-label="J’aime"
-          className="flex items-center gap-1 text-xs font-semibold text-white transition-transform active:scale-90"
+          className="flex items-center gap-1 text-xs font-semibold text-white active:scale-90"
         >
-          <svg width="17" height="17" viewBox="0 0 24 24" fill={liked ? "var(--color-accent)" : "none"} stroke={liked ? "var(--color-accent)" : "currentColor"} strokeWidth="2" aria-hidden>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill={liked ? "var(--color-accent)" : "none"} stroke={liked ? "var(--color-accent)" : "currentColor"} strokeWidth="2" aria-hidden>
             <path d="M12 21s-7.5-4.6-10-9.3C.4 8.4 2 5 5.4 5c2 0 3.3 1.1 4.6 2.6C11.3 6.1 12.6 5 14.6 5 18 5 19.6 8.4 22 11.7 19.5 16.4 12 21 12 21Z" />
           </svg>
           {formatCount(likeCount)}
         </button>
 
-        <span className="flex items-center gap-1 text-xs font-medium text-white/85">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+        <span className="flex items-center gap-1 text-xs text-white/85">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
             <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
             <circle cx="12" cy="12" r="3" />
           </svg>
@@ -160,9 +156,9 @@ export function PhotoCard({ photo }: { photo: PhotoView }) {
           onClick={() => toggleSave(photo.id)}
           aria-pressed={saved}
           aria-label="Enregistrer"
-          className="ml-auto text-white transition-transform active:scale-90"
+          className="ml-auto text-white active:scale-90"
         >
-          <svg width="17" height="17" viewBox="0 0 24 24" fill={saved ? "var(--color-accent)" : "none"} stroke={saved ? "var(--color-accent)" : "currentColor"} strokeWidth="2" aria-hidden>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill={saved ? "var(--color-accent)" : "none"} stroke={saved ? "var(--color-accent)" : "currentColor"} strokeWidth="2" aria-hidden>
             <path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16l-7-4-7 4Z" />
           </svg>
         </button>
