@@ -37,6 +37,7 @@ const SECTIONS: NavSection[] = [
       { href: "/pour-toi", labelKey: "forYou", icon: I("M12 21s-7.5-4.6-10-9.3C.4 8.4 2 5 5.4 5c2 0 3.3 1.1 4.6 2.6C11.3 6.1 12.6 5 14.6 5 18 5 19.6 8.4 22 11.7 19.5 16.4 12 21 12 21Z"), active: (p) => p.startsWith("/pour-toi") },
       { href: "/abonnements", labelKey: "following", icon: I("M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM16 11l2 2 4-4"), active: (p) => p.startsWith("/abonnements") },
       { href: "/favoris", labelKey: "saved", icon: I("M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16l-7-4-7 4Z"), active: (p) => p.startsWith("/favoris") },
+      { href: "/add", labelKey: "add", icon: I("M12 5v14M5 12h14"), active: (p) => p.startsWith("/add") },
     ],
   },
   {
@@ -111,7 +112,7 @@ const TABS: { href: string; labelKey: string; d: string; active: (p: string) => 
   { href: "/", labelKey: "home", d: "M3 11l9-8 9 8M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10", active: (p) => p === "/" },
   { href: "/models", labelKey: "models", d: "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z", active: (p) => p.startsWith("/models") },
   { href: "/feed", labelKey: "feed", d: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM10 8l6 4-6 4z", active: (p) => p.startsWith("/feed") },
-  { href: "/recherche", labelKey: "search", d: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-4.3-4.3", active: (p) => p.startsWith("/recherche") },
+  { href: "/add", labelKey: "add", d: "M12 5v14M5 12h14", active: (p) => p.startsWith("/add") },
   { href: "/connexion", labelKey: "login", d: "M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3", active: (p) => p.startsWith("/connexion") || p.startsWith("/inscription") },
 ];
 
@@ -143,6 +144,8 @@ function BottomTabs() {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const hideChrome = pathname.startsWith("/feed") || pathname.startsWith("/tiktok");
 
   useEffect(() => {
     if (!open) return;
@@ -154,7 +157,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [open]);
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-40 flex min-h-14 items-center gap-2 border-b border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-bg)_90%,transparent)] px-3 pt-[env(safe-area-inset-top)] backdrop-blur-xl sm:gap-3 sm:px-4">
         <button
           type="button"
@@ -175,7 +178,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Suspense>
         </div>
 
-        <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:ml-0">
+        <div className="ml-auto flex shrink-0 items-center gap-1 sm:ml-0 sm:gap-1.5">
+          <Link
+            href="/premium"
+            className="hidden rounded-full bg-amber-400/15 px-3 py-1.5 text-xs font-bold text-amber-400 hover:bg-amber-400/25 sm:inline"
+          >
+            Premium
+          </Link>
+          <Link
+            href="/add"
+            aria-label="Add"
+            className="grid h-9 w-9 place-items-center rounded-lg bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-600)]"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+          </Link>
           <LanguageSwitcher className="hidden sm:block" />
           <Link
             href="/recherche"
@@ -201,7 +219,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </aside>
 
-        <main className="min-w-0 flex-1 pb-[calc(4.25rem+env(safe-area-inset-bottom))] lg:pb-0">
+        <main className="min-w-0 flex-1 pb-[calc(4.25rem+env(safe-area-inset-bottom))] lg:pb-8">
           <div className="mx-auto w-full max-w-[1500px]">{children}</div>
         </main>
       </div>
@@ -230,35 +248,37 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      <BottomTabs />
+      {!hideChrome && <BottomTabs />}
 
-      <footer className="border-t border-[var(--color-border)] bg-[var(--color-surface)] pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0">
-        <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <BrandLogo />
-            <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-[var(--color-ink-faint)]">
-              <Link href="/conditions" className="hover:text-[var(--color-ink-muted)]">
-                Conditions
-              </Link>
-              <Link href="/confidentialite" className="hover:text-[var(--color-ink-muted)]">
-                Privacy
-              </Link>
-              <Link href="/trust-and-safety" className="hover:text-[var(--color-ink-muted)]">
-                Trust & Safety
-              </Link>
-              <Link href="/dmca" className="hover:text-[var(--color-ink-muted)]">
-                DMCA
-              </Link>
-              <Link href="/contact" className="hover:text-[var(--color-ink-muted)]">
-                Contact
-              </Link>
+      {!hideChrome && (
+        <footer className="mt-auto border-t border-[var(--color-border)] bg-[var(--color-surface)] pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-6">
+          <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <BrandLogo />
+              <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-[var(--color-ink-faint)]">
+                <Link href="/conditions" className="hover:text-[var(--color-ink-muted)]">
+                  Conditions
+                </Link>
+                <Link href="/confidentialite" className="hover:text-[var(--color-ink-muted)]">
+                  Privacy
+                </Link>
+                <Link href="/trust-and-safety" className="hover:text-[var(--color-ink-muted)]">
+                  Trust & Safety
+                </Link>
+                <Link href="/dmca" className="hover:text-[var(--color-ink-muted)]">
+                  DMCA
+                </Link>
+                <Link href="/contact" className="hover:text-[var(--color-ink-muted)]">
+                  Contact
+                </Link>
+              </div>
             </div>
+            <p className="mt-4 text-xs text-[var(--color-ink-faint)]">
+              © 2026 LeakFanHub. 18+ only.
+            </p>
           </div>
-          <p className="mt-4 text-xs text-[var(--color-ink-faint)]">
-            © 2026 LeakFanHub. 18+ only.
-          </p>
-        </div>
-      </footer>
+        </footer>
+      )}
     </div>
   );
 }
