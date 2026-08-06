@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { SearchBar } from "./SearchBar";
 import { AccountMenu } from "./AccountMenu";
+import { BrandLogo } from "./BrandLogo";
 
 type NavItem = {
   href: string;
@@ -22,18 +23,17 @@ const I = (d: string) => (
   </svg>
 );
 
+/** Une seule entrée par intention — plus de doublons feed/tiktok/trending home */
 const SECTIONS: NavSection[] = [
   {
     items: [
       { href: "/", label: "Accueil", icon: I("M3 11l9-8 9 8M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"), active: (p) => p === "/" },
-      { href: "/welcome", label: "Bienvenue", icon: I("M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 16v-4M12 8h.01"), active: (p) => p.startsWith("/welcome") },
       { href: "/recherche", label: "Recherche", icon: I("M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-4.3-4.3"), active: (p) => p.startsWith("/recherche") },
       { href: "/models", label: "Découvrir", icon: I("M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM16.2 7.8l-2.9 6.4-6.4 2.9 2.9-6.4z"), active: (p) => p.startsWith("/models") },
-      { href: "/feed", label: "Feed", icon: I("M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM10 8l6 4-6 4z"), active: (p) => p.startsWith("/feed") },
-      { href: "/tiktok", label: "TikTok", icon: I("M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM10 8l6 4-6 4z"), active: (p) => p.startsWith("/tiktok") },
-      { href: "/trending-medias", label: "Trending", icon: I("M5 17l6-6 4 4 8-8M21 7v6h-6"), active: (p) => p.startsWith("/trending-medias") },
-      { href: "/most-liked", label: "Most liked", icon: I("M12 21s-7.5-4.6-10-9.3C.4 8.4 2 5 5.4 5c2 0 3.3 1.1 4.6 2.6C11.3 6.1 12.6 5 14.6 5 18 5 19.6 8.4 22 11.7 19.5 16.4 12 21 12 21Z"), active: (p) => p.startsWith("/most-liked") },
-      { href: "/random/medias", label: "Random", icon: I("M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"), active: (p) => p.startsWith("/random") },
+      { href: "/feed", label: "Feed vertical", icon: I("M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM10 8l6 4-6 4z"), active: (p) => p.startsWith("/feed") || p.startsWith("/tiktok") },
+      { href: "/trending-medias", label: "Tendances", icon: I("M5 17l6-6 4 4 8-8M21 7v6h-6"), active: (p) => p.startsWith("/trending-medias") },
+      { href: "/most-liked", label: "Plus aimés", icon: I("M12 21s-7.5-4.6-10-9.3C.4 8.4 2 5 5.4 5c2 0 3.3 1.1 4.6 2.6C11.3 6.1 12.6 5 14.6 5 18 5 19.6 8.4 22 11.7 19.5 16.4 12 21 12 21Z"), active: (p) => p.startsWith("/most-liked") },
+      { href: "/random/medias", label: "Aléatoire", icon: I("M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"), active: (p) => p.startsWith("/random") },
       { href: "/pour-toi", label: "Pour toi", icon: I("M12 21s-7.5-4.6-10-9.3C.4 8.4 2 5 5.4 5c2 0 3.3 1.1 4.6 2.6C11.3 6.1 12.6 5 14.6 5 18 5 19.6 8.4 22 11.7 19.5 16.4 12 21 12 21Z"), active: (p) => p.startsWith("/pour-toi") },
       { href: "/abonnements", label: "Abonnements", icon: I("M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM16 11l2 2 4-4"), active: (p) => p.startsWith("/abonnements") },
       { href: "/favoris", label: "Enregistrés", icon: I("M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16l-7-4-7 4Z"), active: (p) => p.startsWith("/favoris") },
@@ -85,7 +85,7 @@ function NavContent({ onNavigate }: { onNavigate?: () => void }) {
                     : "text-[var(--color-ink-muted)]";
             return (
               <Link
-                key={item.label}
+                key={item.href + item.label}
                 href={item.href}
                 onClick={onNavigate}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2 text-[15px] font-medium transition-colors hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink)] ${color} ${
@@ -111,24 +111,24 @@ const TABS: { href: string; label: string; d: string; active: (p: string) => boo
   { href: "/models", label: "Modèles", d: "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z", active: (p) => p.startsWith("/models") },
   { href: "/feed", label: "Feed", d: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM10 8l6 4-6 4z", active: (p) => p.startsWith("/feed") },
   { href: "/recherche", label: "Recherche", d: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-4.3-4.3", active: (p) => p.startsWith("/recherche") },
-  { href: "/connexion", label: "Connexion", d: "M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3", active: (p) => p.startsWith("/connexion") || p.startsWith("/inscription") },
+  { href: "/connexion", label: "Compte", d: "M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3", active: (p) => p.startsWith("/connexion") || p.startsWith("/inscription") },
 ];
 
 function BottomTabs() {
   const pathname = usePathname();
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 flex h-[calc(4rem+env(safe-area-inset-bottom))] items-stretch border-t border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-bg)_92%,transparent)] pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-40 flex h-[calc(3.75rem+env(safe-area-inset-bottom))] items-stretch border-t border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-bg)_92%,transparent)] pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden">
       {TABS.map((t) => {
         const active = t.active(pathname);
         return (
           <Link
             key={t.href}
             href={t.href}
-            className={`flex flex-1 flex-col items-center justify-center gap-1 text-[11px] font-medium ${
+            className={`flex flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-medium ${
               active ? "text-[var(--color-accent)]" : "text-[var(--color-ink-muted)]"
             }`}
           >
-            <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d={t.d} />
             </svg>
             {t.label}
@@ -136,19 +136,6 @@ function BottomTabs() {
         );
       })}
     </nav>
-  );
-}
-
-function BrandMark({ className = "" }: { className?: string }) {
-  return (
-    <span className={`flex items-center gap-2 ${className}`}>
-      <span className="grid h-8 w-8 place-items-center rounded-md bg-[var(--color-accent)] text-xs font-black tracking-tighter text-white">
-        LF
-      </span>
-      <span className="text-lg font-black tracking-tight">
-        Leak<span className="text-[var(--color-accent)]">FanHub</span>
-      </span>
-    </span>
   );
 }
 
@@ -178,9 +165,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </svg>
         </button>
 
-        <Link href="/" className="shrink-0">
-          <BrandMark />
-        </Link>
+        <BrandLogo />
 
         <div className="ml-auto hidden min-w-0 max-w-xs flex-1 sm:block md:max-w-sm">
           <Suspense fallback={<div className="h-9 w-full rounded-full border border-[var(--color-border)] bg-[var(--color-surface)]" />}>
@@ -210,7 +195,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </aside>
 
-        <main className="min-w-0 flex-1 pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0">
+        <main className="min-w-0 flex-1 pb-[calc(4.25rem+env(safe-area-inset-bottom))] lg:pb-0">
           <div className="mx-auto w-full max-w-[1500px]">{children}</div>
         </main>
       </div>
@@ -220,7 +205,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="absolute inset-0 bg-black/60" onClick={() => setOpen(false)} aria-hidden />
           <div className="absolute left-0 top-0 flex h-full w-72 flex-col overflow-y-auto overscroll-contain border-r border-[var(--color-border)] bg-[var(--color-bg)] p-3">
             <div className="mb-2 flex items-center justify-between">
-              <BrandMark />
+              <BrandLogo />
               <button
                 onClick={() => setOpen(false)}
                 aria-label="Fermer"
@@ -241,11 +226,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <footer className="border-t border-[var(--color-border)] bg-[var(--color-surface)] pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0">
         <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <BrandMark />
-            <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-[var(--color-ink-faint)]">
-              <Link href="/welcome" className="hover:text-[var(--color-ink-muted)]">
-                Bienvenue
-              </Link>
+            <BrandLogo />
+            <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-[var(--color-ink-faint)]">
               <Link href="/conditions" className="hover:text-[var(--color-ink-muted)]">
                 Conditions
               </Link>
@@ -264,7 +246,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           <p className="mt-4 text-xs text-[var(--color-ink-faint)]">
-            © 2026 LeakFanHub. 18+ only. Tous droits réservés.
+            © 2026 LeakFanHub. 18+ only.
           </p>
         </div>
       </footer>
