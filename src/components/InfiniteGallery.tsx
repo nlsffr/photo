@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PhotoCard } from "./PhotoCard";
+import { AdSlot } from "./AdSlot";
 import type { MediaType, PhotoPage, PhotoView, SortKey } from "@/lib/types";
 
 interface Props {
@@ -12,12 +13,15 @@ interface Props {
     q?: string;
     creator?: string;
     type?: MediaType;
-    /** "0" | "1" string for URL parity */
     ai?: string;
   };
+  /** Hide ads for premium */
+  premium?: boolean;
 }
 
-export function InfiniteGallery({ initial, params }: Props) {
+const AD_EVERY = 15;
+
+export function InfiniteGallery({ initial, params, premium = false }: Props) {
   const [items, setItems] = useState<PhotoView[]>(initial.items);
   const [cursor, setCursor] = useState<number | null>(initial.nextCursor);
   const [errored, setErrored] = useState(false);
@@ -99,15 +103,9 @@ export function InfiniteGallery({ initial, params }: Props) {
   if (items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-24 text-center">
-        <div className="grid h-14 w-14 place-items-center rounded-full bg-[var(--color-surface-2)] text-[var(--color-ink-faint)]">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
-            <circle cx="11" cy="11" r="7" />
-            <path d="m21 21-4.3-4.3" />
-          </svg>
-        </div>
         <p className="text-lg font-semibold">Aucun résultat</p>
         <p className="max-w-sm text-sm text-[var(--color-ink-muted)]">
-          Essaie un autre mot-clé ou retire les filtres pour voir plus de photos.
+          Essaie un autre mot-clé ou retire les filtres.
         </p>
       </div>
     );
@@ -116,9 +114,14 @@ export function InfiniteGallery({ initial, params }: Props) {
   return (
     <>
       <div className="columns-2 gap-2.5 sm:columns-3 sm:gap-3 lg:columns-4 xl:columns-5">
-        {items.map((p) => (
+        {items.map((p, i) => (
           <div key={p.id} className="mb-2.5 break-inside-avoid sm:mb-3">
             <PhotoCard photo={p} />
+            {!premium && (i + 1) % AD_EVERY === 0 && (
+              <div className="mt-2.5 break-inside-avoid">
+                <AdSlot variant="interstitial" />
+              </div>
+            )}
           </div>
         ))}
       </div>

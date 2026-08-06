@@ -1,17 +1,13 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
-import Link from "next/link";
-import { getPhotos, getAllTags } from "@/lib/photos";
+import { getPhotos } from "@/lib/photos";
 import type { MediaType, SortKey } from "@/lib/types";
 import { InfiniteGallery } from "@/components/InfiniteGallery";
-import { FeaturedCreators } from "@/components/FeaturedCreators";
-import { TagChips } from "@/components/TagChips";
 import { MediaTypeTabs } from "@/components/MediaTypeTabs";
 import { SortTabs } from "@/components/SortTabs";
 import { AiFilterTabs } from "@/components/AiFilterTabs";
-import { AdSlot } from "@/components/AdSlot";
 
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 const VALID_SORTS: SortKey[] = [
   "popular",
@@ -26,13 +22,30 @@ function first(v?: string | string[]): string | undefined {
   return Array.isArray(v) ? v[0] : v;
 }
 
-export default async function Home({
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ tag: string }>;
+}): Promise<Metadata> {
+  const { tag } = await params;
+  const decoded = decodeURIComponent(tag);
+  return {
+    title: `#${decoded}`,
+    description: `Médias tagués #${decoded} sur LumenGallery`,
+  };
+}
+
+export default async function TagPage({
+  params,
   searchParams,
 }: {
+  params: Promise<{ tag: string }>;
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
+  const { tag: rawTag } = await params;
+  const tag = decodeURIComponent(rawTag);
   const sp = await searchParams;
-  const tag = first(sp.tag);
+
   const typeRaw = first(sp.type);
   const type: MediaType | undefined =
     typeRaw === "photo" || typeRaw === "video" || typeRaw === "pack"
@@ -49,54 +62,25 @@ export default async function Home({
   const isAi = ai === "1" ? true : ai === "0" ? false : undefined;
 
   const page = await getPhotos({ sort, tag, type, isAi });
-  const allTags = await getAllTags();
-  const queryKey = `${sort}|${tag ?? ""}|${type ?? ""}|${ai ?? ""}`;
-
-  const heading = tag
-    ? `#${tag}`
-    : ai === "1"
-      ? "🤖 Contenu IA"
-      : ai === "0"
-        ? "✨ Contenu réel"
-        : sort === "random"
-          ? "🎲 Aléatoire"
-          : "🔥 Tendances du moment";
+  const basePath = `/tag/${encodeURIComponent(tag)}`;
+  const queryKey = `tag|${tag}|${sort}|${type ?? ""}|${ai ?? ""}`;
 
   return (
     <div className="px-3 py-4 sm:px-5">
-      <AdSlot variant="banner" />
-      <FeaturedCreators />
-
-      <TagChips tags={allTags} activeTag={tag} />
-
       <div className="mb-3 flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
-            {heading}
-          </h1>
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">#{tag}</h1>
           <div className="flex flex-wrap items-center gap-2">
-            <Link
-              href="/?sort=random"
-              className="rounded-full border border-[var(--color-border)] px-3 py-1.5 text-sm font-semibold text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
-            >
-              🎲 Aléatoire
-            </Link>
-            <Link
-              href="/feed"
-              className="rounded-full bg-[var(--color-accent)] px-3 py-1.5 text-sm font-semibold text-white"
-            >
-              Feed vertical
-            </Link>
             <Suspense fallback={<div className="h-9 w-28" />}>
-              <AiFilterTabs basePath="/" />
+              <AiFilterTabs basePath={basePath} />
             </Suspense>
             <Suspense fallback={<div className="h-9 w-52" />}>
-              <MediaTypeTabs basePath="/" />
+              <MediaTypeTabs basePath={basePath} />
             </Suspense>
           </div>
         </div>
         <Suspense fallback={<div className="h-9" />}>
-          <SortTabs basePath="/" />
+          <SortTabs basePath={basePath} />
         </Suspense>
       </div>
 
