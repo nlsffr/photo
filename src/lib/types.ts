@@ -41,6 +41,9 @@ export type SortKey =
   | "random"
   | "longest";
 
+/** Fenêtre temporelle pour trending (basée sur created_at en base). */
+export type TrendWindow = "24h" | "7d" | "30d" | "all";
+
 export interface CreatorSummary {
   handle: string;
   name: string;
@@ -69,6 +72,8 @@ export interface PhotoQuery {
   cursor?: number;
   limit?: number;
   seed?: number;
+  /** Pour sort=trending : 24h | 7d | 30d | all */
+  window?: TrendWindow;
 }
 
 export interface CreatorWithStats extends Creator {
