@@ -189,7 +189,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <path d="M12 5v14M5 12h14" />
             </svg>
           </Link>
-          {/* Mobile : loupe + langue en haut à droite */}
           <Link
             href="/recherche"
             aria-label="Search"
@@ -208,10 +207,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <div className="flex flex-1">
         <aside className="hidden w-60 shrink-0 border-r border-[var(--color-border)] lg:block">
-          <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] max-h-[calc(100dvh-3.5rem-env(safe-area-inset-top))] overflow-y-auto p-3">
-            <NavContent />
-            <div className="mt-4 px-2 pb-4">
-              <LanguageSwitcher className="w-full" />
+          <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] flex max-h-[calc(100dvh-3.5rem-env(safe-area-inset-top))] flex-col p-3">
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <NavContent />
+            </div>
+            <div className="mt-3 shrink-0 border-t border-[var(--color-border)] pt-3">
+              <LanguageSwitcher className="w-full" placement="up" />
             </div>
           </div>
         </aside>
@@ -243,7 +244,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <p className="mb-2 px-1 text-xs font-bold uppercase tracking-wide text-[var(--color-ink-faint)]">
                   Langue
                 </p>
-                {/* Ouvre vers le haut pour ne pas sortir de l’écran */}
                 <LanguageSwitcher className="w-full" placement="up" />
               </div>
             </div>
@@ -254,29 +254,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <BottomTabs />
 
       {!isFeed && (
-        <footer className="mt-auto border-t border-[var(--color-border)] bg-[var(--color-surface)] pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-6">
-          <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <BrandLogo />
-              <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-[var(--color-ink-faint)]">
-                <Link href="/conditions" className="hover:text-[var(--color-ink-muted)]">
-                  Conditions
-                </Link>
-                <Link href="/confidentialite" className="hover:text-[var(--color-ink-muted)]">
-                  Privacy
-                </Link>
-                <Link href="/trust-and-safety" className="hover:text-[var(--color-ink-muted)]">
-                  Trust & Safety
-                </Link>
-                <Link href="/dmca" className="hover:text-[var(--color-ink-muted)]">
-                  DMCA
-                </Link>
-                <Link href="/contact" className="hover:text-[var(--color-ink-muted)]">
-                  Contact
-                </Link>
-              </div>
-            </div>
-            <p className="mt-4 text-xs text-[var(--color-ink-faint)]">© 2026 LeakFanHub. 18+ only.</p>
+        <footer className="mt-auto border-t border-[var(--color-border)] bg-[var(--color-surface)] pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0">
+          <div className="mx-auto flex max-w-[1600px] flex-col items-center gap-5 px-4 py-8 text-center sm:px-6">
+            <BrandLogo size="md" />
+            <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm text-[var(--color-ink-muted)]">
+              <Link href="/conditions" className="hover:text-[var(--color-ink)]">
+                Conditions
+              </Link>
+              <Link href="/confidentialite" className="hover:text-[var(--color-ink)]">
+                Privacy
+              </Link>
+              <Link href="/trust-and-safety" className="hover:text-[var(--color-ink)]">
+                Trust & Safety
+              </Link>
+              <Link href="/dmca" className="hover:text-[var(--color-ink)]">
+                DMCA
+              </Link>
+              <Link href="/contact" className="hover:text-[var(--color-ink)]">
+                Contact
+              </Link>
+            </nav>
+            <p className="text-xs text-[var(--color-ink-faint)]">
+              © 2026 LeakFanHub · 18+ only
+            </p>
           </div>
         </footer>
       )}
