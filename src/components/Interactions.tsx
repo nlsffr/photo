@@ -7,7 +7,9 @@ import {
   useEffect,
   useState,
 } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { formatCount } from "@/lib/format";
+import { useSession } from "./Session";
 
 const KEY = "lumen:interactions:v1";
 
@@ -22,6 +24,7 @@ interface Ctx {
   likedIds: string[];
   savedIds: string[];
   followedHandles: string[];
+  requireAuth: () => boolean;
 }
 
 const InteractionsContext = createContext<Ctx | null>(null);
@@ -38,6 +41,9 @@ export function InteractionsProvider({
 }: {
   children: React.ReactNode;
 }) {
+  const { user } = useSession();
+  const router = useRouter();
+  const pathname = usePathname();
   const [liked, setLiked] = useState<Set<string>>(new Set());
   const [saved, setSaved] = useState<Set<string>>(new Set());
   const [followed, setFollowed] = useState<Set<string>>(new Set());
@@ -53,13 +59,13 @@ export function InteractionsProvider({
         setFollowed(new Set<string>(d.followed ?? []));
       }
     } catch {
-      /* ignore corrupt storage */
+      /* ignore */
     }
     setReady(true);
   }, []);
 
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || !user) return;
     try {
       localStorage.setItem(
         KEY,
@@ -70,21 +76,47 @@ export function InteractionsProvider({
         }),
       );
     } catch {
-      /* ignore quota errors */
+      /* ignore */
     }
-  }, [liked, saved, followed, ready]);
+  }, [liked, saved, followed, ready, user]);
+
+  const requireAuth = useCallback(() => {
+    if (user) return true;
+    const next = encodeURIComponent(pathname || "/");
+    router.push(`/connexion?next=${next}`);
+    return false;
+  }, [user, router, pathname]);
 
   const value: Ctx = {
     ready,
     isLiked: useCallback((id) => liked.has(id), [liked]),
     isSaved: useCallback((id) => saved.has(id), [saved]),
     isFollowing: useCallback((h) => followed.has(h), [followed]),
-    toggleLike: useCallback((id) => setLiked((s) => toggle(s, id)), []),
-    toggleSave: useCallback((id) => setSaved((s) => toggle(s, id)), []),
-    toggleFollow: useCallback((h) => setFollowed((s) => toggle(s, h)), []),
+    toggleLike: useCallback(
+      (id) => {
+        if (!requireAuth()) return;
+        setLiked((s) => toggle(s, id));
+      },
+      [requireAuth],
+    ),
+    toggleSave: useCallback(
+      (id) => {
+        if (!requireAuth()) return;
+        setSaved((s) => toggle(s, id));
+      },
+      [requireAuth],
+    ),
+    toggleFollow: useCallback(
+      (h) => {
+        if (!requireAuth()) return;
+        setFollowed((s) => toggle(s, h));
+      },
+      [requireAuth],
+    ),
     likedIds: [...liked],
     savedIds: [...saved],
     followedHandles: [...followed],
+    requireAuth,
   };
 
   return (
@@ -100,10 +132,6 @@ export function useInteractions(): Ctx {
     throw new Error("useInteractions must be used within InteractionsProvider");
   return ctx;
 }
-
-/* ------------------------------------------------------------------ */
-/*  Reusable buttons                                                   */
-/* ------------------------------------------------------------------ */
 
 export function FollowButton({
   handle,
@@ -130,7 +158,6 @@ export function FollowButton({
   );
 }
 
-/** Small pill Follow used in tight rows (sidebar/lists). */
 export function FollowPill({ handle }: { handle: string }) {
   const { isFollowing, toggleFollow, ready } = useInteractions();
   const following = ready && isFollowing(handle);
@@ -150,7 +177,6 @@ export function FollowPill({ handle }: { handle: string }) {
   );
 }
 
-/** Like + Save buttons for the photo/video detail page. */
 export function PostActions({
   id,
   baseLikes,

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import mysql from "mysql2/promise";
 import { randomUUID } from "crypto";
+import { getSessionUser } from "@/lib/auth-db";
+import { SESSION_COOKIE } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -28,11 +31,20 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const jar = await cookies();
+    const token = jar.get(SESSION_COOKIE)?.value;
+    if (!token) {
+      return NextResponse.json({ error: "auth_required" }, { status: 401 });
+    }
+    const user = await getSessionUser(token);
+    if (!user) {
+      return NextResponse.json({ error: "auth_required" }, { status: 401 });
+    }
+
     const body = await req.json();
     const photoId = String(body.photoId || "");
-    const userId = String(body.userId || "");
     const text = String(body.body || "").trim().slice(0, 1000);
-    if (!photoId || !userId || text.length < 2) {
+    if (!photoId || text.length < 2) {
       return NextResponse.json({ error: "invalid" }, { status: 400 });
     }
     const url = process.env.DATABASE_URL;
@@ -41,10 +53,14 @@ export async function POST(req: NextRequest) {
     const id = randomUUID();
     await conn.execute(
       `INSERT INTO comments (id, photo_id, user_id, body) VALUES (?, ?, ?, ?)`,
-      [id, photoId, userId, text],
+      [id, photoId, user.id, text],
     );
     await conn.end();
-    return NextResponse.json({ ok: true, id });
+    return NextResponse.json({
+      ok: true,
+      id,
+      username: user.username,
+    });
   } catch (e) {
     console.error(e);
     return NextResponse.json({ error: "failed" }, { status: 500 });
