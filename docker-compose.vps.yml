@@ -28,6 +28,11 @@ services:
       S3_BUCKET: ${S3_BUCKET:-lumengallery-media}
       S3_REGION: us-east-1
       S3_FORCE_PATH_STYLE: "true"
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      CONTACT_TO: ${CONTACT_TO:-}
+      CONTACT_FROM: ${CONTACT_FROM:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
     depends_on:
       mariadb:
         condition: service_healthy
