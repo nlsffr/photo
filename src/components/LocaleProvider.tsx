@@ -105,7 +105,14 @@ export function useLocale(): LocaleCtx {
   return ctx;
 }
 
-export function LanguageSwitcher({ className = "" }: { className?: string }) {
+export function LanguageSwitcher({
+  className = "",
+  placement = "down",
+}: {
+  className?: string;
+  /** down = sous le bouton (header) | up = au-dessus (bas de menu) */
+  placement?: "up" | "down";
+}) {
   const { locale, setLocale, locales } = useLocale();
   const [open, setOpen] = useState(false);
 
@@ -116,6 +123,7 @@ export function LanguageSwitcher({ className = "" }: { className?: string }) {
         onClick={() => setOpen((o) => !o)}
         className="flex h-9 items-center gap-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-sm"
         aria-label="Language"
+        aria-expanded={open}
       >
         <span className="text-base leading-none">{FLAGS[locale]}</span>
         <span className="hidden text-xs font-semibold uppercase text-[var(--color-ink-muted)] sm:inline">
@@ -125,7 +133,13 @@ export function LanguageSwitcher({ className = "" }: { className?: string }) {
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} aria-hidden />
-          <ul className="absolute right-0 z-50 mt-1 max-h-64 w-44 overflow-auto rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] py-1 shadow-xl">
+          <ul
+            className={`absolute z-50 max-h-64 w-44 overflow-auto rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] py-1 shadow-xl ${
+              placement === "up"
+                ? "bottom-full left-0 mb-1"
+                : "right-0 top-full mt-1"
+            }`}
+          >
             {locales.map((l) => (
               <li key={l}>
                 <button

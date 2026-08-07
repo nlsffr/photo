@@ -1,14 +1,10 @@
 /**
- * Outbound email — used by the contact / DMCA / report forms.
+ * Outbound email — contact / DMCA / report forms.
  *
- * Provider resolution (first configured one wins):
- *   1. Resend           — set RESEND_API_KEY (recommended, simplest).
- *   2. SMTP (Proton…)   — set SMTP_HOST/PORT/USER/PASS.
- *   3. Not configured   — sendEmail() returns {ok:false, reason:"not_configured"}
- *                         so the API can respond honestly instead of pretending.
- *
- * CONTACT_TO is the inbox that receives every form submission.
- * CONTACT_FROM is the verified sender address (defaults to CONTACT_TO).
+ * 1. Resend — RESEND_API_KEY
+ * 2. SMTP — SMTP_HOST/PORT/USER/PASS
+ * CONTACT_TO = inbox destinataire
+ * CONTACT_FROM = expéditeur vérifié
  */
 
 export type EmailResult =
@@ -17,9 +13,7 @@ export type EmailResult =
 
 export interface OutboundEmail {
   subject: string;
-  /** Plain-text body. */
   text: string;
-  /** Optional reply-to (the submitter's address), so you can answer directly. */
   replyTo?: string;
 }
 
@@ -27,7 +21,7 @@ function recipients() {
   const to = process.env.CONTACT_TO?.trim();
   const from =
     process.env.CONTACT_FROM?.trim() ||
-    (to ? `LumenGallery <${to}>` : undefined);
+    (to ? `LeakFanHub <${to}>` : undefined);
   return { to, from };
 }
 
@@ -37,7 +31,6 @@ async function sendViaResend(email: OutboundEmail): Promise<EmailResult> {
   if (!apiKey || !to || !from) return { ok: false, reason: "not_configured" };
 
   try {
-    // Lazy import so the dependency isn't pulled in when SMTP-only.
     const { Resend } = await import("resend");
     const resend = new Resend(apiKey);
     const { error } = await resend.emails.send({
@@ -64,8 +57,6 @@ async function sendViaSmtp(email: OutboundEmail): Promise<EmailResult> {
   }
 
   try {
-    // nodemailer is optional — only needed for the SMTP path. Imported by name
-    // through a variable so the build doesn't require it when using Resend.
     const mod = "nodemailer";
     const nodemailer = (await import(/* webpackIgnore: true */ mod)).default as {
       createTransport: (opts: unknown) => {
@@ -91,7 +82,6 @@ async function sendViaSmtp(email: OutboundEmail): Promise<EmailResult> {
   }
 }
 
-/** Send an email via the first configured provider. */
 export async function sendEmail(email: OutboundEmail): Promise<EmailResult> {
   if (process.env.RESEND_API_KEY?.trim()) {
     return sendViaResend(email);
@@ -102,7 +92,6 @@ export async function sendEmail(email: OutboundEmail): Promise<EmailResult> {
   return { ok: false, reason: "not_configured" };
 }
 
-/** True when at least one provider + recipient is configured. */
 export function isEmailConfigured(): boolean {
   const { to } = recipients();
   return Boolean(

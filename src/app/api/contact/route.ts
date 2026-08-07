@@ -1,7 +1,6 @@
 import { sendEmail, isEmailConfigured } from "@/lib/email";
 import { anonKey, rateLimit, sweep } from "@/lib/ratelimit";
 
-/** Which form sent this — used only to label the email subject. */
 const KINDS: Record<string, string> = {
   support: "Support",
   signalement: "Signalement de contenu",
@@ -11,10 +10,7 @@ const KINDS: Record<string, string> = {
   contact: "Contact",
 };
 
-const MAX = {
-  field: 300,
-  message: 5000,
-};
+const MAX = { field: 300, message: 5000 };
 
 function clean(v: unknown, max: number): string {
   if (typeof v !== "string") return "";
@@ -22,7 +18,6 @@ function clean(v: unknown, max: number): string {
 }
 
 function isEmailish(v: string): boolean {
-  // Deliberately loose — just enough to reject obvious junk.
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 }
 
@@ -30,7 +25,6 @@ export async function POST(request: Request) {
   sweep();
   const coarse =
     request.headers.get("x-ratelimit-bucket") ?? "shared-contact-bucket";
-  // Tight limit: 5 submissions per 10 minutes per bucket.
   const { allowed, resetAt } = rateLimit(anonKey(`contact:${coarse}`), 5, 600_000);
   if (!allowed) {
     return Response.json(
@@ -54,7 +48,6 @@ export async function POST(request: Request) {
   const email = clean(body.email, MAX.field);
   const message = clean(body.message, MAX.message);
 
-  // The submitter's email + a message are the only hard requirements.
   if (!isEmailish(email)) {
     return Response.json({ ok: false, error: "invalid_email" }, { status: 422 });
   }
@@ -62,14 +55,12 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, error: "empty_message" }, { status: 422 });
   }
 
-  // Any other provided fields (reason, url, name, page…) are appended as-is.
   const extraKeys = ["reason", "url", "name", "page", "outlet", "deadline", "link", "fullname", "work"];
   const extras = extraKeys
     .map((k) => [k, clean(body[k], MAX.field)] as const)
     .filter(([, v]) => v.length > 0);
 
   if (!isEmailConfigured()) {
-    // Honest: we can't actually deliver yet. Tell the client the truth.
     return Response.json(
       { ok: false, error: "not_configured" },
       { status: 503 },
@@ -86,7 +77,7 @@ export async function POST(request: Request) {
   ];
 
   const result = await sendEmail({
-    subject: `[LumenGallery] ${label} — ${email}`,
+    subject: `[LeakFanHub] ${label} — ${email}`,
     text: lines.join("\n"),
     replyTo: email,
   });

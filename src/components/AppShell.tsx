@@ -24,7 +24,6 @@ const I = (d: string) => (
   </svg>
 );
 
-/** Menu latéral — pas de doublon Découvrir/Modèles */
 const SECTIONS: NavSection[] = [
   {
     items: [
@@ -104,7 +103,6 @@ function NavContent({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-/** Bas mobile : Accueil · Modèles · Feed · Recherche · Connexion (pas Ajouter) */
 const TABS: { href: string; labelKey: string; d: string; active: (p: string) => boolean }[] = [
   { href: "/", labelKey: "home", d: "M3 11l9-8 9 8M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10", active: (p) => p === "/" },
   { href: "/models", labelKey: "models", d: "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z", active: (p) => p.startsWith("/models") },
@@ -182,7 +180,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           >
             Premium
           </Link>
-          {/* Ajouter uniquement desktop header — mobile = menu hamburger */}
           <Link
             href="/add"
             aria-label="Add"
@@ -192,6 +189,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <path d="M12 5v14M5 12h14" />
             </svg>
           </Link>
+          {/* Mobile : loupe + langue en haut à droite */}
+          <Link
+            href="/recherche"
+            aria-label="Search"
+            className="grid h-9 w-9 place-items-center rounded-lg text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-2)] sm:hidden"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+              <circle cx="11" cy="11" r="7" />
+              <path d="m21 21-4.3-4.3" />
+            </svg>
+          </Link>
+          <LanguageSwitcher className="sm:hidden" />
           <LanguageSwitcher className="hidden sm:block" />
           <AccountMenu />
         </div>
@@ -215,7 +224,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {open && (
         <div className="fixed inset-0 z-[60] lg:hidden">
           <div className="absolute inset-0 bg-black/60" onClick={() => setOpen(false)} aria-hidden />
-          {/* Padding bas pour passer au-dessus de la barre d’onglets */}
           <div className="absolute left-0 top-0 flex h-full w-72 flex-col border-r border-[var(--color-border)] bg-[var(--color-bg)]">
             <div className="flex shrink-0 items-center justify-between gap-2 p-3 pb-2">
               <BrandLogo />
@@ -235,7 +243,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <p className="mb-2 px-1 text-xs font-bold uppercase tracking-wide text-[var(--color-ink-faint)]">
                   Langue
                 </p>
-                <LanguageSwitcher className="w-full" />
+                {/* Ouvre vers le haut pour ne pas sortir de l’écran */}
+                <LanguageSwitcher className="w-full" placement="up" />
               </div>
             </div>
           </div>

@@ -19,7 +19,7 @@ const CHANNELS = [
   {
     href: "/contact/partenariats",
     title: "Partenariats & créateurs",
-    body: "Tu es modèle ou créateur et veux publier sur LumenGallery ? Parlons-en.",
+    body: "Tu es modèle ou créateur et veux publier sur LeakFanHub ? Parlons-en.",
     icon: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6",
   },
   {
@@ -71,9 +71,12 @@ export default function ContactPage() {
         <h2 className="font-bold text-[var(--color-ink)]">Adresse e-mail générale</h2>
         <p className="mt-1.5">
           Pour toute demande qui n’entre dans aucune catégorie :{" "}
-          <span className="font-mono text-[var(--color-ink)]">
-            contact@lumengallery.example
-          </span>
+          <a
+            href="mailto:contact@leakfanhub.com"
+            className="font-mono text-[var(--color-ink)] hover:text-[var(--color-accent)]"
+          >
+            contact@leakfanhub.com
+          </a>
         </p>
       </div>
     </div>
