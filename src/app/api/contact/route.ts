@@ -1,7 +1,11 @@
 import { randomUUID } from "crypto";
-import { query } from "@/lib/db";
+import mysql from "mysql2/promise";
 import { sendEmail, isEmailConfigured } from "@/lib/email";
-import { notifyContact, isDiscordConfigured, isTelegramConfigured } from "@/lib/telegram";
+import {
+  notifyContact,
+  isDiscordConfigured,
+  isTelegramConfigured,
+} from "@/lib/telegram";
 import { anonKey, rateLimit, sweep } from "@/lib/ratelimit";
 
 const KINDS: Record<string, string> = {
@@ -14,6 +18,20 @@ const KINDS: Record<string, string> = {
 };
 
 const MAX = { field: 300, message: 5000 };
+
+let pool: mysql.Pool | null = null;
+
+function getPool(): mysql.Pool | null {
+  if (pool) return pool;
+  const url = process.env.DATABASE_URL;
+  if (!url) return null;
+  pool = mysql.createPool({
+    uri: url,
+    connectionLimit: 5,
+    waitForConnections: true,
+  });
+  return pool;
+}
 
 function clean(v: unknown, max: number): string {
   if (typeof v !== "string") return "";
@@ -66,7 +84,7 @@ export async function POST(request: Request) {
     "outlet",
     "deadline",
     "link",
-    "fullname",
+    "original",
     "work",
   ];
   const extras: Record<string, string> = {};
@@ -85,23 +103,23 @@ export async function POST(request: Request) {
   ];
   const text = lines.join("\n");
 
-  // 1) Toujours enregistrer en DB (fiable même si Telegram bloqué)
   let saved = false;
-  try {
-    await query(
-      `INSERT INTO contact_messages (id, kind, email, message, meta_json)
-       VALUES (?, ?, ?, ?, ?)`,
-      [randomUUID(), kind, email, message, JSON.stringify(extras)],
-    );
-    saved = true;
-  } catch (e) {
-    console.error("[contact] db save failed", e);
+  const db = getPool();
+  if (db) {
+    try {
+      await db.execute(
+        `INSERT INTO contact_messages (id, kind, email, message, meta_json)
+         VALUES (?, ?, ?, ?, ?)`,
+        [randomUUID(), kind, email, message, JSON.stringify(extras)],
+      );
+      saved = true;
+    } catch (e) {
+      console.error("[contact] db save failed", e);
+    }
   }
 
-  // 2) Notif temps réel si possible (Discord > Telegram)
   let notified = false;
-  const hasNotify = isDiscordConfigured() || isTelegramConfigured();
-  if (hasNotify) {
+  if (isDiscordConfigured() || isTelegramConfigured()) {
     const n = await notifyContact(text);
     if (n.ok) notified = true;
   }
@@ -115,12 +133,9 @@ export async function POST(request: Request) {
     if (em.ok) notified = true;
   }
 
-  // Succès si DB OK (même sans notif externe)
   if (saved) {
     return Response.json({ ok: true, stored: true, notified });
   }
-
-  // Dernier recours : au moins une notif a marché
   if (notified) {
     return Response.json({ ok: true, stored: false, notified: true });
   }
