@@ -66,7 +66,6 @@ function rowToView(row: PhotoRow, tags: string[]): PhotoView {
   );
   const views = Number(row.views_count) || 0;
   const likes = Number(row.likes_count) || 0;
-  // Score 0–100 pour UI (pas le tri SQL)
   const ageDays = Math.max(ageMinutes / 1440, 0.1);
   const velocity = (views + likes * 12) / Math.pow(ageDays + 2, 1.3);
   const trending = Math.min(100, Math.round(Math.log10(velocity + 1) * 25));
@@ -103,15 +102,6 @@ function rowToView(row: PhotoRow, tags: string[]): PhotoView {
   };
 }
 
-/**
- * Ordres SQL vraiment différents :
- * - recent   → date d’ajout
- * - popular  → vues totales (all-time)
- * - liked    → likes totaux
- * - trending → vélocité : engagement / âge^1.4 (favorise le récent + vues/likes)
- * - random   → aléatoire seedé
- * - longest  → durée vidéo
- */
 const SORT_SQL: Record<SortKey, string> = {
   recent: "p.created_at DESC, p.id DESC",
   popular: "p.views_count DESC, p.likes_count DESC, p.id DESC",
@@ -127,9 +117,9 @@ const SORT_SQL: Record<SortKey, string> = {
 
 function windowSql(window: TrendWindow | undefined): string {
   if (!window || window === "all") return "";
-  if (window === "24h") return " AND p.created_at >= NOW() - INTERVAL 1 DAY";
-  if (window === "7d") return " AND p.created_at >= NOW() - INTERVAL 7 DAY";
-  if (window === "30d") return " AND p.created_at >= NOW() - INTERVAL 30 DAY";
+  if (window === "24h") return "p.created_at >= NOW() - INTERVAL 1 DAY";
+  if (window === "7d") return "p.created_at >= NOW() - INTERVAL 7 DAY";
+  if (window === "30d") return "p.created_at >= NOW() - INTERVAL 30 DAY";
   return "";
 }
 
@@ -283,10 +273,9 @@ export class MariaDBProvider implements DataProvider {
       params.tag = query.tag;
     }
 
-    // Fenêtre uniquement pertinente pour trending (sinon on filtre trop agressivement)
     if (sort === "trending") {
       const w = windowSql(query.window ?? "30d");
-      if (w) where.push(w.replace(/^\s*AND\s+/, ""));
+      if (w) where.push(w);
     }
 
     const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
@@ -427,7 +416,6 @@ export class MariaDBProvider implements DataProvider {
 
   async getRankings(limit = 20) {
     const lim = Math.min(Math.max(Number(limit) || 20, 1), 100);
-    // Classement créateurs : followers + vues (plus de liste vide)
     const rows = await this.q<RowDataPacket>(
       `SELECT c.handle, c.name, c.avatar_url, c.bio, c.location, c.followers_count, c.verified,
               COALESCE(SUM(p.views_count), 0) AS views,
@@ -438,28 +426,11 @@ export class MariaDBProvider implements DataProvider {
        FROM creators c
        LEFT JOIN photos p ON p.creator_id = c.id
        GROUP BY c.id
-       HAVING photoCount > 0 OR c.followers_count > 0
-       ORDER BY score DESC, c.followers_count DESC
-       LIMIT ${lim}`,
-    );
-    // Fix HAVING — photoCount alias not available in HAVING in all MariaDB modes
-    // Re-query safer:
-    const rows2 = await this.q<RowDataPacket>(
-      `SELECT c.handle, c.name, c.avatar_url, c.bio, c.location, c.followers_count, c.verified,
-              COALESCE(SUM(p.views_count), 0) AS views,
-              COALESCE(SUM(p.likes_count), 0) AS likes,
-              COUNT(p.id) AS photoCount,
-              (COALESCE(c.followers_count,0) * 10
-                + COALESCE(SUM(p.views_count), 0)
-                + COALESCE(SUM(p.likes_count), 0) * 5) AS score
-       FROM creators c
-       LEFT JOIN photos p ON p.creator_id = c.id
-       GROUP BY c.id
        HAVING COUNT(p.id) > 0 OR COALESCE(c.followers_count,0) > 0
        ORDER BY score DESC, c.followers_count DESC
        LIMIT ${lim}`,
     );
-    return rows2.map((r) => ({
+    return rows.map((r) => ({
       handle: r.handle as string,
       name: r.name as string,
       avatarUrl: (r.avatar_url as string) || "",
