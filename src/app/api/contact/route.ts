@@ -1,5 +1,7 @@
+import { randomUUID } from "crypto";
+import { query } from "@/lib/db";
 import { sendEmail, isEmailConfigured } from "@/lib/email";
-import { sendTelegram, isTelegramConfigured } from "@/lib/telegram";
+import { notifyContact, isDiscordConfigured, isTelegramConfigured } from "@/lib/telegram";
 import { anonKey, rateLimit, sweep } from "@/lib/ratelimit";
 
 const KINDS: Record<string, string> = {
@@ -44,7 +46,7 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, error: "bad_request" }, { status: 400 });
   }
 
-  const kind = clean(body.kind, 40);
+  const kind = clean(body.kind, 40) || "contact";
   const label = KINDS[kind] ?? "Contact";
   const email = clean(body.email, MAX.field);
   const message = clean(body.message, MAX.message);
@@ -56,52 +58,72 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, error: "empty_message" }, { status: 422 });
   }
 
-  const extraKeys = ["reason", "url", "name", "page", "outlet", "deadline", "link", "fullname", "work"];
-  const extras = extraKeys
-    .map((k) => [k, clean(body[k], MAX.field)] as const)
-    .filter(([, v]) => v.length > 0);
+  const extraKeys = [
+    "reason",
+    "url",
+    "name",
+    "page",
+    "outlet",
+    "deadline",
+    "link",
+    "fullname",
+    "work",
+  ];
+  const extras: Record<string, string> = {};
+  for (const k of extraKeys) {
+    const v = clean(body[k], MAX.field);
+    if (v) extras[k] = v;
+  }
 
   const lines = [
     `🔔 LeakFanHub — ${label}`,
     `De : ${email}`,
-    ...extras.map(([k, v]) => `${k} : ${v}`),
+    ...Object.entries(extras).map(([k, v]) => `${k} : ${v}`),
     "",
     "Message :",
     message,
   ];
   const text = lines.join("\n");
 
-  const hasTelegram = isTelegramConfigured();
-  const hasEmail = isEmailConfigured();
-
-  if (!hasTelegram && !hasEmail) {
-    return Response.json(
-      { ok: false, error: "not_configured" },
-      { status: 503 },
+  // 1) Toujours enregistrer en DB (fiable même si Telegram bloqué)
+  let saved = false;
+  try {
+    await query(
+      `INSERT INTO contact_messages (id, kind, email, message, meta_json)
+       VALUES (?, ?, ?, ?, ?)`,
+      [randomUUID(), kind, email, message, JSON.stringify(extras)],
     );
+    saved = true;
+  } catch (e) {
+    console.error("[contact] db save failed", e);
   }
 
-  let delivered = false;
-
-  // Priorité Telegram (ce que tu veux)
-  if (hasTelegram) {
-    const tg = await sendTelegram(text);
-    if (tg.ok) delivered = true;
+  // 2) Notif temps réel si possible (Discord > Telegram)
+  let notified = false;
+  const hasNotify = isDiscordConfigured() || isTelegramConfigured();
+  if (hasNotify) {
+    const n = await notifyContact(text);
+    if (n.ok) notified = true;
   }
 
-  // Email en secours / en plus si configuré
-  if (hasEmail) {
+  if (isEmailConfigured()) {
     const em = await sendEmail({
       subject: `[LeakFanHub] ${label} — ${email}`,
       text,
       replyTo: email,
     });
-    if (em.ok) delivered = true;
+    if (em.ok) notified = true;
   }
 
-  if (!delivered) {
-    return Response.json({ ok: false, error: "send_failed" }, { status: 502 });
+  // Succès si DB OK (même sans notif externe)
+  if (saved) {
+    return Response.json({ ok: true, stored: true, notified });
   }
 
-  return Response.json({ ok: true });
+  // Dernier recours : au moins une notif a marché
+  if (notified) {
+    return Response.json({ ok: true, stored: false, notified: true });
+  }
+
+  return Response.json({ ok: false, error: "send_failed" }, { status: 502 });
 }
