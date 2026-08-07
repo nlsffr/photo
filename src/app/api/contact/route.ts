@@ -1,4 +1,5 @@
 import { sendEmail, isEmailConfigured } from "@/lib/email";
+import { sendTelegram, isTelegramConfigured } from "@/lib/telegram";
 import { anonKey, rateLimit, sweep } from "@/lib/ratelimit";
 
 const KINDS: Record<string, string> = {
@@ -60,31 +61,46 @@ export async function POST(request: Request) {
     .map((k) => [k, clean(body[k], MAX.field)] as const)
     .filter(([, v]) => v.length > 0);
 
-  if (!isEmailConfigured()) {
-    return Response.json(
-      { ok: false, error: "not_configured" },
-      { status: 503 },
-    );
-  }
-
   const lines = [
-    `Formulaire : ${label} (${kind || "contact"})`,
+    `🔔 LeakFanHub — ${label}`,
     `De : ${email}`,
     ...extras.map(([k, v]) => `${k} : ${v}`),
     "",
     "Message :",
     message,
   ];
+  const text = lines.join("\n");
 
-  const result = await sendEmail({
-    subject: `[LeakFanHub] ${label} — ${email}`,
-    text: lines.join("\n"),
-    replyTo: email,
-  });
+  const hasTelegram = isTelegramConfigured();
+  const hasEmail = isEmailConfigured();
 
-  if (!result.ok) {
-    const status = result.reason === "not_configured" ? 503 : 502;
-    return Response.json({ ok: false, error: result.reason }, { status });
+  if (!hasTelegram && !hasEmail) {
+    return Response.json(
+      { ok: false, error: "not_configured" },
+      { status: 503 },
+    );
+  }
+
+  let delivered = false;
+
+  // Priorité Telegram (ce que tu veux)
+  if (hasTelegram) {
+    const tg = await sendTelegram(text);
+    if (tg.ok) delivered = true;
+  }
+
+  // Email en secours / en plus si configuré
+  if (hasEmail) {
+    const em = await sendEmail({
+      subject: `[LeakFanHub] ${label} — ${email}`,
+      text,
+      replyTo: email,
+    });
+    if (em.ok) delivered = true;
+  }
+
+  if (!delivered) {
+    return Response.json({ ok: false, error: "send_failed" }, { status: 502 });
   }
 
   return Response.json({ ok: true });
