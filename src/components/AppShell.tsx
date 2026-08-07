@@ -24,12 +24,13 @@ const I = (d: string) => (
   </svg>
 );
 
+/** Menu latéral — pas de doublon Découvrir/Modèles */
 const SECTIONS: NavSection[] = [
   {
     items: [
       { href: "/", labelKey: "home", icon: I("M3 11l9-8 9 8M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"), active: (p) => p === "/" },
       { href: "/recherche", labelKey: "search", icon: I("M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-4.3-4.3"), active: (p) => p.startsWith("/recherche") },
-      { href: "/models", labelKey: "discover", icon: I("M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM16.2 7.8l-2.9 6.4-6.4 2.9 2.9-6.4z"), active: (p) => p.startsWith("/models") },
+      { href: "/models", labelKey: "models", icon: I("M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"), active: (p) => p.startsWith("/models") },
       { href: "/feed", labelKey: "feed", icon: I("M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM10 8l6 4-6 4z"), active: (p) => p.startsWith("/feed") || p.startsWith("/tiktok") },
       { href: "/trending-medias", labelKey: "trending", icon: I("M5 17l6-6 4 4 8-8M21 7v6h-6"), active: (p) => p.startsWith("/trending-medias") },
       { href: "/most-liked", labelKey: "mostLiked", icon: I("M12 21s-7.5-4.6-10-9.3C.4 8.4 2 5 5.4 5c2 0 3.3 1.1 4.6 2.6C11.3 6.1 12.6 5 14.6 5 18 5 19.6 8.4 22 11.7 19.5 16.4 12 21 12 21Z"), active: (p) => p.startsWith("/most-liked") },
@@ -38,6 +39,7 @@ const SECTIONS: NavSection[] = [
       { href: "/abonnements", labelKey: "following", icon: I("M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM16 11l2 2 4-4"), active: (p) => p.startsWith("/abonnements") },
       { href: "/favoris", labelKey: "saved", icon: I("M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16l-7-4-7 4Z"), active: (p) => p.startsWith("/favoris") },
       { href: "/add", labelKey: "add", icon: I("M12 5v14M5 12h14"), active: (p) => p.startsWith("/add") },
+      { href: "/classements", labelKey: "rankings", icon: I("M8 21V9M16 21V5M4 21v-6M20 21v-10"), active: (p) => p.startsWith("/classements") },
     ],
   },
   {
@@ -45,12 +47,6 @@ const SECTIONS: NavSection[] = [
       { href: "/premium", labelKey: "premium", icon: I("M3 7l4 5 5-7 5 7 4-5v11H3z"), accent: "gold", active: (p) => p.startsWith("/premium") },
       { href: "/connexion", labelKey: "login", icon: I("M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"), active: (p) => p.startsWith("/connexion") },
       { href: "/inscription", labelKey: "signup", icon: I("M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6"), accent: "pink", active: (p) => p.startsWith("/inscription") },
-    ],
-  },
-  {
-    items: [
-      { href: "/models", labelKey: "models", icon: I("M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"), active: (p) => p === "/models" },
-      { href: "/classements", labelKey: "rankings", icon: I("M8 21V9M16 21V5M4 21v-6M20 21v-10"), active: (p) => p.startsWith("/classements") },
     ],
   },
   {
@@ -108,11 +104,12 @@ function NavContent({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
+/** Bas mobile : Accueil · Modèles · Feed · Recherche · Connexion (pas Ajouter) */
 const TABS: { href: string; labelKey: string; d: string; active: (p: string) => boolean }[] = [
   { href: "/", labelKey: "home", d: "M3 11l9-8 9 8M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10", active: (p) => p === "/" },
   { href: "/models", labelKey: "models", d: "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z", active: (p) => p.startsWith("/models") },
   { href: "/feed", labelKey: "feed", d: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM10 8l6 4-6 4z", active: (p) => p.startsWith("/feed") },
-  { href: "/add", labelKey: "add", d: "M12 5v14M5 12h14", active: (p) => p.startsWith("/add") },
+  { href: "/recherche", labelKey: "search", d: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-4.3-4.3", active: (p) => p.startsWith("/recherche") },
   { href: "/connexion", labelKey: "login", d: "M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3", active: (p) => p.startsWith("/connexion") || p.startsWith("/inscription") },
 ];
 
@@ -145,7 +142,6 @@ function BottomTabs() {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
-  // Feed immersive: hide footer only — ALWAYS keep bottom tabs so user can leave
   const isFeed = pathname.startsWith("/feed") || pathname.startsWith("/tiktok");
 
   useEffect(() => {
@@ -186,26 +182,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           >
             Premium
           </Link>
+          {/* Ajouter uniquement desktop header — mobile = menu hamburger */}
           <Link
             href="/add"
             aria-label="Add"
-            className="grid h-9 w-9 place-items-center rounded-lg bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-600)]"
+            className="hidden h-9 w-9 place-items-center rounded-lg bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-600)] sm:grid"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
               <path d="M12 5v14M5 12h14" />
             </svg>
           </Link>
           <LanguageSwitcher className="hidden sm:block" />
-          <Link
-            href="/recherche"
-            aria-label="Search"
-            className="grid h-9 w-9 place-items-center rounded-lg text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-2)] sm:hidden"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-              <circle cx="11" cy="11" r="7" />
-              <path d="m21 21-4.3-4.3" />
-            </svg>
-          </Link>
           <AccountMenu />
         </div>
       </header>
@@ -214,7 +201,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <aside className="hidden w-60 shrink-0 border-r border-[var(--color-border)] lg:block">
           <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] max-h-[calc(100dvh-3.5rem-env(safe-area-inset-top))] overflow-y-auto p-3">
             <NavContent />
-            <div className="mt-4 px-2">
+            <div className="mt-4 px-2 pb-4">
               <LanguageSwitcher className="w-full" />
             </div>
           </div>
@@ -226,10 +213,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       {open && (
-        <div className="fixed inset-0 z-50 lg:hidden">
+        <div className="fixed inset-0 z-[60] lg:hidden">
           <div className="absolute inset-0 bg-black/60" onClick={() => setOpen(false)} aria-hidden />
-          <div className="absolute left-0 top-0 flex h-full w-72 flex-col overflow-y-auto overscroll-contain border-r border-[var(--color-border)] bg-[var(--color-bg)] p-3">
-            <div className="mb-2 flex items-center justify-between gap-2">
+          {/* Padding bas pour passer au-dessus de la barre d’onglets */}
+          <div className="absolute left-0 top-0 flex h-full w-72 flex-col border-r border-[var(--color-border)] bg-[var(--color-bg)]">
+            <div className="flex shrink-0 items-center justify-between gap-2 p-3 pb-2">
               <BrandLogo />
               <button
                 onClick={() => setOpen(false)}
@@ -241,15 +229,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </svg>
               </button>
             </div>
-            <NavContent onNavigate={() => setOpen(false)} />
-            <div className="mt-4 px-2">
-              <LanguageSwitcher className="w-full" />
+            <div className="flex-1 overflow-y-auto overscroll-contain px-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
+              <NavContent onNavigate={() => setOpen(false)} />
+              <div className="mt-4 border-t border-[var(--color-border)] pt-4">
+                <p className="mb-2 px-1 text-xs font-bold uppercase tracking-wide text-[var(--color-ink-faint)]">
+                  Langue
+                </p>
+                <LanguageSwitcher className="w-full" />
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Always visible — user must be able to leave /feed */}
       <BottomTabs />
 
       {!isFeed && (
@@ -275,9 +267,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </Link>
               </div>
             </div>
-            <p className="mt-4 text-xs text-[var(--color-ink-faint)]">
-              © 2026 LeakFanHub. 18+ only.
-            </p>
+            <p className="mt-4 text-xs text-[var(--color-ink-faint)]">© 2026 LeakFanHub. 18+ only.</p>
           </div>
         </footer>
       )}
