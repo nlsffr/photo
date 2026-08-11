@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Suspense } from "react";
 import { getPhotos } from "@/lib/photos";
 import type { MediaType, SortKey } from "@/lib/types";
@@ -29,9 +30,12 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { tag } = await params;
   const decoded = decodeURIComponent(tag);
+  const path = `/tag/${encodeURIComponent(decoded)}`;
   return {
     title: `#${decoded}`,
-    description: `Médias tagués #${decoded} sur LumenGallery`,
+    description: `Photos and videos tagged #${decoded} on LeakFanHub. Free gallery, updated daily. 18+.",
+    alternates: { canonical: path },
+    robots: { index: true, follow: true, "max-image-preview": "large" },
   };
 }
 
@@ -61,9 +65,21 @@ export default async function TagPage({
   const ai = aiRaw === "0" || aiRaw === "1" ? aiRaw : undefined;
   const isAi = ai === "1" ? true : ai === "0" ? false : undefined;
 
-  const page = await getPhotos({ sort, tag, type, isAi });
+  const cursorRaw = first(sp.cursor);
+  const cursorParsed = cursorRaw ? parseInt(cursorRaw, 10) : NaN;
+  const cursor = Number.isFinite(cursorParsed) && cursorParsed > 0 ? cursorParsed : undefined;
+
+  const page = await getPhotos({ sort, tag, type, isAi, cursor, limit: 30 });
   const basePath = `/tag/${encodeURIComponent(tag)}`;
-  const queryKey = `tag|${tag}|${sort}|${type ?? ""}|${ai ?? ""}`;
+  const queryKey = `tag|${tag}|${sort}|${type ?? ""}|${ai ?? ""}|${cursor ?? 0}`;
+
+  const nextParams = new URLSearchParams();
+  if (sort !== "popular") nextParams.set("sort", sort);
+  if (type) nextParams.set("type", type);
+  if (ai) nextParams.set("ai", ai);
+  if (page.nextCursor != null) nextParams.set("cursor", String(page.nextCursor));
+  const qs = nextParams.toString();
+  const nextHref = page.nextCursor != null ? `${basePath}${qs ? `?${qs}` : ""}` : null;
 
   return (
     <div className="px-3 py-4 sm:px-5">
@@ -89,6 +105,17 @@ export default async function TagPage({
         initial={page}
         params={{ sort, tag, type, ai }}
       />
+
+      {nextHref && (
+        <nav className="mt-8 flex justify-center" aria-label="Pagination">
+          <Link
+            href={nextHref}
+            className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-2.5 text-sm font-semibold"
+          >
+            More #{tag} →
+          </Link>
+        </nav>
+      )}
     </div>
   );
 }
