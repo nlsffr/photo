@@ -33,7 +33,7 @@ export async function generateMetadata({
   const path = `/tag/${encodeURIComponent(decoded)}`;
   return {
     title: `#${decoded}`,
-    description: `Photos and videos tagged #${decoded} on LeakFanHub. Free gallery, updated daily. 18+.",
+    description: `Photos and videos tagged #${decoded} on LeakFanHub. Free gallery, updated daily. 18+.`,
     alternates: { canonical: path },
     robots: { index: true, follow: true, "max-image-preview": "large" },
   };
