@@ -14,15 +14,11 @@ const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").repl
 /** Google limit 50k URLs / file — stay under. */
 const MEDIA_CHUNK = 10_000;
 const MEDIA_PAGE = 500;
-/** Max media sitemap files (10k * 50 = 500k URLs). */
 const MAX_MEDIA_SITEMAPS = 50;
 
 /**
- * Sitemap ids (leakgallery-style split):
- *  0 = static pages
- *  1 = creator profiles
- *  2 = tags
- *  3..N = media chunks ( /handle/id )
+ * 0 = static | 1 = profiles | 2 = tags | 3+ = media chunks
+ * (same split idea as leakgallery.com)
  */
 export async function generateSitemaps() {
   const ids: { id: number }[] = [{ id: 0 }, { id: 1 }, { id: 2 }];
@@ -45,15 +41,15 @@ export async function generateSitemaps() {
   return ids;
 }
 
-export default async function sitemap({
-  id,
-}: {
-  id: number | string;
-}): Promise<MetadataRoute.Sitemap> {
-  const sid = typeof id === "string" ? parseInt(id, 10) : id;
+/** Next 15+ may pass props as a Promise — always resolve id. */
+export default async function sitemap(
+  props: { id: number | string } | Promise<{ id: number | string }>,
+): Promise<MetadataRoute.Sitemap> {
+  const { id } = await Promise.resolve(props);
+  const sid = typeof id === "string" ? parseInt(id, 10) : Number(id);
   const now = new Date();
 
-  if (sid === 0) return staticSitemap(now);
+  if (!Number.isFinite(sid) || sid === 0) return staticSitemap(now);
   if (sid === 1) return profilesSitemap(now);
   if (sid === 2) return tagsSitemap(now);
   if (sid >= 3) return mediaSitemap(sid - 3, now);
@@ -61,7 +57,11 @@ export default async function sitemap({
 }
 
 function staticSitemap(now: Date): MetadataRoute.Sitemap {
-  const paths: { path: string; changeFrequency: MetadataRoute.Sitemap[0]["changeFrequency"]; priority: number }[] = [
+  const paths: {
+    path: string;
+    changeFrequency: NonNullable<MetadataRoute.Sitemap[0]["changeFrequency"]>;
+    priority: number;
+  }[] = [
     { path: "/", changeFrequency: "hourly", priority: 1 },
     { path: "/models", changeFrequency: "daily", priority: 0.9 },
     { path: "/trending-medias", changeFrequency: "hourly", priority: 0.8 },
@@ -153,7 +153,7 @@ async function mediaSitemap(
       cursor = page.nextCursor;
     }
   } catch {
-    // empty chunk if DB unavailable
+    // empty if DB down
   }
 
   return entries;
