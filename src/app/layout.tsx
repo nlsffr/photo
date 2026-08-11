@@ -14,30 +14,41 @@ const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").repl
 export const metadata: Metadata = {
   metadataBase: new URL(SITE),
   title: {
-    default: "LeakFanHub — photos & vidéos 18+",
+    default: "Latest OnlyFans Leaks - LeakFanHub",
     template: "%s · LeakFanHub",
   },
   description:
-    "LeakFanHub — photos et vidéos de créateurs. Feed, modèles, tags. Contenu réservé aux adultes (18+).",
+    "Find exclusive content from your favorite OnlyFans models here. LeakFanHub is a free OnlyFans leaks gallery — photos, videos, trending creators updated daily. 18+ only.",
   applicationName: "LeakFanHub",
   authors: [{ name: "LeakFanHub" }],
-  keywords: ["LeakFanHub", "photos", "vidéos", "créateurs", "modèles", "feed"],
+  keywords: [
+    "OnlyFans leaks",
+    "OnlyFans leak",
+    "OnlyFans models",
+    "leaked OnlyFans",
+    "free OnlyFans",
+    "LeakFanHub",
+    "creator leaks",
+    "OnlyFans videos",
+    "OnlyFans photos",
+  ],
   alternates: {
     canonical: "/",
   },
   openGraph: {
     type: "website",
-    locale: "fr_FR",
+    locale: "en_US",
     url: SITE,
     siteName: "LeakFanHub",
-    title: "LeakFanHub — photos & vidéos 18+",
+    title: "Latest OnlyFans Leaks - LeakFanHub",
     description:
-      "Découverte de photos et vidéos. Feed, créateurs, tags. 18+.",
+      "Free OnlyFans leaks gallery. Browse photos and videos from popular creators. Updated daily. 18+.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "LeakFanHub — photos & vidéos 18+",
-    description: "Découverte de photos et vidéos. Feed, créateurs, tags. 18+.",
+    title: "Latest OnlyFans Leaks - LeakFanHub",
+    description:
+      "Free OnlyFans leaks gallery. Photos, videos, trending models. 18+.",
   },
   robots: {
     index: true,
@@ -63,7 +74,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fr" className="h-full antialiased">
+    <html lang="en" className="h-full antialiased">
       <body className="min-h-full">
         <LocaleProvider>
           <SessionProvider>

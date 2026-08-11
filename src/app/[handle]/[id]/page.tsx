@@ -17,6 +17,8 @@ import { Comments } from "@/components/Comments";
 import { JsonLd } from "@/components/JsonLd";
 import { BackLink } from "@/components/BackLink";
 
+const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").replace(/\/$/, "");
+
 const RESERVED = new Set([
   "api", "creator", "models", "photo", "media", "_next",
   "favicon.ico", "robots.txt", "sitemap.xml", "saved", "liked",
@@ -30,20 +32,38 @@ export async function generateMetadata({
   params: Promise<{ handle: string; id: string }>;
 }): Promise<Metadata> {
   const { handle, id } = await params;
-  if (RESERVED.has(handle.toLowerCase())) return { title: "Introuvable" };
+  if (RESERVED.has(handle.toLowerCase())) return { title: "Not found" };
   const photo = await getPhotoById(id);
   if (!photo || photo.creatorHandle.toLowerCase() !== handle.toLowerCase()) {
-    return { title: "Introuvable" };
+    return { title: "Not found" };
   }
-  const title = photo.title?.trim()
-    ? photo.title
-    : `${photo.creatorHandle} — ${photo.type}`;
+
+  const h = photo.creatorHandle;
+  const kind =
+    photo.type === "video" ? "video" : photo.type === "pack" ? "pack" : "photo";
+  const title = `${h} leaked ${kind} #${photo.sourceId || id}`;
+  const description = `${h} OnlyFans leaked ${kind} — free on LeakFanHub. ${formatCount(photo.views)} views. Browse more ${h} leaks, photos and videos. 18+.`;
+  const url = `${SITE}/${encodeURIComponent(h)}/${encodeURIComponent(id)}`;
+
   return {
     title,
-    description: `${title} · ${photo.views} vues`,
+    description,
+    alternates: {
+      canonical: `/${encodeURIComponent(h)}/${encodeURIComponent(id)}`,
+    },
     openGraph: {
+      type: photo.type === "video" ? "video.other" : "article",
       title,
+      description,
+      url,
+      siteName: "LeakFanHub",
       images: photo.imageUrl ? [{ url: photo.imageUrl }] : [],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: photo.imageUrl ? [photo.imageUrl] : undefined,
     },
   };
 }
@@ -64,19 +84,23 @@ export default async function MediaByHandlePage({
   const photo = withCreator(raw, creator);
   const related = await getRelatedPhotos(raw);
 
+  const h1 = `${photo.creatorHandle} leaked ${photo.type}`;
+
   const schema =
     photo.type === "video" && photo.videoUrl
       ? {
           "@context": "https://schema.org",
           "@type": "VideoObject",
-          name: photo.title,
+          name: h1,
+          description: `${photo.creatorHandle} OnlyFans leaked video on LeakFanHub`,
           thumbnailUrl: photo.imageUrl,
           contentUrl: photo.videoUrl,
         }
       : {
           "@context": "https://schema.org",
           "@type": "ImageObject",
-          name: photo.title,
+          name: h1,
+          description: `${photo.creatorHandle} OnlyFans leaked photo on LeakFanHub`,
           contentUrl: photo.imageUrl,
         };
 
@@ -84,14 +108,12 @@ export default async function MediaByHandlePage({
     <div className="mx-auto max-w-[1600px] px-3 pb-8 pt-3 sm:px-6 sm:py-6">
       <JsonLd data={schema} />
 
-      {/* Back — big mobile-friendly */}
       <BackLink
         fallback={`/creator/${photo.creatorHandle}`}
-        label="Retour"
+        label="Back"
         className="mb-3"
       />
 
-      {/* Creator row FIRST on mobile — avatar + follow on top */}
       <div className="mb-4 flex items-center gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 lg:hidden">
         <Link
           href={`/creator/${photo.creatorHandle}`}
@@ -123,7 +145,7 @@ export default async function MediaByHandlePage({
             <VideoPlayer
               src={photo.videoUrl}
               poster={photo.imageUrl}
-              title={photo.title}
+              title={h1}
               views={photo.views}
               likes={photo.likes}
               width={photo.width}
@@ -134,7 +156,7 @@ export default async function MediaByHandlePage({
             <div className="flex w-full items-center justify-center">
               <MediaImg
                 src={photo.imageUrl}
-                alt={photo.title}
+                alt={h1}
                 width={photo.width}
                 height={photo.height}
                 sizes="(max-width: 1024px) 100vw, 70vw"
@@ -146,7 +168,6 @@ export default async function MediaByHandlePage({
         </div>
 
         <aside className="flex flex-col gap-4">
-          {/* Desktop creator card */}
           <div className="hidden items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 lg:flex">
             <Link
               href={`/creator/${photo.creatorHandle}`}
@@ -166,7 +187,7 @@ export default async function MediaByHandlePage({
                 </p>
                 {creator && (
                   <p className="truncate text-sm text-[var(--color-ink-muted)]">
-                    {formatCount(creator.followers)} abonnés
+                    {formatCount(creator.followers)} followers
                   </p>
                 )}
               </div>
@@ -175,18 +196,16 @@ export default async function MediaByHandlePage({
           </div>
 
           <div>
-            <h1 className="text-lg font-bold leading-snug sm:text-xl">
-              {photo.title}
-            </h1>
+            <h1 className="text-lg font-bold leading-snug sm:text-xl">{h1}</h1>
             <p className="mt-1 text-xs text-[var(--color-ink-faint)]">
-              {formatAge(photo.ageMinutes)}
+              {formatAge(photo.ageMinutes)} · @{photo.creatorHandle} OnlyFans leak
             </p>
           </div>
 
           <div className="grid grid-cols-3 gap-2">
             {[
-              { label: "Vues", value: formatCount(photo.views) },
-              { label: "J’aime", value: formatCount(photo.likes) },
+              { label: "Views", value: formatCount(photo.views) },
+              { label: "Likes", value: formatCount(photo.likes) },
               { label: "Score", value: `${photo.trending}` },
             ].map((s) => (
               <div
@@ -221,14 +240,16 @@ export default async function MediaByHandlePage({
             href={`/dmca?photo=${encodeURIComponent(photo.id)}`}
             className="text-center text-xs text-[var(--color-ink-faint)] underline"
           >
-            Signaler / DMCA
+            Report / DMCA
           </Link>
         </aside>
       </div>
 
       {related.length > 0 && (
         <section className="mt-10">
-          <h2 className="mb-3 text-base font-bold sm:text-lg">Similaires</h2>
+          <h2 className="mb-3 text-base font-bold sm:text-lg">
+            More {photo.creatorHandle} leaks
+          </h2>
           <div className="media-grid">
             {related.map((p) => (
               <PhotoCard key={p.id} photo={p} />

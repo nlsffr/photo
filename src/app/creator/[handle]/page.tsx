@@ -27,18 +27,26 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { handle } = await params;
   const creator = await getCreator(handle);
-  if (!creator) return { title: "Profil introuvable" };
+  if (!creator) return { title: "Profile not found" };
 
-  const title = `${creator.name} (@${creator.handle})`;
-  const description =
-    creator.bio?.slice(0, 155) ||
-    `Profil de ${creator.name} (@${creator.handle}) sur LeakFanHub — photos et vidéos.`;
+  const title = `${creator.handle} OnlyFans leaks — photos & videos`;
+  const rawDesc =
+    creator.bio?.slice(0, 120) ||
+    `Free ${creator.handle} OnlyFans leaked content on LeakFanHub. Browse ${creator.name} (@${creator.handle}) photos and videos. Updated daily. 18+.`;
+  const description = rawDesc.length > 160 ? `${rawDesc.slice(0, 157)}...` : rawDesc;
   const url = `${SITE}/creator/${encodeURIComponent(creator.handle)}`;
   const image = creator.avatarUrl || undefined;
 
   return {
     title,
     description,
+    keywords: [
+      `${creator.handle} leaked`,
+      `${creator.handle} OnlyFans`,
+      `${creator.handle} leaks`,
+      `${creator.name} OnlyFans`,
+      "OnlyFans leaks",
+    ],
     alternates: { canonical: `/creator/${encodeURIComponent(creator.handle)}` },
     openGraph: {
       type: "profile",
@@ -98,11 +106,11 @@ export default async function CreatorPage({
   };
 
   const chips = [
-    { label: "Tout", href: q({ sort }), active: !type },
+    { label: "All", href: q({ sort }), active: !type },
     { label: "Photos", href: q({ type: "photo", sort }), active: type === "photo" },
-    { label: "Vidéos", href: q({ type: "video", sort }), active: type === "video" },
+    { label: "Videos", href: q({ type: "video", sort }), active: type === "video" },
     { label: "Top", href: q({ type, sort: "popular" }), active: sort === "popular" },
-    { label: "Récents", href: q({ type, sort: "recent" }), active: sort === "recent" },
+    { label: "Recent", href: q({ type, sort: "recent" }), active: sort === "recent" },
   ];
 
   const queryKey = `${handle}|${sort}|${type ?? ""}`;
@@ -114,7 +122,7 @@ export default async function CreatorPage({
     alternateName: creator.handle,
     url: `${SITE}/creator/${encodeURIComponent(creator.handle)}`,
     image: avatarSrc || undefined,
-    description: creator.bio || undefined,
+    description: creator.bio || `${creator.handle} OnlyFans leaks on LeakFanHub`,
     interactionStatistic: {
       "@type": "InteractionCounter",
       interactionType: "https://schema.org/FollowAction",
@@ -126,7 +134,7 @@ export default async function CreatorPage({
     <div className="pb-4">
       <JsonLd data={jsonLd} />
       <div className="px-3 pt-3 sm:px-5">
-        <BackLink fallback="/" label="Retour" />
+        <BackLink fallback="/" label="Back" />
       </div>
 
       <div className="px-3 pt-4 sm:px-5">
@@ -134,7 +142,7 @@ export default async function CreatorPage({
           {avatarSrc ? (
             <MediaImg
               src={avatarSrc}
-              alt={creator.name}
+              alt={`${creator.handle} OnlyFans`}
               width={112}
               height={112}
               className="h-20 w-20 shrink-0 rounded-full object-cover object-top ring-2 ring-[var(--color-border)] sm:h-24 sm:w-24"
@@ -150,7 +158,9 @@ export default async function CreatorPage({
               <span className="truncate">{creator.name}</span>
               {creator.verified && <VerifiedBadge size={16} />}
             </h1>
-            <p className="text-sm text-[var(--color-ink-faint)]">@{creator.handle}</p>
+            <p className="text-sm text-[var(--color-ink-faint)]">
+              @{creator.handle} · OnlyFans leaks
+            </p>
           </div>
 
           <FollowButton handle={creator.handle} className="shrink-0" />
@@ -160,20 +170,24 @@ export default async function CreatorPage({
           <p className="mt-3 line-clamp-3 text-sm text-[var(--color-ink-muted)]">
             {creator.bio}
           </p>
-        ) : null}
+        ) : (
+          <p className="mt-3 text-sm text-[var(--color-ink-muted)]">
+            Free {creator.handle} OnlyFans leaked photos and videos on LeakFanHub.
+          </p>
+        )}
 
         <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm">
           <span>
             <strong>{formatCount(creator.followers)}</strong>{" "}
-            <span className="text-[var(--color-ink-faint)]">abonnés</span>
+            <span className="text-[var(--color-ink-faint)]">followers</span>
           </span>
           <span>
             <strong>{stats.photoCount}</strong>{" "}
-            <span className="text-[var(--color-ink-faint)]">médias</span>
+            <span className="text-[var(--color-ink-faint)]">media</span>
           </span>
           <span>
             <strong>{formatCount(stats.totalViews)}</strong>{" "}
-            <span className="text-[var(--color-ink-faint)]">vues</span>
+            <span className="text-[var(--color-ink-faint)]">views</span>
           </span>
         </div>
 
