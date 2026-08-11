@@ -2,13 +2,23 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+type Hit = {
+  handle: string;
+  name: string;
+  avatarUrl: string;
+  followers?: number;
+};
 
 export function SearchForm({ tags }: { tags: string[] }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [value, setValue] = useState("");
   const [advanced, setAdvanced] = useState(false);
+  const [hits, setHits] = useState<Hit[]>([]);
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
 
   const activeTag = searchParams.get("tag");
 
@@ -16,9 +26,40 @@ export function SearchForm({ tags }: { tags: string[] }) {
     setValue(searchParams.get("q") ?? "");
   }, [searchParams]);
 
+  useEffect(() => {
+    const q = value.trim();
+    if (q.length < 1) {
+      setHits([]);
+      setOpen(false);
+      return;
+    }
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/creators/search?q=${encodeURIComponent(q)}`,
+        );
+        const data = (await res.json()) as { items: Hit[] };
+        setHits(data.items ?? []);
+        setOpen(true);
+      } catch {
+        setHits([]);
+      }
+    }, 150);
+    return () => clearTimeout(t);
+  }, [value]);
+
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+
   function submit(e: React.FormEvent) {
     e.preventDefault();
     const q = value.trim();
+    setOpen(false);
     router.push(q ? `/recherche?q=${encodeURIComponent(q)}` : "/recherche");
   }
 
@@ -33,33 +74,87 @@ export function SearchForm({ tags }: { tags: string[] }) {
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-3">
-      <div className="relative">
-        <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--color-ink-faint)]">
+      <div ref={wrapRef} className="relative">
+        <span className="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 text-[var(--color-ink-faint)]">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
             <circle cx="11" cy="11" r="7" />
             <path d="m21 21-4.3-4.3" />
           </svg>
         </span>
+        {/* type=text — pas type=search (évite la 2e croix native du navigateur) */}
         <input
-          type="search"
+          type="text"
           value={value}
           onChange={(e) => setValue(e.target.value)}
+          onFocus={() => hits.length > 0 && setOpen(true)}
           autoFocus
-          placeholder="Rechercher un modèle, un tag, un titre…"
-          aria-label="Rechercher"
+          placeholder="Search a model, tag, title…"
+          aria-label="Search"
+          autoComplete="off"
           className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] py-3 pl-12 pr-11 text-base text-[var(--color-ink)] outline-none transition focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent-soft)]"
         />
-        {value && (
+        {value.length > 0 && (
           <button
             type="button"
-            onClick={() => setValue("")}
-            aria-label="Effacer"
-            className="absolute right-3 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink)]"
+            onClick={() => {
+              setValue("");
+              setHits([]);
+              setOpen(false);
+            }}
+            aria-label="Clear"
+            className="absolute right-3 top-1/2 z-10 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink)]"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
               <path d="M18 6 6 18M6 6l12 12" />
             </svg>
           </button>
+        )}
+
+        {open && hits.length > 0 && (
+          <ul className="absolute left-0 right-0 z-50 mt-1.5 max-h-80 overflow-auto rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] py-1 shadow-2xl">
+            {hits.map((h, i) => (
+              <li key={h.handle}>
+                <Link
+                  href={`/creator/${encodeURIComponent(h.handle)}`}
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-[var(--color-surface-2)]"
+                >
+                  <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-[var(--color-surface-2)] text-xs font-bold">
+                    {h.avatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={h.avatarUrl} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      h.name.slice(0, 1).toUpperCase()
+                    )}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1.5">
+                      <span className="truncate font-semibold">{h.name}</span>
+                      {i < 3 && (
+                        <span className="shrink-0 rounded-full bg-[var(--color-accent)]/15 px-1.5 py-0.5 text-[10px] font-bold text-[var(--color-accent)]">
+                          TOP
+                        </span>
+                      )}
+                    </span>
+                    <span className="block truncate text-xs text-[var(--color-ink-faint)]">
+                      @{h.handle}
+                      {typeof h.followers === "number" && h.followers > 0
+                        ? ` · ${h.followers.toLocaleString()} followers`
+                        : ""}
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+            <li>
+              <button
+                type="submit"
+                className="w-full px-3 py-2.5 text-left text-xs font-semibold text-[var(--color-accent)] hover:bg-[var(--color-surface-2)]"
+              >
+                Search « {value.trim()} » →
+              </button>
+            </li>
+          </ul>
         )}
       </div>
 
@@ -67,7 +162,7 @@ export function SearchForm({ tags }: { tags: string[] }) {
         type="submit"
         className="w-full rounded-xl bg-[var(--color-accent)] py-3 text-base font-semibold text-white transition-colors hover:bg-[var(--color-accent-600)]"
       >
-        Rechercher
+        Search
       </button>
 
       <button
@@ -77,10 +172,7 @@ export function SearchForm({ tags }: { tags: string[] }) {
         aria-controls="recherche-avancee"
         className="inline-flex w-fit items-center gap-1.5 rounded-lg bg-[var(--color-surface-2)] px-3 py-1.5 text-sm font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-          <path d="M3 7l4 5 5-7 5 7 4-5v11H3z" />
-        </svg>
-        Recherche avancée
+        Advanced
         <svg
           width="14"
           height="14"
@@ -102,7 +194,7 @@ export function SearchForm({ tags }: { tags: string[] }) {
           className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3"
         >
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">
-            Filtrer par tag
+            Filter by tag
           </p>
           <div className="flex flex-wrap gap-2">
             {tags.map((tag) => {

@@ -11,7 +11,7 @@ import { MediaImg } from "@/components/MediaImg";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { formatCount } from "@/lib/format";
 
-export const metadata: Metadata = { title: "Recherche" };
+export const metadata: Metadata = { title: "Search" };
 
 function first(v?: string | string[]): string | undefined {
   return Array.isArray(v) ? v[0] : v;
@@ -39,13 +39,14 @@ export default async function SearchPage({
     ? await getPhotos({ q, tag, type, isAi, sort: "popular" })
     : await getPhotos({ type, isAi, sort: "trending" });
   const allTags = await getAllTags();
+  // Dès 1 caractère : suggestions profils (préfixe / fuzzy côté provider)
   const creators =
-    q && q.trim().length >= 2 ? await searchCreators(q.trim(), 8) : [];
+    q && q.trim().length >= 1 ? await searchCreators(q.trim(), 12) : [];
 
   return (
     <div className="px-3 py-5 sm:px-5">
       <h1 className="mb-4 text-2xl font-bold tracking-tight">
-        <span className="text-[var(--color-accent)]">Recherche</span>
+        <span className="text-[var(--color-accent)]">Search</span>
         {label && (
           <span className="text-[var(--color-ink-muted)]"> / {label}</span>
         )}
@@ -60,10 +61,10 @@ export default async function SearchPage({
       {creators.length > 0 && (
         <section className="mb-8">
           <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-[var(--color-ink-faint)]">
-            Profils
+            Creators
           </h2>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {creators.map((c) => (
+            {creators.map((c, i) => (
               <Link
                 key={c.handle}
                 href={`/creator/${c.handle}`}
@@ -76,15 +77,20 @@ export default async function SearchPage({
                   height={48}
                   className="h-12 w-12 rounded-full object-cover"
                 />
-                <div className="min-w-0">
-                  <p className="flex items-center gap-1 font-semibold">
+                <div className="min-w-0 flex-1">
+                  <p className="flex items-center gap-1.5 font-semibold">
                     <span className="truncate">{c.name}</span>
                     {c.verified && <VerifiedBadge size={13} />}
+                    {i < 3 && (
+                      <span className="shrink-0 rounded-full bg-[var(--color-accent)]/15 px-1.5 py-0.5 text-[10px] font-bold text-[var(--color-accent)]">
+                        TOP
+                      </span>
+                    )}
                   </p>
                   <p className="truncate text-sm text-[var(--color-ink-muted)]">
                     @{c.handle}
                     {c.followers
-                      ? ` · ${formatCount(c.followers)} abonnés`
+                      ? ` · ${formatCount(c.followers)} followers`
                       : ""}
                   </p>
                 </div>
@@ -97,8 +103,8 @@ export default async function SearchPage({
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-[var(--color-ink-muted)]">
           {hasQuery
-            ? `${page.total.toLocaleString("fr-FR")} résultat${page.total > 1 ? "s" : ""}`
-            : "Tendances du moment"}
+            ? `${page.total.toLocaleString("en-US")} result${page.total === 1 ? "" : "s"}`
+            : "Trending now"}
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <Suspense fallback={<div className="h-9 w-28" />}>

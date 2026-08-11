@@ -138,6 +138,34 @@ const PHOTO_FROM = `
   LEFT JOIN bot_ingested b ON b.photo_id = p.id
 `;
 
+/** Normalize for fuzzy match: lowercase, strip non-alnum */
+function norm(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+/** Simple edit distance (Levenshtein), capped for short strings */
+function editDist(a: string, b: string): number {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  const m = a.length;
+  const n = b.length;
+  if (Math.abs(m - n) > 4) return 99;
+  const dp = new Array(n + 1);
+  for (let j = 0; j <= n; j++) dp[j] = j;
+  for (let i = 1; i <= m; i++) {
+    let prev = dp[0];
+    dp[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const tmp = dp[j];
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[j] = Math.min(dp[j] + 1, dp[j - 1] + 1, prev + cost);
+      prev = tmp;
+    }
+  }
+  return dp[n];
+}
+
 export class MariaDBProvider implements DataProvider {
   private pool: mysql.Pool;
 
@@ -204,26 +232,65 @@ export class MariaDBProvider implements DataProvider {
   }
 
   async searchCreators(q: string, limit = 12): Promise<Creator[]> {
-    const term = `${q.trim()}%`;
+    const raw = q.trim();
+    if (!raw) return [];
     const lim = Math.min(Math.max(Number(limit) || 12, 1), 30);
+    const nq = norm(raw);
+    const prefix = `${raw}%`;
+    const mid = `%${raw}%`;
+    // Prefetch candidates: prefix, contains, first chars
+    const head = raw.slice(0, Math.min(3, raw.length));
     const rows = await this.q<RowDataPacket>(
       `SELECT handle, name, avatar_url, cover_url, bio, location, followers_count, verified
        FROM creators
-       WHERE handle LIKE :q OR name LIKE :q OR handle LIKE :q2 OR name LIKE :q2
-       ORDER BY followers_count DESC, handle ASC
-       LIMIT ${lim}`,
-      { q: term, q2: `%${q.trim()}%` },
+       WHERE handle LIKE :prefix OR name LIKE :prefix
+          OR handle LIKE :mid OR name LIKE :mid
+          OR handle LIKE :head OR name LIKE :head
+       LIMIT 80`,
+      { prefix, mid, head: `${head}%` },
     );
-    return rows.map((r) => ({
-      handle: r.handle as string,
-      name: r.name as string,
-      avatarUrl: r.avatar_url as string,
-      coverUrl: (r.cover_url as string) || undefined,
-      bio: (r.bio as string) ?? "",
-      location: (r.location as string) ?? "",
-      followers: Number(r.followers_count) || 0,
-      verified: Boolean(r.verified),
-    }));
+
+    type Cand = Creator & { _score: number };
+    const scored: Cand[] = [];
+    for (const r of rows) {
+      const handle = r.handle as string;
+      const name = r.name as string;
+      const followers = Number(r.followers_count) || 0;
+      const nh = norm(handle);
+      const nn = norm(name);
+      let score = 0;
+      if (handle.toLowerCase() === raw.toLowerCase() || name.toLowerCase() === raw.toLowerCase()) {
+        score = 1000;
+      } else if (handle.toLowerCase().startsWith(raw.toLowerCase()) || name.toLowerCase().startsWith(raw.toLowerCase())) {
+        score = 800;
+      } else if (nh.startsWith(nq) || nn.startsWith(nq)) {
+        score = 700;
+      } else if (nh.includes(nq) || nn.includes(nq)) {
+        score = 500;
+      } else {
+        // Typo tolerance on normalized strings
+        const d = Math.min(editDist(nq, nh.slice(0, nq.length + 2)), editDist(nq, nn.slice(0, nq.length + 2)));
+        if (d <= 2 && nq.length >= 3) score = 400 - d * 40;
+        else if (d <= 1 && nq.length >= 2) score = 350;
+        else continue;
+      }
+      // Boost popular creators
+      score += Math.min(120, Math.log10(followers + 10) * 25);
+      scored.push({
+        handle,
+        name,
+        avatarUrl: r.avatar_url as string,
+        coverUrl: (r.cover_url as string) || undefined,
+        bio: (r.bio as string) ?? "",
+        location: (r.location as string) ?? "",
+        followers,
+        verified: Boolean(r.verified),
+        _score: score,
+      });
+    }
+
+    scored.sort((a, b) => b._score - a._score || b.followers - a.followers);
+    return scored.slice(0, lim).map(({ _score, ...c }) => c);
   }
 
   async getPhotos(query: {
@@ -265,8 +332,12 @@ export class MariaDBProvider implements DataProvider {
       where.push("COALESCE(p.is_ai, 0) = 0");
     }
     if (query.q) {
-      where.push("(p.title LIKE :q OR c.name LIKE :q OR c.handle LIKE :q)");
-      params.q = `%${query.q}%`;
+      const qq = query.q.trim();
+      where.push(
+        "(p.title LIKE :q OR c.name LIKE :q OR c.handle LIKE :q OR c.name LIKE :q2 OR c.handle LIKE :q2)",
+      );
+      params.q = `%${qq}%`;
+      params.q2 = `${qq}%`;
     }
     if (query.tag) {
       where.push("p.id IN (SELECT photo_id FROM photo_tags WHERE tag = :tag)");

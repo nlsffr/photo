@@ -7,12 +7,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ items: [] });
   }
   try {
-    const items = await searchCreators(q, 12);
+    const items = await searchCreators(q, 14);
     return NextResponse.json({
       items: items.map((c) => ({
         handle: c.handle,
         name: c.name,
         avatarUrl: c.avatarUrl,
+        followers: c.followers,
       })),
     });
   } catch {

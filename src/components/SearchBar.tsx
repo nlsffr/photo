@@ -4,7 +4,12 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-type Hit = { handle: string; name: string; avatarUrl: string };
+type Hit = {
+  handle: string;
+  name: string;
+  avatarUrl: string;
+  followers?: number;
+};
 
 export function SearchBar() {
   const router = useRouter();
@@ -22,18 +27,21 @@ export function SearchBar() {
     const q = value.trim();
     if (q.length < 1) {
       setHits([]);
+      setOpen(false);
       return;
     }
     const t = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/creators/search?q=${encodeURIComponent(q)}`);
+        const res = await fetch(
+          `/api/creators/search?q=${encodeURIComponent(q)}`,
+        );
         const data = (await res.json()) as { items: Hit[] };
         setHits(data.items ?? []);
         setOpen(true);
       } catch {
         setHits([]);
       }
-    }, 180);
+    }, 150);
     return () => clearTimeout(t);
   }, [value]);
 
@@ -66,15 +74,15 @@ export function SearchBar() {
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onFocus={() => hits.length > 0 && setOpen(true)}
-          placeholder="Rechercher un modèle, un tag…"
-          aria-label="Rechercher"
+          placeholder="Search a model, tag…"
+          aria-label="Search"
           autoComplete="off"
           className="w-full rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] py-2 pl-10 pr-9 text-sm text-[var(--color-ink)] placeholder:text-[var(--color-ink-faint)] outline-none transition focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent-soft)]"
         />
         {value.length > 0 && (
           <button
             type="button"
-            aria-label="Effacer"
+            aria-label="Clear"
             onClick={() => {
               setValue("");
               setHits([]);
@@ -91,7 +99,7 @@ export function SearchBar() {
 
       {open && hits.length > 0 && (
         <ul className="absolute left-0 right-0 z-50 mt-1.5 max-h-72 overflow-auto rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] py-1 shadow-2xl">
-          {hits.map((h) => (
+          {hits.map((h, i) => (
             <li key={h.handle}>
               <Link
                 href={`/creator/${encodeURIComponent(h.handle)}`}
@@ -106,8 +114,15 @@ export function SearchBar() {
                     h.name.slice(0, 1).toUpperCase()
                   )}
                 </span>
-                <span className="min-w-0">
-                  <span className="block truncate font-semibold">{h.name}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-1.5">
+                    <span className="truncate font-semibold">{h.name}</span>
+                    {i < 3 && (
+                      <span className="shrink-0 rounded-full bg-[var(--color-accent)]/15 px-1.5 py-0.5 text-[10px] font-bold text-[var(--color-accent)]">
+                        TOP
+                      </span>
+                    )}
+                  </span>
                   <span className="block truncate text-xs text-[var(--color-ink-faint)]">
                     @{h.handle}
                   </span>
@@ -118,10 +133,16 @@ export function SearchBar() {
           <li>
             <button
               type="button"
-              onClick={submit as unknown as () => void}
+              onClick={() => {
+                const q = value.trim();
+                setOpen(false);
+                router.push(
+                  q ? `/recherche?q=${encodeURIComponent(q)}` : "/recherche",
+                );
+              }}
               className="w-full px-3 py-2 text-left text-xs font-semibold text-[var(--color-accent)] hover:bg-[var(--color-surface-2)]"
             >
-              Chercher « {value.trim()} » →
+              Search « {value.trim()} » →
             </button>
           </li>
         </ul>
