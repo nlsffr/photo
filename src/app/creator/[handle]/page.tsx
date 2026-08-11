@@ -15,6 +15,7 @@ export const dynamic = "force-dynamic";
 
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").replace(/\/$/, "");
 const VALID_SORTS: SortKey[] = ["recent", "popular", "liked", "trending", "longest"];
+const PAGE_SIZE = 30;
 
 function first(v?: string | string[]): string | undefined {
   return Array.isArray(v) ? v[0] : v;
@@ -27,27 +28,29 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { handle } = await params;
   const creator = await getCreator(handle);
-  if (!creator) return { title: "Profile not found" };
+  if (!creator) return { title: "Profile not found", robots: { index: false, follow: true } };
 
-  const title = `${creator.handle} OnlyFans leaks — photos & videos`;
+  const title = `${creator.name} (@${creator.handle}) — photos & videos`;
   const rawDesc =
-    creator.bio?.slice(0, 120) ||
-    `Free ${creator.handle} OnlyFans leaked content on LeakFanHub. Browse ${creator.name} (@${creator.handle}) photos and videos. Updated daily. 18+.`;
+    creator.bio?.slice(0, 140) ||
+    `Browse free ${creator.handle} photos and videos on LeakFanHub. ${creator.name} (@${creator.handle}) — updated regularly. 18+ only.`;
   const description = rawDesc.length > 160 ? `${rawDesc.slice(0, 157)}...` : rawDesc;
-  const url = `${SITE}/creator/${encodeURIComponent(creator.handle)}`;
+  const path = `/creator/${encodeURIComponent(creator.handle)}`;
+  const url = `${SITE}${path}`;
   const image = creator.avatarUrl || undefined;
 
   return {
     title,
     description,
     keywords: [
-      `${creator.handle} leaked`,
-      `${creator.handle} OnlyFans`,
-      `${creator.handle} leaks`,
-      `${creator.name} OnlyFans`,
-      "OnlyFans leaks",
+      creator.handle,
+      `${creator.handle} photos`,
+      `${creator.handle} videos`,
+      creator.name,
+      "LeakFanHub",
     ],
-    alternates: { canonical: `/creator/${encodeURIComponent(creator.handle)}` },
+    alternates: { canonical: path },
+    robots: { index: true, follow: true, "max-image-preview": "large" as const },
     openGraph: {
       type: "profile",
       title,
@@ -88,8 +91,18 @@ export default async function CreatorPage({
     ? (sortRaw as SortKey)
     : "popular";
 
+  const cursorRaw = first(sp.cursor);
+  const cursorParsed = cursorRaw ? parseInt(cursorRaw, 10) : NaN;
+  const cursor = Number.isFinite(cursorParsed) && cursorParsed > 0 ? cursorParsed : undefined;
+
   const stats = await getCreatorStats(handle);
-  const page = await getPhotos({ creator: handle, sort, type, limit: 30 });
+  const page = await getPhotos({
+    creator: handle,
+    sort,
+    type,
+    limit: PAGE_SIZE,
+    cursor,
+  });
 
   const avatarSrc =
     creator.avatarUrl && creator.avatarUrl.trim()
@@ -97,10 +110,11 @@ export default async function CreatorPage({
       : page.items[0]?.imageUrl || "";
 
   const base = `/creator/${encodeURIComponent(handle)}`;
-  const q = (opts: { type?: string | null; sort?: string }) => {
+  const q = (opts: { type?: string | null; sort?: string; cursor?: number | null }) => {
     const p = new URLSearchParams();
     if (opts.type) p.set("type", opts.type);
     if (opts.sort && opts.sort !== "popular") p.set("sort", opts.sort);
+    if (opts.cursor != null && opts.cursor > 0) p.set("cursor", String(opts.cursor));
     const qs = p.toString();
     return qs ? `${base}?${qs}` : base;
   };
@@ -113,16 +127,16 @@ export default async function CreatorPage({
     { label: "Recent", href: q({ type, sort: "recent" }), active: sort === "recent" },
   ];
 
-  const queryKey = `${handle}|${sort}|${type ?? ""}`;
+  const queryKey = `${handle}|${sort}|${type ?? ""}|${cursor ?? 0}`;
 
-  const jsonLd = {
+  const personLd = {
     "@context": "https://schema.org",
     "@type": "Person",
     name: creator.name,
     alternateName: creator.handle,
-    url: `${SITE}/creator/${encodeURIComponent(creator.handle)}`,
+    url: `${SITE}${base}`,
     image: avatarSrc || undefined,
-    description: creator.bio || `${creator.handle} OnlyFans leaks on LeakFanHub`,
+    description: creator.bio || `${creator.name} (@${creator.handle}) on LeakFanHub`,
     interactionStatistic: {
       "@type": "InteractionCounter",
       interactionType: "https://schema.org/FollowAction",
@@ -130,9 +144,27 @@ export default async function CreatorPage({
     },
   };
 
+  const breadcrumbLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: SITE },
+      { "@type": "ListItem", position: 2, name: "Models", item: `${SITE}/models` },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: creator.handle,
+        item: `${SITE}${base}`,
+      },
+    ],
+  };
+
+  const nextHref =
+    page.nextCursor != null ? q({ type, sort, cursor: page.nextCursor }) : null;
+
   return (
     <div className="pb-4">
-      <JsonLd data={jsonLd} />
+      <JsonLd data={[personLd, breadcrumbLd]} />
       <div className="px-3 pt-3 sm:px-5">
         <BackLink fallback="/" label="Back" />
       </div>
@@ -142,7 +174,7 @@ export default async function CreatorPage({
           {avatarSrc ? (
             <MediaImg
               src={avatarSrc}
-              alt={`${creator.handle} OnlyFans`}
+              alt={`${creator.name} (@${creator.handle})`}
               width={112}
               height={112}
               className="h-20 w-20 shrink-0 rounded-full object-cover object-top ring-2 ring-[var(--color-border)] sm:h-24 sm:w-24"
@@ -158,21 +190,17 @@ export default async function CreatorPage({
               <span className="truncate">{creator.name}</span>
               {creator.verified && <VerifiedBadge size={16} />}
             </h1>
-            <p className="text-sm text-[var(--color-ink-faint)]">
-              @{creator.handle} · OnlyFans leaks
-            </p>
+            <p className="text-sm text-[var(--color-ink-faint)]">@{creator.handle}</p>
           </div>
 
           <FollowButton handle={creator.handle} className="shrink-0" />
         </div>
 
         {creator.bio ? (
-          <p className="mt-3 line-clamp-3 text-sm text-[var(--color-ink-muted)]">
-            {creator.bio}
-          </p>
+          <p className="mt-3 line-clamp-3 text-sm text-[var(--color-ink-muted)]">{creator.bio}</p>
         ) : (
           <p className="mt-3 text-sm text-[var(--color-ink-muted)]">
-            Free {creator.handle} OnlyFans leaked photos and videos on LeakFanHub.
+            Photos and videos from {creator.name} (@{creator.handle}) on LeakFanHub.
           </p>
         )}
 
@@ -214,6 +242,18 @@ export default async function CreatorPage({
             initial={page}
             params={{ sort, creator: handle, type }}
           />
+
+          {/* Crawlable pagination — Google can follow without JS */}
+          {nextHref && (
+            <nav className="mt-8 flex justify-center" aria-label="Pagination">
+              <Link
+                href={nextHref}
+                className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-2.5 text-sm font-semibold text-[var(--color-ink)] hover:border-[var(--color-accent)]"
+              >
+                More @{creator.handle} media →
+              </Link>
+            </nav>
+          )}
         </section>
       </div>
     </div>

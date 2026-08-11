@@ -21,10 +21,23 @@ const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").repl
 
 const RESERVED = new Set([
   "api", "creator", "models", "photo", "media", "_next",
-  "favicon.ico", "robots.txt", "sitemap.xml", "saved", "liked",
+  "favicon.ico", "robots.txt", "sitemap.xml", "sitemaps", "saved", "liked",
   "search", "trending-medias", "most-liked", "random", "tiktok",
   "trust-and-safety", "welcome", "tag", "add", "premium",
+  "feed", "pour-toi", "classements", "recherche", "about", "dmca",
+  "connexion", "inscription", "favoris", "abonnements",
 ]);
+
+function durationIso(sec?: number): string | undefined {
+  if (sec == null || sec <= 0 || !Number.isFinite(sec)) return undefined;
+  const s = Math.round(sec);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const r = s % 60;
+  if (h > 0) return `PT${h}H${m}M${r}S`;
+  if (m > 0) return `PT${m}M${r}S`;
+  return `PT${r}S`;
+}
 
 export async function generateMetadata({
   params,
@@ -32,25 +45,28 @@ export async function generateMetadata({
   params: Promise<{ handle: string; id: string }>;
 }): Promise<Metadata> {
   const { handle, id } = await params;
-  if (RESERVED.has(handle.toLowerCase())) return { title: "Not found" };
+  if (RESERVED.has(handle.toLowerCase())) {
+    return { title: "Not found", robots: { index: false, follow: true } };
+  }
   const photo = await getPhotoById(id);
   if (!photo || photo.creatorHandle.toLowerCase() !== handle.toLowerCase()) {
-    return { title: "Not found" };
+    return { title: "Not found", robots: { index: false, follow: true } };
   }
 
   const h = photo.creatorHandle;
   const kind =
     photo.type === "video" ? "video" : photo.type === "pack" ? "pack" : "photo";
-  const title = `${h} leaked ${kind} #${photo.sourceId || id}`;
-  const description = `${h} OnlyFans leaked ${kind} — free on LeakFanHub. ${formatCount(photo.views)} views. Browse more ${h} leaks, photos and videos. 18+.`;
-  const url = `${SITE}/${encodeURIComponent(h)}/${encodeURIComponent(id)}`;
+  const sid = photo.sourceId || id;
+  const title = `@${h} — ${kind} #${sid}`;
+  const description = `${h} ${kind} on LeakFanHub. ${formatCount(photo.views)} views · more from @${h}. 18+ only.`;
+  const path = `/${encodeURIComponent(h)}/${encodeURIComponent(sid)}`;
+  const url = `${SITE}${path}`;
 
   return {
     title,
     description,
-    alternates: {
-      canonical: `/${encodeURIComponent(h)}/${encodeURIComponent(id)}`,
-    },
+    alternates: { canonical: path },
+    robots: { index: true, follow: true, "max-image-preview": "large" as const },
     openGraph: {
       type: photo.type === "video" ? "video.other" : "article",
       title,
@@ -84,41 +100,67 @@ export default async function MediaByHandlePage({
   const photo = withCreator(raw, creator);
   const related = await getRelatedPhotos(raw);
 
-  const h1 = `${photo.creatorHandle} leaked ${photo.type}`;
+  const sid = photo.sourceId || id;
+  const kind =
+    photo.type === "video" ? "video" : photo.type === "pack" ? "pack" : "photo";
+  const h1 = `@${photo.creatorHandle} — ${kind} #${sid}`;
+  const creatorPath = `/creator/${encodeURIComponent(photo.creatorHandle)}`;
+  const mediaPath = `/${encodeURIComponent(photo.creatorHandle)}/${encodeURIComponent(sid)}`;
 
-  const schema =
+  const mediaLd =
     photo.type === "video" && photo.videoUrl
       ? {
           "@context": "https://schema.org",
           "@type": "VideoObject",
           name: h1,
-          description: `${photo.creatorHandle} OnlyFans leaked video on LeakFanHub`,
+          description: `${photo.creatorHandle} video on LeakFanHub`,
           thumbnailUrl: photo.imageUrl,
           contentUrl: photo.videoUrl,
+          uploadDate: undefined as string | undefined,
+          duration: durationIso(photo.durationSec),
+          interactionStatistic: {
+            "@type": "InteractionCounter",
+            interactionType: "https://schema.org/WatchAction",
+            userInteractionCount: photo.views,
+          },
         }
       : {
           "@context": "https://schema.org",
           "@type": "ImageObject",
           name: h1,
-          description: `${photo.creatorHandle} OnlyFans leaked photo on LeakFanHub`,
+          description: `${photo.creatorHandle} photo on LeakFanHub`,
           contentUrl: photo.imageUrl,
+          thumbnailUrl: photo.imageUrl,
         };
+
+  const breadcrumbLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: SITE },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: photo.creatorHandle,
+        item: `${SITE}${creatorPath}`,
+      },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: `#${sid}`,
+        item: `${SITE}${mediaPath}`,
+      },
+    ],
+  };
 
   return (
     <div className="mx-auto max-w-[1600px] px-3 pb-8 pt-3 sm:px-6 sm:py-6">
-      <JsonLd data={schema} />
+      <JsonLd data={[mediaLd, breadcrumbLd]} />
 
-      <BackLink
-        fallback={`/creator/${photo.creatorHandle}`}
-        label="Back"
-        className="mb-3"
-      />
+      <BackLink fallback={creatorPath} label="Back" className="mb-3" />
 
       <div className="mb-4 flex items-center gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 lg:hidden">
-        <Link
-          href={`/creator/${photo.creatorHandle}`}
-          className="flex min-w-0 flex-1 items-center gap-3"
-        >
+        <Link href={creatorPath} className="flex min-w-0 flex-1 items-center gap-3">
           <MediaImg
             src={photo.creator.avatarUrl || photo.imageUrl}
             alt={photo.creator.name}
@@ -131,9 +173,7 @@ export default async function MediaByHandlePage({
               <span className="truncate">{photo.creator.name}</span>
               {photo.creator.verified && <VerifiedBadge size={14} />}
             </p>
-            <p className="text-xs text-[var(--color-ink-faint)]">
-              @{photo.creatorHandle}
-            </p>
+            <p className="text-xs text-[var(--color-ink-faint)]">@{photo.creatorHandle}</p>
           </div>
         </Link>
         <FollowButton handle={photo.creatorHandle} />
@@ -169,10 +209,7 @@ export default async function MediaByHandlePage({
 
         <aside className="flex flex-col gap-4">
           <div className="hidden items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 lg:flex">
-            <Link
-              href={`/creator/${photo.creatorHandle}`}
-              className="flex min-w-0 flex-1 items-center gap-3"
-            >
+            <Link href={creatorPath} className="flex min-w-0 flex-1 items-center gap-3">
               <MediaImg
                 src={photo.creator.avatarUrl || photo.imageUrl}
                 alt={photo.creator.name}
@@ -198,7 +235,10 @@ export default async function MediaByHandlePage({
           <div>
             <h1 className="text-lg font-bold leading-snug sm:text-xl">{h1}</h1>
             <p className="mt-1 text-xs text-[var(--color-ink-faint)]">
-              {formatAge(photo.ageMinutes)} · @{photo.creatorHandle} OnlyFans leak
+              {formatAge(photo.ageMinutes)} ·{" "}
+              <Link href={creatorPath} className="underline-offset-2 hover:underline">
+                @{photo.creatorHandle}
+              </Link>
             </p>
           </div>
 
@@ -237,6 +277,13 @@ export default async function MediaByHandlePage({
           <Comments photoId={photo.id} />
 
           <Link
+            href={creatorPath}
+            className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-center text-sm font-semibold"
+          >
+            All @{photo.creatorHandle} media →
+          </Link>
+
+          <Link
             href={`/dmca?photo=${encodeURIComponent(photo.id)}`}
             className="text-center text-xs text-[var(--color-ink-faint)] underline"
           >
@@ -247,9 +294,12 @@ export default async function MediaByHandlePage({
 
       {related.length > 0 && (
         <section className="mt-10">
-          <h2 className="mb-3 text-base font-bold sm:text-lg">
-            More {photo.creatorHandle} leaks
-          </h2>
+          <div className="mb-3 flex items-end justify-between gap-3">
+            <h2 className="text-base font-bold sm:text-lg">More @{photo.creatorHandle}</h2>
+            <Link href={creatorPath} className="text-sm font-medium text-[var(--color-accent)]">
+              View profile
+            </Link>
+          </div>
           <div className="media-grid">
             {related.map((p) => (
               <PhotoCard key={p.id} photo={p} />
