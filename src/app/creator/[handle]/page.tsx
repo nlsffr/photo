@@ -9,9 +9,11 @@ import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { FollowButton } from "@/components/Interactions";
 import { MediaImg } from "@/components/MediaImg";
 import { BackLink } from "@/components/BackLink";
+import { JsonLd } from "@/components/JsonLd";
 
 export const dynamic = "force-dynamic";
 
+const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").replace(/\/$/, "");
 const VALID_SORTS: SortKey[] = ["recent", "popular", "liked", "trending", "longest"];
 
 function first(v?: string | string[]): string | undefined {
@@ -26,9 +28,32 @@ export async function generateMetadata({
   const { handle } = await params;
   const creator = await getCreator(handle);
   if (!creator) return { title: "Profil introuvable" };
+
+  const title = `${creator.name} (@${creator.handle})`;
+  const description =
+    creator.bio?.slice(0, 155) ||
+    `Profil de ${creator.name} (@${creator.handle}) sur LeakFanHub — photos et vidéos.`;
+  const url = `${SITE}/creator/${encodeURIComponent(creator.handle)}`;
+  const image = creator.avatarUrl || undefined;
+
   return {
-    title: `${creator.name} (@${creator.handle})`,
-    description: creator.bio || `Profil de ${creator.name} sur LeakFanHub`,
+    title,
+    description,
+    alternates: { canonical: `/creator/${encodeURIComponent(creator.handle)}` },
+    openGraph: {
+      type: "profile",
+      title,
+      description,
+      url,
+      siteName: "LeakFanHub",
+      images: image ? [{ url: image }] : undefined,
+    },
+    twitter: {
+      card: "summary",
+      title,
+      description,
+      images: image ? [image] : undefined,
+    },
   };
 }
 
@@ -82,13 +107,28 @@ export default async function CreatorPage({
 
   const queryKey = `${handle}|${sort}|${type ?? ""}`;
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    name: creator.name,
+    alternateName: creator.handle,
+    url: `${SITE}/creator/${encodeURIComponent(creator.handle)}`,
+    image: avatarSrc || undefined,
+    description: creator.bio || undefined,
+    interactionStatistic: {
+      "@type": "InteractionCounter",
+      interactionType: "https://schema.org/FollowAction",
+      userInteractionCount: creator.followers,
+    },
+  };
+
   return (
     <div className="pb-4">
+      <JsonLd data={jsonLd} />
       <div className="px-3 pt-3 sm:px-5">
         <BackLink fallback="/" label="Retour" />
       </div>
 
-      {/* Pas de bannière — avatar entier, jamais coupé */}
       <div className="px-3 pt-4 sm:px-5">
         <div className="flex items-center gap-3 sm:gap-4">
           {avatarSrc ? (
