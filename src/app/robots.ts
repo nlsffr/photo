@@ -1,6 +1,9 @@
 import type { MetadataRoute } from "next";
 
-const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").replace(/\/$/, "");
+const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").replace(
+  /\/$/,
+  "",
+);
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -18,7 +21,8 @@ export default function robots(): MetadataRoute.Robots {
         ],
       },
     ],
-    sitemap: `${SITE}/sitemap.xml`,
+    // Index multi-fichiers (comme leakgallery) + sitemap unique de secours
+    sitemap: [`${SITE}/sitemaps`, `${SITE}/sitemap.xml`],
     host: SITE.replace(/^https?:\/\//, ""),
   };
 }
