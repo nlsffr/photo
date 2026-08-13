@@ -35,6 +35,15 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "/",
   },
+  // Explicit icons for Google (≥48px) + browsers
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/icon", type: "image/png", sizes: "48x48" },
+    ],
+    apple: [{ url: "/apple-icon", sizes: "180x180", type: "image/png" }],
+    shortcut: ["/icon"],
+  },
   openGraph: {
     type: "website",
     locale: "en_US",
@@ -78,15 +87,16 @@ export default function RootLayout({
       <body className="min-h-full">
         <LocaleProvider>
           <SessionProvider>
-            <PremiumProvider>
-              <AnonIdentityProvider>
-                <InteractionsProvider>
-                  <AgeGate />
-                  <AppShell>{children}</AppShell>
-                  <CookieBanner />
-                </InteractionsProvider>
-              </AnonIdentityProvider>
-            </PremiumProvider>
+            <AnonIdentityProvider>
+              <InteractionsProvider>
+                <PremiumProvider>
+                  <AgeGate>
+                    <AppShell>{children}</AppShell>
+                    <CookieBanner />
+                  </AgeGate>
+                </PremiumProvider>
+              </InteractionsProvider>
+            </AnonIdentityProvider>
           </SessionProvider>
         </LocaleProvider>
       </body>
