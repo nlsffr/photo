@@ -5,9 +5,21 @@ import lgAliasesJson from "@/data/creator-aliases.json";
 
 const MAX_ALIASES = 20;
 
-const LG_MAP: Record<string, string[]> =
-  (lgAliasesJson as { aliases?: Record<string, string[]> })?.aliases ||
-  (lgAliasesJson as Record<string, string[]>);
+const LG_MAP: Record<string, string[]> = (() => {
+  const raw = lgAliasesJson as unknown as {
+    aliases?: Record<string, string[]>;
+  } & Record<string, string[]>;
+  if (raw && typeof raw === "object" && raw.aliases && typeof raw.aliases === "object") {
+    return raw.aliases;
+  }
+  // flat map fallback
+  const out: Record<string, string[]> = {};
+  for (const [k, v] of Object.entries(raw || {})) {
+    if (k === "aliases") continue;
+    if (Array.isArray(v)) out[k] = v.map(String);
+  }
+  return out;
+})();
 
 /** Common keyboard / spelling variants of a handle */
 export function generateTypoAliases(handle: string): string[] {
@@ -31,7 +43,6 @@ export function generateTypoAliases(handle: string): string[] {
   if (h.endsWith("nn")) out.add(h.slice(0, -1));
   if (h.includes("er")) out.add(h.replace("er", "ar"));
   if (h.includes("ar")) out.add(h.replace("ar", "er"));
-  // a/ai / ie swaps common on OF handles
   if (h.includes("ai")) out.add(h.replace(/ai/g, "a"));
   if (h.includes("ie")) out.add(h.replace(/ie/g, "ei"));
 
@@ -39,14 +50,12 @@ export function generateTypoAliases(handle: string): string[] {
   return [...out].filter((v) => v.length >= 3 && v.length <= 40);
 }
 
-/** LG exact aliases for a handle (case-insensitive key) */
 export function getLeakGalleryAliases(handle: string): string[] {
   const k = handle.toLowerCase().trim();
   const list = LG_MAP[k] || LG_MAP[handle] || [];
   return Array.isArray(list) ? list.map(String) : [];
 }
 
-/** Merge: name + handle + LG aliases + stored + typos (deduped) */
 export function buildAliasList(
   handle: string,
   name?: string | null,
@@ -59,17 +68,15 @@ export function buildAliasList(
   const push = (raw: string) => {
     const t = raw.trim();
     if (!t || t.length < 2) return;
-    const k = t.toLowerCase();
-    if (seen.has(k)) return;
-    seen.add(k);
+    const key = t.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
     list.push(t);
   };
 
   if (name && name.toLowerCase() !== primary.toLowerCase()) push(name);
-  // Exact LeakGallery aliases first (quality)
   for (const a of getLeakGalleryAliases(primary)) push(a);
   for (const a of stored || []) push(a);
-  // Extra typos they may not have
   for (const a of generateTypoAliases(primary)) push(a);
 
   return list.slice(0, MAX_ALIASES);
