@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getPhotos } from "@/lib/photos";
 import { InfiniteGallery } from "@/components/InfiniteGallery";
+import type { MediaType } from "@/lib/types";
 
 export const revalidate = 30;
 
@@ -40,7 +41,7 @@ export default async function TrendingMediasPage({
   const sp = await searchParams;
   const win = first(sp.window) ?? "week";
   const typeRaw = first(sp.type);
-  const type =
+  const type: MediaType | undefined =
     typeRaw === "photo" || typeRaw === "video" || typeRaw === "pack"
       ? typeRaw
       : undefined;
@@ -53,13 +54,6 @@ export default async function TrendingMediasPage({
   const windowDef = WINDOWS.find((w) => w.key === win) ?? WINDOWS[1];
   let items = page.items.filter((p) => p.ageMinutes <= windowDef.minutes);
   if (items.length < 8) items = page.items;
-
-  const nextParams = new URLSearchParams();
-  nextParams.set("window", win);
-  if (type) nextParams.set("type", type);
-  if (page.nextCursor != null) nextParams.set("cursor", String(page.nextCursor));
-  const nextHref =
-    page.nextCursor != null ? `/trending-medias?${nextParams.toString()}` : null;
 
   return (
     <div className="px-3 py-4 sm:px-5">
@@ -85,7 +79,7 @@ export default async function TrendingMediasPage({
       <InfiniteGallery
         key={`trend-${win}-${type ?? "all"}-${cursor ?? 0}`}
         initial={{ ...page, items }}
-        nextHref={nextHref}
+        params={{ sort: "trending", type }}
       />
     </div>
   );

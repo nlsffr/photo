@@ -39,13 +39,11 @@ function hrefFor(opts: {
   sort?: string;
   type?: string | null;
   tag?: string;
-  cursor?: number | null;
 }) {
   const p = new URLSearchParams();
   if (opts.sort && opts.sort !== "popular") p.set("sort", opts.sort);
   if (opts.type) p.set("type", opts.type);
   if (opts.tag) p.set("tag", opts.tag);
-  if (opts.cursor != null && opts.cursor > 0) p.set("cursor", String(opts.cursor));
   const qs = p.toString();
   return qs ? `/?${qs}` : "/";
 }
@@ -68,13 +66,9 @@ export default async function Home({
     ? (sortRaw as SortKey)
     : "popular";
 
-  const cursorRaw = first(sp.cursor);
-  const cursorParsed = cursorRaw ? parseInt(cursorRaw, 10) : NaN;
-  const cursor = Number.isFinite(cursorParsed) && cursorParsed > 0 ? cursorParsed : undefined;
-
-  const page = await getPhotos({ sort, tag, type, cursor, limit: 24 });
+  const page = await getPhotos({ sort, tag, type, limit: 24 });
   const allTags = await getAllTags();
-  const queryKey = `${sort}|${tag ?? ""}|${type ?? ""}|${cursor ?? 0}`;
+  const queryKey = `${sort}|${tag ?? ""}|${type ?? ""}`;
 
   const filters: { label: string; href: string; active: boolean }[] = [
     { label: "Plus vus", href: hrefFor({ sort: "popular", type, tag }), active: sort === "popular" },
@@ -83,11 +77,6 @@ export default async function Home({
     { label: "Photos", href: hrefFor({ sort, type: "photo", tag }), active: type === "photo" },
     { label: "Vidéos", href: hrefFor({ sort, type: "video", tag }), active: type === "video" },
   ];
-
-  const nextHref =
-    page.nextCursor != null
-      ? hrefFor({ sort, type, tag, cursor: page.nextCursor })
-      : null;
 
   const websiteLd = {
     "@context": "https://schema.org",
@@ -136,7 +125,11 @@ export default async function Home({
         </Link>
       </div>
 
-      <InfiniteGallery key={queryKey} initial={page} nextHref={nextHref} />
+      <InfiniteGallery
+        key={queryKey}
+        initial={page}
+        params={{ sort, tag, type }}
+      />
     </div>
   );
 }

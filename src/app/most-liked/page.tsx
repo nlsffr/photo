@@ -35,8 +35,6 @@ export default async function MostLikedPage({
   const cursor = Number.isFinite(cursorParsed) && cursorParsed > 0 ? cursorParsed : undefined;
 
   const page = await getPhotos({ sort: "liked", limit: 24, cursor });
-  const nextHref =
-    page.nextCursor != null ? `/most-liked?cursor=${page.nextCursor}` : null;
 
   return (
     <div className="px-3 py-4 sm:px-5">
@@ -47,7 +45,7 @@ export default async function MostLikedPage({
       <InfiniteGallery
         key={`liked-${cursor ?? 0}`}
         initial={page}
-        nextHref={nextHref}
+        params={{ sort: "liked" }}
       />
     </div>
   );
