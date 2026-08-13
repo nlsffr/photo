@@ -8,7 +8,6 @@ import { TagChips } from "@/components/TagChips";
 import { AdSlot } from "@/components/AdSlot";
 import { JsonLd } from "@/components/JsonLd";
 
-/** Soft cache — home feels instant on repeat visits */
 export const revalidate = 30;
 
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").replace(/\/$/, "");
@@ -77,27 +76,12 @@ export default async function Home({
   const allTags = await getAllTags();
   const queryKey = `${sort}|${tag ?? ""}|${type ?? ""}|${cursor ?? 0}`;
 
-  const chips: { label: string; href: string; active: boolean }[] = [
-    { label: "Tout", href: hrefFor({ sort, type: null, tag }), active: !type },
-    {
-      label: "Photos",
-      href: hrefFor({ sort, type: "photo", tag }),
-      active: type === "photo",
-    },
-    {
-      label: "Vidéos",
-      href: hrefFor({ sort, type: "video", tag }),
-      active: type === "video",
-    },
-  ];
-
-  const sortChips: { label: string; href: string; active: boolean }[] = [
+  const filters: { label: string; href: string; active: boolean }[] = [
     { label: "Plus vus", href: hrefFor({ sort: "popular", type, tag }), active: sort === "popular" },
     { label: "Plus aimés", href: hrefFor({ sort: "liked", type, tag }), active: sort === "liked" },
     { label: "Récents", href: hrefFor({ sort: "recent", type, tag }), active: sort === "recent" },
-    { label: "Tendances", href: hrefFor({ sort: "trending", type, tag }), active: sort === "trending" },
-    { label: "Plus longs", href: hrefFor({ sort: "longest", type, tag }), active: sort === "longest" },
-    { label: "Aléatoire", href: hrefFor({ sort: "random", type, tag }), active: sort === "random" },
+    { label: "Photos", href: hrefFor({ sort, type: "photo", tag }), active: type === "photo" },
+    { label: "Vidéos", href: hrefFor({ sort, type: "video", tag }), active: type === "video" },
   ];
 
   const nextHref =
@@ -127,8 +111,8 @@ export default async function Home({
         <TagChips tags={allTags} activeTag={tag} />
       </div>
 
-      <div className="no-scrollbar mb-2 flex gap-2 overflow-x-auto pb-0.5">
-        {sortChips.map((c) => (
+      <div className="no-scrollbar mb-3 flex gap-2 overflow-x-auto pb-0.5">
+        {filters.map((c) => (
           <Link
             key={c.label}
             href={c.href}
@@ -150,24 +134,6 @@ export default async function Home({
         >
           Feed ↗
         </Link>
-      </div>
-
-      <div className="no-scrollbar mb-3 flex gap-2 overflow-x-auto pb-0.5">
-        {chips.map((c) => (
-          <Link
-            key={c.label}
-            href={c.href}
-            scroll={false}
-            prefetch={true}
-            className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition ${
-              c.active
-                ? "bg-[var(--color-accent)] text-white"
-                : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]"
-            }`}
-          >
-            {c.label}
-          </Link>
-        ))}
       </div>
 
       <InfiniteGallery key={queryKey} initial={page} nextHref={nextHref} />
