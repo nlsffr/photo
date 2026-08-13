@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify every creator gets ~18 SEO aliases (LG exact + smart typos). Same logic as site."""
+"""Verify every creator gets up to 12 SEO aliases (LG exact + smart typos)."""
 from __future__ import annotations
 
 import json
@@ -8,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ALIASES_FILE = ROOT / "src" / "data" / "creator-aliases.json"
-MAX_ALIASES = 18
+MAX_ALIASES = 12
 MIN_ALIASES = 12
 
 NEIGH = {
@@ -174,7 +174,7 @@ def main():
     env = load_env()
     handles = handles_from_db(env)
     lg_map = load_lg_map()
-    print(f"creators={len(handles)} lg_json={len(lg_map)}")
+    print(f"creators={len(handles)} lg_json={len(lg_map)} MAX={MAX_ALIASES}")
 
     counts = []
     low = []

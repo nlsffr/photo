@@ -1,10 +1,10 @@
 /**
  * Creator SEO aliases — LeakGallery exact first, then realistic typos.
- * Always aims for ≥12 unique names in titles.
+ * Title cap: 12 aliases max.
  */
 import lgAliasesJson from "@/data/creator-aliases.json";
 
-const MAX_ALIASES = 18;
+const MAX_ALIASES = 12;
 const MIN_ALIASES = 12;
 
 const LG_MAP: Record<string, string[]> = (() => {
@@ -22,18 +22,16 @@ const LG_MAP: Record<string, string[]> = (() => {
   return out;
 })();
 
-/** QWERTY neighbors for realistic mistypes */
 const NEIGH: Record<string, string> = {
   a: "sqwz", b: "vghn", c: "xdfv", d: "sfrecx",
   e: "wrsdf", f: "dgrtcv", g: "fhtybv", h: "gjyunb",
-  i: "ujko", j: "hkui nm", k: "jloi", l: "kop",
+  i: "ujko", j: "hkuinm", k: "jloi", l: "kop",
   m: "njk", n: "bhjm", o: "iklp", p: "ol",
   q: "wa", r: "edft", s: "awedxz", t: "rfgy",
   u: "yhij", v: "cfgb", w: "qase", x: "zsdc",
   y: "tghu", z: "asx",
 };
 
-/** Realistic spelling mistakes people actually type */
 export function generateTypoAliases(handle: string): string[] {
   const h = handle.toLowerCase().trim();
   if (h.length < 3) return [];
@@ -47,9 +45,9 @@ export function generateTypoAliases(handle: string): string[] {
     out.push(t);
   };
 
-  // --- HIGH priority: end-of-name mistakes (most common) ---
-  add(h + h[h.length - 1]); // double last letter
-  add(h.slice(0, -1)); // miss last letter
+  // end-of-name (most common)
+  add(h + h[h.length - 1]);
+  add(h.slice(0, -1));
   if (h.length > 4) add(h.slice(0, -2));
   if (!h.endsWith("s")) add(h + "s");
   if (h.endsWith("s")) add(h.slice(0, -1));
@@ -60,9 +58,8 @@ export function generateTypoAliases(handle: string): string[] {
   if (!h.endsWith("x")) add(h + "x");
   if (!h.endsWith("xx")) add(h + "xx");
   if (!h.endsWith("of")) add(h + "of");
-  if (!h.endsWith("_of")) add(h + "_of");
 
-  // --- phonetic / common spelling ---
+  // phonetic
   if (h.includes("i")) add(h.replace(/i/g, "y"));
   if (h.includes("y")) add(h.replace(/y/g, "i"));
   if (h.includes("ph")) add(h.replace(/ph/g, "f"));
@@ -77,7 +74,7 @@ export function generateTypoAliases(handle: string): string[] {
   if (h.includes("nn")) add(h.replace(/nn/g, "n"));
   if (h.includes("ss")) add(h.replace(/ss/g, "s"));
   if (h.includes("ck")) add(h.replace(/ck/g, "k"));
-  // single → double in middle (corina → corinna style)
+
   for (let i = 1; i < h.length - 1; i++) {
     const c = h[i];
     if ("aeioulnrs".includes(c) && h[i - 1] !== c && h[i + 1] !== c) {
@@ -85,19 +82,15 @@ export function generateTypoAliases(handle: string): string[] {
     }
   }
 
-  // --- adjacent transpose (middle, not first char only) ---
   for (let i = 1; i < h.length - 1; i++) {
     add(h.slice(0, i) + h[i + 1] + h[i] + h.slice(i + 2));
   }
 
-  // --- drop one letter (prefer middle/end, skip index 0 first wave) ---
   for (let i = h.length - 1; i >= 1; i--) {
     add(h.slice(0, i) + h.slice(i + 1));
   }
-  // drop first letter last (less common search)
   add(h.slice(1));
 
-  // --- keyboard neighbor substitution (middle letters) ---
   for (let i = 1; i < h.length; i++) {
     const n = NEIGH[h[i]] || "";
     for (const ch of n) {
@@ -106,7 +99,6 @@ export function generateTypoAliases(handle: string): string[] {
     }
   }
 
-  // --- double one letter (middle) ---
   for (let i = 1; i < h.length; i++) {
     add(h.slice(0, i) + h[i] + h.slice(i));
   }
@@ -160,6 +152,7 @@ export function creatorSeoTitle(handle: string, name: string, aliases: string[])
     seen.add(k);
     parts.push(t);
   }
+  // handle + up to 12 aliases already sliced in buildAliasList
   return `${parts.join(" / ")} / Exclusive Leaked Nude OnlyFans`;
 }
 
@@ -183,7 +176,7 @@ export function mediaSeoTitle(
     seen.add(k);
     parts.push(t);
   }
-  const head = parts.slice(0, 14).join(" / ");
+  const head = parts.slice(0, 12).join(" / ");
   return `${head} Exclusive Leaked Nude OnlyFans #${sourceId}`;
 }
 
