@@ -14,6 +14,7 @@ import type {
 } from "./types";
 import { getDataProvider } from "./data-provider";
 import { ensureDataProvider } from "./bootstrap";
+import { cacheGet, cacheSet, cacheKey } from "./cache";
 
 async function getProvider() {
   await ensureDataProvider();
@@ -71,28 +72,34 @@ export async function searchCreators(q: string, limit = 12): Promise<Creator[]> 
 
 export async function getModels(
   sort: "followers" | "views" = "followers",
+  limit?: number,
 ): Promise<CreatorWithStats[]> {
+  const ck = cacheKey({ fn: "getModels", sort, limit: limit ?? "all" });
+  const hit = cacheGet<CreatorWithStats[]>(ck);
+  if (hit) return hit;
+
   const provider = await getProvider();
+  let list: CreatorWithStats[];
   if (provider.getModels) {
-    return provider.getModels(sort);
-  }
-
-  // Lightweight fallback — creators only, NO full photo table scan
-  const creators = await provider.getCreators();
-  const withStats: CreatorWithStats[] = creators.map((c) => ({
-    ...c,
-    photoCount: 0,
-    totalViews: 0,
-    totalLikes: 0,
-    coverUrl: c.avatarUrl || "",
-  }));
-
-  if (sort === "followers") {
-    withStats.sort((a, b) => b.followers - a.followers);
+    list = await provider.getModels(sort);
   } else {
-    withStats.sort((a, b) => b.totalViews - a.totalViews || b.followers - a.followers);
+    const creators = await provider.getCreators();
+    list = creators.map((c) => ({
+      ...c,
+      photoCount: 0,
+      totalViews: 0,
+      totalLikes: 0,
+      coverUrl: c.avatarUrl || "",
+    }));
+    if (sort === "followers") {
+      list.sort((a, b) => b.followers - a.followers);
+    } else {
+      list.sort((a, b) => b.totalViews - a.totalViews || b.followers - a.followers);
+    }
   }
-  return withStats;
+  if (limit != null && limit > 0) list = list.slice(0, limit);
+  cacheSet(ck, list, 30_000);
+  return list;
 }
 
 export async function getRankings(limit = 20) {
@@ -100,9 +107,8 @@ export async function getRankings(limit = 20) {
   if (provider.getRankings) {
     return provider.getRankings(limit);
   }
-
-  const models = await getModels("followers");
-  return models.slice(0, limit).map((c) => ({
+  const models = await getModels("followers", limit);
+  return models.map((c) => ({
     ...c,
     score: c.followers,
     views: c.totalViews,
@@ -111,12 +117,17 @@ export async function getRankings(limit = 20) {
 }
 
 export async function getRecommendedCreators(exclude?: string, limit = 6) {
-  const models = await getModels("followers");
+  const models = await getModels("followers", limit + 5);
   return models.filter((c) => c.handle !== exclude).slice(0, limit);
 }
 
 export async function getAllTags(): Promise<string[]> {
-  return (await getProvider()).getTags();
+  const ck = "tags:all";
+  const hit = cacheGet<string[]>(ck);
+  if (hit) return hit;
+  const tags = await (await getProvider()).getTags();
+  cacheSet(ck, tags, 60_000);
+  return tags;
 }
 
 export async function getCreator(handle: string) {

@@ -2,10 +2,11 @@ import Link from "next/link";
 import { getModels } from "@/lib/photos";
 import { MediaImg } from "./MediaImg";
 
+/** Only top N — never pull full creator list on home */
+const FEATURED = 14;
+
 export async function FeaturedCreators() {
-  const models = await getModels("views");
-  // Plus de modèles importants visibles
-  const creators = models.slice(0, 28);
+  const creators = await getModels("views", FEATURED);
 
   if (creators.length === 0) return null;
 
@@ -17,6 +18,7 @@ export async function FeaturedCreators() {
         </h2>
         <Link
           href="/models"
+          prefetch={true}
           className="text-xs font-semibold text-[var(--color-accent)]"
         >
           Voir tout
@@ -29,6 +31,7 @@ export async function FeaturedCreators() {
             <Link
               key={c.handle}
               href={`/creator/${c.handle}`}
+              prefetch={true}
               className="flex w-[4.1rem] shrink-0 flex-col items-center gap-1.5 sm:w-[4.5rem]"
             >
               <span className="rounded-full bg-gradient-to-tr from-[var(--color-accent)] to-orange-400 p-[2px]">

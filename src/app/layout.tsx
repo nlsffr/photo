@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import "./globals.css";
 import { AppShell } from "@/components/AppShell";
 import { InteractionsProvider } from "@/components/Interactions";
@@ -8,6 +9,7 @@ import { AgeGate } from "@/components/AgeGate";
 import { LocaleProvider } from "@/components/LocaleProvider";
 import { PremiumProvider } from "@/components/Premium";
 import { CookieBanner } from "@/components/CookieBanner";
+import { NavProgress } from "@/components/NavProgress";
 
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").replace(/\/$/, "");
 
@@ -41,7 +43,7 @@ export const metadata: Metadata = {
       { url: "/icon", type: "image/png", sizes: "48x48" },
     ],
     apple: [{ url: "/apple-icon", sizes: "180x180", type: "image/png" }],
-    shortcut: ["/icon"],
+    shortcut: ["/favicon.svg"],
   },
   openGraph: {
     type: "website",
@@ -74,6 +76,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  themeColor: "#0a0a0b",
 };
 
 export default function RootLayout({
@@ -83,12 +86,19 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full antialiased">
+      <head>
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        <link rel="apple-touch-icon" href="/apple-icon" />
+      </head>
       <body className="min-h-full">
         <LocaleProvider>
           <SessionProvider>
             <PremiumProvider>
               <AnonIdentityProvider>
                 <InteractionsProvider>
+                  <Suspense fallback={null}>
+                    <NavProgress />
+                  </Suspense>
                   <AgeGate />
                   <AppShell>{children}</AppShell>
                   <CookieBanner />
