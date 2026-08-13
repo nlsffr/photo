@@ -1,5 +1,5 @@
 /**
- * Creator SEO aliases — LeakGallery exact first, then dense typo variants.
+ * Creator SEO aliases — LeakGallery exact first, then realistic typos.
  * Always aims for ≥12 unique names in titles.
  */
 import lgAliasesJson from "@/data/creator-aliases.json";
@@ -22,61 +22,96 @@ const LG_MAP: Record<string, string[]> = (() => {
   return out;
 })();
 
-/** Dense keyboard / spelling variants — more than LG for long-tail */
+/** QWERTY neighbors for realistic mistypes */
+const NEIGH: Record<string, string> = {
+  a: "sqwz", b: "vghn", c: "xdfv", d: "sfrecx",
+  e: "wrsdf", f: "dgrtcv", g: "fhtybv", h: "gjyunb",
+  i: "ujko", j: "hkui nm", k: "jloi", l: "kop",
+  m: "njk", n: "bhjm", o: "iklp", p: "ol",
+  q: "wa", r: "edft", s: "awedxz", t: "rfgy",
+  u: "yhij", v: "cfgb", w: "qase", x: "zsdc",
+  y: "tghu", z: "asx",
+};
+
+/** Realistic spelling mistakes people actually type */
 export function generateTypoAliases(handle: string): string[] {
   const h = handle.toLowerCase().trim();
   if (h.length < 3) return [];
-  const out = new Set<string>();
+  const out: string[] = [];
+  const seen = new Set<string>([h]);
 
   const add = (v: string) => {
-    if (v.length >= 3 && v.length <= 42 && v !== h) out.add(v);
+    const t = v.toLowerCase();
+    if (t.length < 3 || t.length > 42 || seen.has(t)) return;
+    seen.add(t);
+    out.push(t);
   };
 
-  // drop each char
-  for (let i = 0; i < h.length; i++) add(h.slice(0, i) + h.slice(i + 1));
-  // double each char
-  for (let i = 0; i < h.length; i++) add(h.slice(0, i) + h[i] + h.slice(i));
-  // adjacent transpose
-  for (let i = 0; i < h.length - 1; i++) {
-    add(h.slice(0, i) + h[i + 1] + h[i] + h.slice(i + 2));
-  }
-  // insert common letters in middle positions
-  const inserts = ["a", "e", "i", "o", "u", "n", "r", "s", "y"];
-  for (let i = 1; i < h.length && out.size < 40; i++) {
-    for (const ch of inserts) add(h.slice(0, i) + ch + h.slice(i));
-  }
-  // vowel / lookalike swaps
-  const pairs: [RegExp, string][] = [
-    [/i/g, "y"],
-    [/y/g, "i"],
-    [/ph/g, "f"],
-    [/f/g, "ph"],
-    [/er/g, "ar"],
-    [/ar/g, "er"],
-    [/ai/g, "ay"],
-    [/ay/g, "ai"],
-    [/ie/g, "ei"],
-    [/ei/g, "ie"],
-    [/ll/g, "l"],
-    [/nn/g, "n"],
-    [/ss/g, "s"],
-    [/ck/g, "k"],
-    [/k/g, "ck"],
-  ];
-  for (const [re, rep] of pairs) {
-    if (re.test(h)) add(h.replace(re, rep));
-  }
-  // trailing variations
-  if (h.endsWith("n") && !h.endsWith("nn")) add(h + "n");
-  if (h.endsWith("nn")) add(h.slice(0, -1));
+  // --- HIGH priority: end-of-name mistakes (most common) ---
+  add(h + h[h.length - 1]); // double last letter
+  add(h.slice(0, -1)); // miss last letter
+  if (h.length > 4) add(h.slice(0, -2));
   if (!h.endsWith("s")) add(h + "s");
   if (h.endsWith("s")) add(h.slice(0, -1));
+  if (h.endsWith("n") && !h.endsWith("nn")) add(h + "n");
+  if (h.endsWith("nn")) add(h.slice(0, -1));
+  if (h.endsWith("e")) add(h.slice(0, -1));
+  else add(h + "e");
   if (!h.endsWith("x")) add(h + "x");
   if (!h.endsWith("xx")) add(h + "xx");
   if (!h.endsWith("of")) add(h + "of");
-  // underscore / dot noise stripped variants already plain
+  if (!h.endsWith("_of")) add(h + "_of");
 
-  return [...out].slice(0, 40);
+  // --- phonetic / common spelling ---
+  if (h.includes("i")) add(h.replace(/i/g, "y"));
+  if (h.includes("y")) add(h.replace(/y/g, "i"));
+  if (h.includes("ph")) add(h.replace(/ph/g, "f"));
+  if (h.includes("f") && !h.includes("ph")) add(h.replace(/f/g, "ph"));
+  if (h.includes("er")) add(h.replace(/er/g, "ar"));
+  if (h.includes("ar")) add(h.replace(/ar/g, "er"));
+  if (h.includes("ai")) add(h.replace(/ai/g, "ay"));
+  if (h.includes("ay")) add(h.replace(/ay/g, "ai"));
+  if (h.includes("ie")) add(h.replace(/ie/g, "ei"));
+  if (h.includes("ei")) add(h.replace(/ei/g, "ie"));
+  if (h.includes("ll")) add(h.replace(/ll/g, "l"));
+  if (h.includes("nn")) add(h.replace(/nn/g, "n"));
+  if (h.includes("ss")) add(h.replace(/ss/g, "s"));
+  if (h.includes("ck")) add(h.replace(/ck/g, "k"));
+  // single → double in middle (corina → corinna style)
+  for (let i = 1; i < h.length - 1; i++) {
+    const c = h[i];
+    if ("aeioulnrs".includes(c) && h[i - 1] !== c && h[i + 1] !== c) {
+      add(h.slice(0, i) + c + h.slice(i));
+    }
+  }
+
+  // --- adjacent transpose (middle, not first char only) ---
+  for (let i = 1; i < h.length - 1; i++) {
+    add(h.slice(0, i) + h[i + 1] + h[i] + h.slice(i + 2));
+  }
+
+  // --- drop one letter (prefer middle/end, skip index 0 first wave) ---
+  for (let i = h.length - 1; i >= 1; i--) {
+    add(h.slice(0, i) + h.slice(i + 1));
+  }
+  // drop first letter last (less common search)
+  add(h.slice(1));
+
+  // --- keyboard neighbor substitution (middle letters) ---
+  for (let i = 1; i < h.length; i++) {
+    const n = NEIGH[h[i]] || "";
+    for (const ch of n) {
+      if (out.length > 50) break;
+      add(h.slice(0, i) + ch + h.slice(i + 1));
+    }
+  }
+
+  // --- double one letter (middle) ---
+  for (let i = 1; i < h.length; i++) {
+    add(h.slice(0, i) + h[i] + h.slice(i));
+  }
+
+  return out;
 }
 
 export function getLeakGalleryAliases(handle: string): string[] {
@@ -85,7 +120,6 @@ export function getLeakGalleryAliases(handle: string): string[] {
   return Array.isArray(list) ? list.map(String) : [];
 }
 
-/** LG exact + extras — always try to reach MIN_ALIASES */
 export function buildAliasList(
   handle: string,
   name?: string | null,
@@ -105,20 +139,11 @@ export function buildAliasList(
   };
 
   if (name && name.toLowerCase() !== primary.toLowerCase()) push(name);
-  // 1) exact LG
   for (const a of getLeakGalleryAliases(primary)) push(a);
-  // 2) any stored
   for (const a of stored || []) push(a);
-  // 3) dense typos until MIN then up to MAX
   for (const a of generateTypoAliases(primary)) {
     if (list.length >= MAX_ALIASES) break;
     push(a);
-  }
-  // pad if still short (rare short handles)
-  while (list.length < Math.min(MIN_ALIASES, MAX_ALIASES)) {
-    const pad = `${primary}${list.length}`;
-    if (seen.has(pad)) break;
-    push(pad);
   }
 
   return list.slice(0, MAX_ALIASES);
