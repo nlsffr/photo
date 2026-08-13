@@ -8,8 +8,8 @@ import { TagChips } from "@/components/TagChips";
 import { AdSlot } from "@/components/AdSlot";
 import { JsonLd } from "@/components/JsonLd";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+/** Soft cache — home feels instant on repeat visits */
+export const revalidate = 30;
 
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").replace(/\/$/, "");
 
@@ -73,32 +73,31 @@ export default async function Home({
   const cursorParsed = cursorRaw ? parseInt(cursorRaw, 10) : NaN;
   const cursor = Number.isFinite(cursorParsed) && cursorParsed > 0 ? cursorParsed : undefined;
 
-  const page = await getPhotos({ sort, tag, type, cursor, limit: 30 });
+  const page = await getPhotos({ sort, tag, type, cursor, limit: 24 });
   const allTags = await getAllTags();
   const queryKey = `${sort}|${tag ?? ""}|${type ?? ""}|${cursor ?? 0}`;
 
   const chips: { label: string; href: string; active: boolean }[] = [
-    { label: "Top", href: hrefFor({ type }), active: sort === "popular" && !type },
-    {
-      label: "Vidéos",
-      href: hrefFor({ type: "video", sort }),
-      active: type === "video",
-    },
+    { label: "Tout", href: hrefFor({ sort, type: null, tag }), active: !type },
     {
       label: "Photos",
-      href: hrefFor({ type: "photo", sort }),
+      href: hrefFor({ sort, type: "photo", tag }),
       active: type === "photo",
     },
     {
-      label: "Récents",
-      href: hrefFor({ type, sort: "recent" }),
-      active: sort === "recent",
+      label: "Vidéos",
+      href: hrefFor({ sort, type: "video", tag }),
+      active: type === "video",
     },
-    {
-      label: "Tendances",
-      href: hrefFor({ type, sort: "trending" }),
-      active: sort === "trending",
-    },
+  ];
+
+  const sortChips: { label: string; href: string; active: boolean }[] = [
+    { label: "Plus vus", href: hrefFor({ sort: "popular", type, tag }), active: sort === "popular" },
+    { label: "Plus aimés", href: hrefFor({ sort: "liked", type, tag }), active: sort === "liked" },
+    { label: "Récents", href: hrefFor({ sort: "recent", type, tag }), active: sort === "recent" },
+    { label: "Tendances", href: hrefFor({ sort: "trending", type, tag }), active: sort === "trending" },
+    { label: "Plus longs", href: hrefFor({ sort: "longest", type, tag }), active: sort === "longest" },
+    { label: "Aléatoire", href: hrefFor({ sort: "random", type, tag }), active: sort === "random" },
   ];
 
   const nextHref =
@@ -128,12 +127,13 @@ export default async function Home({
         <TagChips tags={allTags} activeTag={tag} />
       </div>
 
-      <div className="no-scrollbar mb-3 flex gap-2 overflow-x-auto pb-0.5">
-        {chips.map((c) => (
+      <div className="no-scrollbar mb-2 flex gap-2 overflow-x-auto pb-0.5">
+        {sortChips.map((c) => (
           <Link
             key={c.label}
             href={c.href}
             scroll={false}
+            prefetch={true}
             className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition ${
               c.active
                 ? "bg-[var(--color-accent)] text-white shadow-sm shadow-[var(--color-accent)]/30"
@@ -145,28 +145,32 @@ export default async function Home({
         ))}
         <Link
           href="/feed"
+          prefetch={true}
           className="ml-auto shrink-0 rounded-full border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-ink-muted)]"
         >
           Feed ↗
         </Link>
       </div>
 
-      <InfiniteGallery
-        key={queryKey}
-        initial={page}
-        params={{ sort, tag, type }}
-      />
-
-      {nextHref && (
-        <nav className="mt-8 flex justify-center" aria-label="Pagination">
+      <div className="no-scrollbar mb-3 flex gap-2 overflow-x-auto pb-0.5">
+        {chips.map((c) => (
           <Link
-            href={nextHref}
-            className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-2.5 text-sm font-semibold"
+            key={c.label}
+            href={c.href}
+            scroll={false}
+            prefetch={true}
+            className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition ${
+              c.active
+                ? "bg-[var(--color-accent)] text-white"
+                : "bg-[var(--color-surface-2)] text-[var(--color-ink-muted)]"
+            }`}
           >
-            More media →
+            {c.label}
           </Link>
-        </nav>
-      )}
+        ))}
+      </div>
+
+      <InfiniteGallery key={queryKey} initial={page} nextHref={nextHref} />
     </div>
   );
 }
