@@ -5,6 +5,8 @@ import { CreatorCard } from "@/components/CreatorCard";
 import { JsonLd } from "@/components/JsonLd";
 
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").replace(/\/$/, "");
+/** Cap first paint — full list kills TTFB with 800+ creators */
+const PAGE_SIZE = 48;
 
 export const metadata: Metadata = {
   title: "Models & creators",
@@ -31,7 +33,12 @@ export default async function ModelsPage({
 }) {
   const sp = await searchParams;
   const sort = first(sp.sort) === "views" ? "views" : "followers";
-  const models = await getModels(sort);
+  const pageNum = Math.max(1, parseInt(first(sp.page) || "1", 10) || 1);
+  const all = await getModels(sort);
+  const total = all.length;
+  const start = (pageNum - 1) * PAGE_SIZE;
+  const models = all.slice(start, start + PAGE_SIZE);
+  const hasMore = start + PAGE_SIZE < total;
 
   const toggle =
     "rounded-full px-4 py-1.5 text-sm font-semibold transition-colors";
@@ -43,15 +50,17 @@ export default async function ModelsPage({
     url: `${SITE}/models`,
     mainEntity: {
       "@type": "ItemList",
-      numberOfItems: models.length,
+      numberOfItems: total,
       itemListElement: models.slice(0, 50).map((m, i) => ({
         "@type": "ListItem",
-        position: i + 1,
+        position: start + i + 1,
         url: `${SITE}/creator/${encodeURIComponent(m.handle)}`,
         name: m.name || m.handle,
       })),
     },
   };
+
+  const sortQs = sort === "views" ? "sort=views&" : "";
 
   return (
     <div className="px-3 py-6 sm:px-5">
@@ -60,31 +69,29 @@ export default async function ModelsPage({
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Models</h1>
           <p className="text-sm text-[var(--color-ink-muted)]">
-            {models.length} creators on LeakFanHub
+            {total} creators on LeakFanHub
           </p>
         </div>
         <div className="inline-flex rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] p-1">
           <Link
             href="/models"
-            title="Sort by followers"
             className={`${toggle} ${
               sort === "followers"
                 ? "bg-[var(--color-accent)] text-white"
                 : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
             }`}
           >
-            Top followed
+            Plus suivis
           </Link>
           <Link
             href="/models?sort=views"
-            title="Sort by content views"
             className={`${toggle} ${
               sort === "views"
                 ? "bg-[var(--color-accent)] text-white"
                 : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
             }`}
           >
-            Top viewed
+            Plus vus
           </Link>
         </div>
       </div>
@@ -94,6 +101,17 @@ export default async function ModelsPage({
           <CreatorCard key={c.handle} creator={c} />
         ))}
       </div>
+
+      {hasMore && (
+        <div className="mt-8 flex justify-center">
+          <Link
+            href={`/models?${sortQs}page=${pageNum + 1}`}
+            className="rounded-full bg-[var(--color-accent)] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[var(--color-accent-600)]"
+          >
+            Voir plus
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

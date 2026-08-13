@@ -1,5 +1,6 @@
 /**
  * Query layer — delegates to DataProvider.
+ * Never load full photo table in fallbacks (kills /models at scale).
  */
 
 import type {
@@ -76,33 +77,20 @@ export async function getModels(
     return provider.getModels(sort);
   }
 
-  // Fallback (demo / empty)
+  // Lightweight fallback — creators only, NO full photo table scan
   const creators = await provider.getCreators();
-  const photos = await provider.getAllPhotos();
-  const stats = new Map<string, { views: number; likes: number; cover: string }>();
-  for (const p of photos) {
-    const s = stats.get(p.creatorHandle) ?? { views: 0, likes: 0, cover: "" };
-    s.views += p.views;
-    s.likes += p.likes;
-    if (!s.cover) s.cover = p.imageUrl;
-    stats.set(p.creatorHandle, s);
-  }
-  const withStats = creators.map((c) => {
-    const s = stats.get(c.handle) ?? { views: 0, likes: 0, cover: "" };
-    const photoCount = photos.filter((p) => p.creatorHandle === c.handle).length;
-    return {
-      ...c,
-      photoCount,
-      totalViews: s.views,
-      totalLikes: s.likes,
-      coverUrl: s.cover,
-    };
-  }).filter((c) => c.photoCount > 0);
+  const withStats: CreatorWithStats[] = creators.map((c) => ({
+    ...c,
+    photoCount: 0,
+    totalViews: 0,
+    totalLikes: 0,
+    coverUrl: c.avatarUrl || "",
+  }));
 
   if (sort === "followers") {
     withStats.sort((a, b) => b.followers - a.followers);
   } else {
-    withStats.sort((a, b) => b.totalViews - a.totalViews);
+    withStats.sort((a, b) => b.totalViews - a.totalViews || b.followers - a.followers);
   }
   return withStats;
 }
@@ -113,22 +101,13 @@ export async function getRankings(limit = 20) {
     return provider.getRankings(limit);
   }
 
-  const creators = await provider.getCreators();
-  const photos = await provider.getAllPhotos();
-  const stats = new Map<string, { views: number; likes: number }>();
-  for (const p of photos) {
-    const s = stats.get(p.creatorHandle) ?? { views: 0, likes: 0 };
-    s.views += p.views;
-    s.likes += p.likes;
-    stats.set(p.creatorHandle, s);
-  }
-  const ranked = creators.map((c) => {
-    const s = stats.get(c.handle) ?? { views: 0, likes: 0 };
-    const score = s.views + s.likes * 3;
-    return { ...c, score, views: s.views, likes: s.likes };
-  });
-  ranked.sort((a, b) => b.score - a.score);
-  return ranked.slice(0, limit);
+  const models = await getModels("followers");
+  return models.slice(0, limit).map((c) => ({
+    ...c,
+    score: c.followers,
+    views: c.totalViews,
+    likes: c.totalLikes,
+  }));
 }
 
 export async function getRecommendedCreators(exclude?: string, limit = 6) {
