@@ -24,6 +24,7 @@ const I = (d: string) => (
   </svg>
 );
 
+/** Menu complet — comme avant (découvrir + compte + aide légale) */
 const SECTIONS: NavSection[] = [
   {
     items: [
@@ -37,8 +38,26 @@ const SECTIONS: NavSection[] = [
       { href: "/pour-toi", labelKey: "forYou", icon: I("M12 21s-7.5-4.6-10-9.3C.4 8.4 2 5 5.4 5c2 0 3.3 1.1 4.6 2.6C11.3 6.1 12.6 5 14.6 5 18 5 19.6 8.4 22 11.7 19.5 16.4 12 21 12 21Z"), active: (p) => p.startsWith("/pour-toi") },
       { href: "/abonnements", labelKey: "following", icon: I("M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM16 11l2 2 4-4"), active: (p) => p.startsWith("/abonnements") },
       { href: "/favoris", labelKey: "saved", icon: I("M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16l-7-4-7 4z"), active: (p) => p.startsWith("/favoris") },
-      { href: "/premium", labelKey: "premium", icon: I("M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z"), accent: "gold", active: (p) => p.startsWith("/premium") },
-      { href: "/add", labelKey: "add", icon: I("M12 5v14M5 12h14"), accent: "pink", active: (p) => p.startsWith("/add") },
+      { href: "/add", labelKey: "add", icon: I("M12 5v14M5 12h14"), active: (p) => p.startsWith("/add") },
+      { href: "/classements", labelKey: "rankings", icon: I("M8 21V9M16 21V5M4 21v-6M20 21v-10"), active: (p) => p.startsWith("/classements") },
+    ],
+  },
+  {
+    items: [
+      { href: "/premium", labelKey: "premium", icon: I("M3 7l4 5 5-7 5 7 4-5v11H3z"), accent: "gold", active: (p) => p.startsWith("/premium") },
+      { href: "/connexion", labelKey: "login", icon: I("M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"), active: (p) => p.startsWith("/connexion") },
+      { href: "/inscription", labelKey: "signup", icon: I("M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6"), accent: "pink", active: (p) => p.startsWith("/inscription") },
+    ],
+  },
+  {
+    titleKey: "help",
+    items: [
+      { href: "/contact", labelKey: "contact", icon: I("M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM22 6l-10 7L2 6"), active: (p) => p.startsWith("/contact") },
+      { href: "/dmca", labelKey: "dmca", icon: I("M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"), active: (p) => p.startsWith("/dmca") },
+      { href: "/trust-and-safety", labelKey: "trust", icon: I("M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"), active: (p) => p.startsWith("/trust-and-safety") },
+      { href: "/contact/signalement", labelKey: "report", icon: I("M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7"), active: (p) => p.startsWith("/contact/signalement") },
+      { href: "/conditions", labelKey: "terms", icon: I("M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8"), active: (p) => p.startsWith("/conditions") },
+      { href: "/confidentialite", labelKey: "privacy", icon: I("M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"), active: (p) => p.startsWith("/confidentialite") },
     ],
   },
 ];
@@ -47,30 +66,42 @@ function NavContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { t } = useLocale();
   return (
-    <nav className="flex flex-col gap-1">
-      {SECTIONS.map((sec, si) => (
-        <div key={si} className="space-y-0.5">
-          {sec.items.map((item) => {
-            const active = item.active?.(pathname) ?? pathname === item.href;
+    <nav className="flex flex-col gap-4">
+      {SECTIONS.map((section, si) => (
+        <div key={si} className="flex flex-col gap-0.5">
+          {section.titleKey && (
+            <p className="px-3 pb-1 pt-2 text-xs font-bold uppercase tracking-wide text-[var(--color-ink-faint)]">
+              {t(section.titleKey)}
+            </p>
+          )}
+          {section.items.map((item) => {
+            const isActive = item.active?.(pathname) ?? false;
+            const color =
+              item.accent === "gold"
+                ? "text-amber-400"
+                : item.accent === "pink"
+                  ? "text-[var(--color-accent)]"
+                  : isActive
+                    ? "text-[var(--color-ink)]"
+                    : "text-[var(--color-ink-muted)]";
             return (
               <Link
-                key={item.href}
+                key={item.href + item.labelKey}
                 href={item.href}
                 prefetch={true}
                 onClick={onNavigate}
-                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
-                  active
-                    ? "bg-[var(--color-accent)]/15 text-[var(--color-accent)]"
-                    : item.accent === "gold"
-                      ? "text-amber-400 hover:bg-amber-400/10"
-                      : "text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink)]"
+                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-[15px] font-medium transition-colors hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink)] ${color} ${
+                  isActive ? "bg-[var(--color-surface-2)]" : ""
                 }`}
               >
-                {item.icon}
+                <span className="shrink-0">{item.icon}</span>
                 {t(item.labelKey)}
               </Link>
             );
           })}
+          {si < SECTIONS.length - 1 && (
+            <div className="mx-3 mt-2 border-t border-[var(--color-border)]" />
+          )}
         </div>
       ))}
     </nav>
@@ -251,7 +282,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </aside>
 
-        <main className="min-w-0 flex-1 pb-[calc(4.25rem+env(safe-area-inset-bottom))] lg:pb-8">
+        <main className={`min-w-0 flex-1 ${isFeed ? "pb-0" : "pb-[calc(4.25rem+env(safe-area-inset-bottom))] lg:pb-8"}`}>
           {children}
         </main>
       </div>
@@ -285,12 +316,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <footer className="mt-auto border-t border-[var(--color-border)] bg-[var(--color-surface)] pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0">
           <div className="mx-auto flex max-w-[1600px] flex-col items-center gap-5 px-4 py-8 text-center sm:px-6">
             <BrandLogo size="md" />
+            <p className="max-w-xl text-xs text-[var(--color-ink-muted)]">
+              18+ only. Tolérance zéro : tout contenu impliquant des mineurs est interdit et doit être signalé immédiatement.
+            </p>
             <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm text-[var(--color-ink-muted)]">
               <Link href="/conditions" className="hover:text-[var(--color-ink)]">Conditions</Link>
               <Link href="/confidentialite" className="hover:text-[var(--color-ink)]">Confidentialité</Link>
               <Link href="/trust-and-safety" className="hover:text-[var(--color-ink)]">Trust & Safety</Link>
               <Link href="/dmca" className="hover:text-[var(--color-ink)]">DMCA</Link>
               <Link href="/contact" className="hover:text-[var(--color-ink)]">Contact</Link>
+              <Link href="/contact/signalement" className="font-semibold text-[var(--color-accent)] hover:underline">Signaler</Link>
             </nav>
             <p className="text-xs text-[var(--color-ink-faint)]">© 2026 LeakFanHub · 18+ only</p>
           </div>
