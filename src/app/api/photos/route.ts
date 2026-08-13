@@ -1,6 +1,7 @@
 import { getPhotos } from "@/lib/photos";
 import type { MediaType, SortKey } from "@/lib/types";
 import { anonKey, rateLimit, sweep } from "@/lib/ratelimit";
+import { cacheGet, cacheSet, cacheKey } from "@/lib/cache";
 
 const SORTS: SortKey[] = [
   "recent",
@@ -10,6 +11,9 @@ const SORTS: SortKey[] = [
   "random",
   "longest",
 ];
+
+/** Cache only first pages of common feeds (high traffic). */
+const CACHE_TTL_MS = 20_000;
 
 function clientKey(request: Request): string {
   const explicit = request.headers.get("x-ratelimit-bucket");
@@ -60,21 +64,55 @@ export async function GET(request: Request) {
   const seedParam = searchParams.get("seed");
   const seed = seedParam !== null && seedParam !== "" ? Number(seedParam) : undefined;
 
+  const cursor = Number(searchParams.get("cursor")) || 0;
+  const limit = Number(searchParams.get("limit")) || undefined;
+  const tag = searchParams.get("tag") ?? undefined;
+  const q = searchParams.get("q") ?? undefined;
+  const creator = searchParams.get("creator") ?? undefined;
+
+  // Cache only simple list queries (no search), first pages
+  const canCache =
+    !q &&
+    !tag &&
+    !creator &&
+    sort !== "random" &&
+    cursor < 3;
+
+  const key = canCache
+    ? cacheKey({ sort, type, isAi, cursor, limit, seed: undefined })
+    : null;
+
+  if (key) {
+    const hit = cacheGet<unknown>(key);
+    if (hit) {
+      return Response.json(hit, {
+        headers: {
+          "X-RateLimit-Remaining": String(remaining),
+          "X-Cache": "HIT",
+          "Cache-Control": "public, s-maxage=15, stale-while-revalidate=60",
+        },
+      });
+    }
+  }
+
   const page = await getPhotos({
     sort,
     type,
     isAi,
-    tag: searchParams.get("tag") ?? undefined,
-    q: searchParams.get("q") ?? undefined,
-    creator: searchParams.get("creator") ?? undefined,
-    cursor: Number(searchParams.get("cursor")) || 0,
-    limit: Number(searchParams.get("limit")) || undefined,
+    tag,
+    q,
+    creator,
+    cursor,
+    limit,
     seed: Number.isFinite(seed) ? seed : undefined,
   });
+
+  if (key) cacheSet(key, page, CACHE_TTL_MS);
 
   return Response.json(page, {
     headers: {
       "X-RateLimit-Remaining": String(remaining),
+      "X-Cache": key ? "MISS" : "BYPASS",
       "Cache-Control": "public, s-maxage=15, stale-while-revalidate=60",
     },
   });
