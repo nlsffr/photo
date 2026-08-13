@@ -33,7 +33,6 @@ const securityHeaders = [
       "camera=(), microphone=(), geolocation=(), interest-cohort=(), browsing-topics=()",
   },
   { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
-  // allow same-origin media embedding
   { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
   ...(isDev
     ? []
@@ -43,6 +42,22 @@ const securityHeaders = [
           value: "max-age=63072000; includeSubDomains; preload",
         },
       ]),
+];
+
+/** Immutable hashed assets — aggressive browser cache */
+const staticCacheHeaders = [
+  {
+    key: "Cache-Control",
+    value: "public, max-age=31536000, immutable",
+  },
+];
+
+/** Thumbs / media — 7 days browser cache */
+const mediaCacheHeaders = [
+  {
+    key: "Cache-Control",
+    value: "public, max-age=604800, stale-while-revalidate=86400",
+  },
 ];
 
 const nextConfig: NextConfig = {
@@ -55,7 +70,10 @@ const nextConfig: NextConfig = {
   ],
   output: "standalone",
   poweredByHeader: false,
+  compress: true,
   images: {
+    formats: ["image/avif", "image/webp"],
+    minimumCacheTTL: 60 * 60 * 24 * 7,
     remotePatterns: [
       { protocol: "https", hostname: cdnHostname },
       { protocol: "https", hostname: "**.leakgallery.com" },
@@ -70,7 +88,14 @@ const nextConfig: NextConfig = {
     ],
   },
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      { source: "/_next/static/:path*", headers: staticCacheHeaders },
+      { source: "/favicon.svg", headers: staticCacheHeaders },
+      { source: "/icon", headers: mediaCacheHeaders },
+      { source: "/apple-icon", headers: mediaCacheHeaders },
+      { source: "/media/:path*", headers: mediaCacheHeaders },
+    ];
   },
 };
 
