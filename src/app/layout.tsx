@@ -35,7 +35,6 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "/",
   },
-  // Explicit icons for Google (≥48px) + browsers
   icons: {
     icon: [
       { url: "/favicon.svg", type: "image/svg+xml" },
@@ -87,16 +86,15 @@ export default function RootLayout({
       <body className="min-h-full">
         <LocaleProvider>
           <SessionProvider>
-            <AnonIdentityProvider>
-              <InteractionsProvider>
-                <PremiumProvider>
-                  <AgeGate>
-                    <AppShell>{children}</AppShell>
-                    <CookieBanner />
-                  </AgeGate>
-                </PremiumProvider>
-              </InteractionsProvider>
-            </AnonIdentityProvider>
+            <PremiumProvider>
+              <AnonIdentityProvider>
+                <InteractionsProvider>
+                  <AgeGate />
+                  <AppShell>{children}</AppShell>
+                  <CookieBanner />
+                </InteractionsProvider>
+              </AnonIdentityProvider>
+            </PremiumProvider>
           </SessionProvider>
         </LocaleProvider>
       </body>
