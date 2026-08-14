@@ -29,7 +29,7 @@ const SECTIONS: NavSection[] = [
   {
     items: [
       { href: "/", labelKey: "home", icon: I("M3 11l9-8 9 8M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"), active: (p) => p === "/" },
-      { href: "/recherche", labelKey: "search", icon: I("M11 11a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-4.3-4.3"), active: (p) => p.startsWith("/recherche") },
+      { href: "/recherche", labelKey: "search", icon: I("M21 21l-4.35-4.35M11 11m-7 0a7 7 0 1 0 14 0a7 7 0 1 0-14 0"), active: (p) => p.startsWith("/recherche") },
       { href: "/models", labelKey: "models", icon: I("M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"), active: (p) => p.startsWith("/models") },
       { href: "/feed", labelKey: "feed", icon: I("M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM10 8l6 4-6 4z"), active: (p) => p.startsWith("/feed") || p.startsWith("/tiktok") },
       { href: "/trending-medias", labelKey: "trending", icon: I("M5 17l6-6 4 4 8-8M21 7v6h-6"), active: (p) => p.startsWith("/trending-medias") },
@@ -84,7 +84,6 @@ function NavContent({ onNavigate }: { onNavigate?: () => void }) {
                   : isActive
                     ? "text-[var(--color-accent)]"
                     : "text-[var(--color-ink-muted)]";
-            // Actif = fond accent clair. Hover = gris. Jamais le même style.
             const bg = isActive
               ? "bg-[var(--color-accent)]/15"
               : "hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink)]";
