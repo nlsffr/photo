@@ -52,7 +52,7 @@ const SECTIONS: NavSection[] = [
   {
     titleKey: "help",
     items: [
-      { href: "/contact", labelKey: "contact", icon: I("M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM22 6l-10 7L2 6"), active: (p) => p.startsWith("/contact") },
+      { href: "/contact", labelKey: "contact", icon: I("M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM22 6l-10 7L2 6"), active: (p) => p === "/contact" || p.startsWith("/contact?") },
       { href: "/dmca", labelKey: "dmca", icon: I("M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"), active: (p) => p.startsWith("/dmca") },
       { href: "/trust-and-safety", labelKey: "trust", icon: I("M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"), active: (p) => p.startsWith("/trust-and-safety") },
       { href: "/contact/signalement", labelKey: "report", icon: I("M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7"), active: (p) => p.startsWith("/contact/signalement") },
@@ -82,17 +82,19 @@ function NavContent({ onNavigate }: { onNavigate?: () => void }) {
                 : item.accent === "pink"
                   ? "text-[var(--color-accent)]"
                   : isActive
-                    ? "text-[var(--color-ink)]"
+                    ? "text-[var(--color-accent)]"
                     : "text-[var(--color-ink-muted)]";
+            // Actif = fond accent clair. Hover = gris. Jamais le même style.
+            const bg = isActive
+              ? "bg-[var(--color-accent)]/15"
+              : "hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink)]";
             return (
               <Link
                 key={item.href + item.labelKey}
                 href={item.href}
                 prefetch={true}
                 onClick={onNavigate}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-[15px] font-medium transition-colors hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink)] ${color} ${
-                  isActive ? "bg-[var(--color-surface-2)]" : ""
-                }`}
+                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-[15px] font-medium transition-colors ${color} ${bg}`}
               >
                 <span className="shrink-0">{item.icon}</span>
                 {t(item.labelKey)}
