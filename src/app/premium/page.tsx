@@ -11,7 +11,6 @@ const CRYPTO_ASSETS = [
     id: "btc",
     name: "Bitcoin",
     symbol: "BTC",
-    // Replace via NEXT_PUBLIC_CRYPTO_* in production
     address:
       (typeof process !== "undefined" && process.env.NEXT_PUBLIC_CRYPTO_BTC) ||
       "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
@@ -40,11 +39,14 @@ function formatUsd(n: number) {
 
 export default function PremiumPage() {
   const { user, loading } = useSession();
-  const { isPremium, setPremium } = usePremium();
+  const { isPremium, refresh } = usePremium();
   const [planId, setPlanId] = useState<PlanId>("week");
   const [method, setMethod] = useState<PayMethod | null>(null);
   const [cryptoAsset, setCryptoAsset] = useState<(typeof CRYPTO_ASSETS)[number]["id"]>("btc");
   const [copied, setCopied] = useState(false);
+  const [txHash, setTxHash] = useState("");
+  const [cryptoSent, setCryptoSent] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   const plan = useMemo(() => getPlan(planId), [planId]);
   const asset = CRYPTO_ASSETS.find((a) => a.id === cryptoAsset) ?? CRYPTO_ASSETS[0];
@@ -69,6 +71,27 @@ export default function PremiumPage() {
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
+  const submitCrypto = async () => {
+    setBusy(true);
+    try {
+      const res = await fetch("/api/premium/crypto-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          planId,
+          cryptoAsset,
+          txHash: txHash.trim(),
+        }),
+      });
+      if (res.ok) {
+        setCryptoSent(true);
+        await refresh();
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="mx-auto max-w-lg px-4 py-16 text-center text-sm text-[var(--color-ink-muted)]">
@@ -91,18 +114,10 @@ export default function PremiumPage() {
         >
           Retour à la galerie
         </Link>
-        <button
-          type="button"
-          onClick={() => setPremium(false)}
-          className="mt-4 block w-full text-xs text-[var(--color-ink-faint)] underline"
-        >
-          (dev) désactiver
-        </button>
       </div>
     );
   }
 
-  // Must be logged in
   if (!user) {
     return (
       <div className="mx-auto max-w-lg px-4 py-16 text-center">
@@ -145,7 +160,6 @@ export default function PremiumPage() {
         </p>
       </div>
 
-      {/* Plans */}
       <div className="mt-8 grid gap-3 sm:grid-cols-2">
         {PLANS.map((p) => {
           const active = planId === p.id;
@@ -156,6 +170,7 @@ export default function PremiumPage() {
               onClick={() => {
                 setPlanId(p.id);
                 setMethod(null);
+                setCryptoSent(false);
               }}
               className={`relative rounded-2xl border p-4 text-left transition ${
                 active
@@ -178,7 +193,6 @@ export default function PremiumPage() {
         })}
       </div>
 
-      {/* Payment methods */}
       <h2 className="mt-10 text-sm font-bold uppercase tracking-wide text-[var(--color-ink-faint)]">
         Moyen de paiement
       </h2>
@@ -206,7 +220,6 @@ export default function PremiumPage() {
         ))}
       </div>
 
-      {/* Method panels */}
       {method === "card" || method === "stars" ? (
         <div className="mt-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
           <h3 className="font-bold">
@@ -215,35 +228,15 @@ export default function PremiumPage() {
               : "Payer avec Telegram Stars"}
           </h3>
           <p className="mt-2 text-sm text-[var(--color-ink-muted)]">
-            {method === "card" ? (
-              <>
-                Tu seras redirigé vers Telegram pour activer{" "}
-                <strong>Premium — {plan.label}</strong>. Si tu n’as pas assez de
-                Stars, Telegram te propose d’en acheter par carte bancaire, puis
-                de valider l’abonnement.
-              </>
-            ) : (
-              <>
-                Ouvre Telegram et confirme le paiement de{" "}
-                <strong>~{plan.stars} Stars</strong> ({formatUsd(plan.priceUsd)})
-                pour <strong>{plan.label}</strong> sur ton compte.
-              </>
-            )}
+            Ouvre Telegram, paie ~{plan.stars} Stars ({formatUsd(plan.priceUsd)}) pour{" "}
+            <strong>{plan.label}</strong>. L’activation est validée côté compte après
+            confirmation.
           </p>
-          <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm text-[var(--color-ink-muted)]">
-            <li>Clique sur le bouton ci-dessous</li>
-            <li>Telegram s’ouvre avec « Activate Premium »</li>
-            <li>Paie en Stars (ou achète des Stars par carte)</li>
-            <li>Ton compte LeakFanHub est activé automatiquement</li>
-          </ol>
           <button
             type="button"
             onClick={openTelegram}
             className="mt-5 flex w-full items-center justify-center gap-2 rounded-full bg-[#2AABEE] py-3 text-sm font-bold text-white hover:brightness-110"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12a.43.43 0 01.14.28c.02.06.02.2 0 .31z" />
-            </svg>
             Ouvrir Telegram — {plan.label} ({formatUsd(plan.priceUsd)})
           </button>
           <p className="mt-3 text-center text-[11px] text-[var(--color-ink-faint)]">
@@ -256,8 +249,8 @@ export default function PremiumPage() {
         <div className="mt-6 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
           <h3 className="font-bold">Payer en crypto</h3>
           <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-            Envoie <strong>{formatUsd(plan.priceUsd)}</strong> (équivalent) à
-            l’adresse ci-dessous. Indique ton e-mail en mémo si possible.
+            Envoie <strong>{formatUsd(plan.priceUsd)}</strong> (équivalent) à l’adresse,
+            puis confirme ci-dessous.
           </p>
 
           <div className="mt-4 flex flex-wrap gap-2">
@@ -300,12 +293,32 @@ export default function PremiumPage() {
               >
                 {copied ? "Copié ✓" : "Copier l’adresse"}
               </button>
-              <p className="mt-3 text-[11px] text-[var(--color-ink-faint)]">
-                Après envoi, l’activation peut prendre quelques minutes. Contacte
-                le support avec le hash de transaction si besoin.
-              </p>
             </div>
           </div>
+
+          {cryptoSent ? (
+            <p className="mt-5 rounded-xl bg-emerald-500/10 px-4 py-3 text-sm text-emerald-400">
+              Demande enregistrée. Activation sous peu après vérification du paiement.
+            </p>
+          ) : (
+            <div className="mt-5 space-y-3">
+              <input
+                type="text"
+                value={txHash}
+                onChange={(e) => setTxHash(e.target.value)}
+                placeholder="Hash de transaction (optionnel)"
+                className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm"
+              />
+              <button
+                type="button"
+                disabled={busy}
+                onClick={submitCrypto}
+                className="w-full rounded-full bg-[var(--color-accent)] py-3 text-sm font-bold text-white disabled:opacity-50"
+              >
+                {busy ? "Envoi…" : "J’ai payé — notifier"}
+              </button>
+            </div>
+          )}
         </div>
       ) : null}
 
@@ -318,7 +331,7 @@ export default function PremiumPage() {
       <ul className="mt-10 space-y-2 text-sm text-[var(--color-ink-muted)]">
         <li>✓ Sans publicité</li>
         <li>✓ Qualité et vitesse prioritaires</li>
-        <li>✓ Annulation à la fin de la période (pas de reconduction forcée ici)</li>
+        <li>✓ Premium lié à ton compte (tous tes appareils)</li>
       </ul>
     </div>
   );

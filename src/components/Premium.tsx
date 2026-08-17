@@ -7,46 +7,52 @@ import {
   useEffect,
   useState,
 } from "react";
-
-const KEY = "lfh:premium:v1";
+import { useSession } from "./Session";
 
 interface PremiumCtx {
   isPremium: boolean;
   ready: boolean;
   setPremium: (v: boolean) => void;
-  /** @deprecated Stripe removed — kept as no-op for old callers */
+  refresh: () => Promise<void>;
   startCheckout: () => Promise<void>;
 }
 
 const Ctx = createContext<PremiumCtx | null>(null);
 
 export function PremiumProvider({ children }: { children: React.ReactNode }) {
+  const { user, loading: sessionLoading } = useSession();
   const [isPremium, setIsPremium] = useState(false);
   const [ready, setReady] = useState(false);
 
-  useEffect(() => {
+  const refresh = useCallback(async () => {
+    if (!user) {
+      setIsPremium(false);
+      setReady(true);
+      return;
+    }
     try {
-      if (localStorage.getItem(KEY) === "1") setIsPremium(true);
-      if (typeof window !== "undefined") {
-        const q = new URLSearchParams(window.location.search);
-        if (q.get("premium_success") === "1" || q.get("premium") === "1") {
-          setIsPremium(true);
-          localStorage.setItem(KEY, "1");
-        }
+      const res = await fetch("/api/premium/status", { cache: "no-store" });
+      if (res.ok) {
+        const j = await res.json();
+        setIsPremium(Boolean(j.isPremium));
+      } else {
+        setIsPremium(false);
       }
     } catch {
-      /* ignore */
+      setIsPremium(false);
+    } finally {
+      setReady(true);
     }
-    setReady(true);
-  }, []);
+  }, [user]);
+
+  useEffect(() => {
+    if (sessionLoading) return;
+    setReady(false);
+    void refresh();
+  }, [user, sessionLoading, refresh]);
 
   const setPremium = useCallback((v: boolean) => {
     setIsPremium(v);
-    try {
-      localStorage.setItem(KEY, v ? "1" : "0");
-    } catch {
-      /* ignore */
-    }
   }, []);
 
   const startCheckout = useCallback(async () => {
@@ -54,7 +60,7 @@ export function PremiumProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <Ctx.Provider value={{ isPremium, ready, setPremium, startCheckout }}>
+    <Ctx.Provider value={{ isPremium, ready, setPremium, refresh, startCheckout }}>
       {children}
     </Ctx.Provider>
   );
@@ -67,6 +73,7 @@ export function usePremium(): PremiumCtx {
       isPremium: false,
       ready: true,
       setPremium: () => {},
+      refresh: async () => {},
       startCheckout: async () => {},
     };
   }
