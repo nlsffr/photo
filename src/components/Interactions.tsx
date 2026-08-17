@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import { useRouter, usePathname } from "next/navigation";
@@ -41,44 +42,97 @@ export function InteractionsProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const { user } = useSession();
+  const { user, loading: sessionLoading } = useSession();
   const router = useRouter();
   const pathname = usePathname();
   const [liked, setLiked] = useState<Set<string>>(new Set());
   const [saved, setSaved] = useState<Set<string>>(new Set());
   const [followed, setFollowed] = useState<Set<string>>(new Set());
   const [ready, setReady] = useState(false);
+  const mergedRef = useRef(false);
 
+  // Load from API when logged in; fall back to localStorage only as merge source
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(KEY);
-      if (raw) {
-        const d = JSON.parse(raw);
-        setLiked(new Set<string>(d.liked ?? []));
-        setSaved(new Set<string>(d.saved ?? []));
-        setFollowed(new Set<string>(d.followed ?? []));
+    if (sessionLoading) return;
+    let cancelled = false;
+
+    async function load() {
+      if (!user) {
+        setLiked(new Set());
+        setSaved(new Set());
+        setFollowed(new Set());
+        mergedRef.current = false;
+        setReady(true);
+        return;
       }
-    } catch {
-      /* ignore */
-    }
-    setReady(true);
-  }, []);
 
-  useEffect(() => {
-    if (!ready || !user) return;
-    try {
-      localStorage.setItem(
-        KEY,
-        JSON.stringify({
-          liked: [...liked],
-          saved: [...saved],
-          followed: [...followed],
-        }),
-      );
-    } catch {
-      /* ignore */
+      // Read any old local data once to merge into DB
+      let localLiked: string[] = [];
+      let localSaved: string[] = [];
+      let localFollowed: string[] = [];
+      try {
+        const raw = localStorage.getItem(KEY);
+        if (raw) {
+          const d = JSON.parse(raw);
+          localLiked = d.liked ?? [];
+          localSaved = d.saved ?? [];
+          localFollowed = d.followed ?? [];
+        }
+      } catch {
+        /* ignore */
+      }
+
+      try {
+        if (!mergedRef.current && (localLiked.length || localSaved.length || localFollowed.length)) {
+          const res = await fetch("/api/interactions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "merge",
+              liked: localLiked,
+              saved: localSaved,
+              followed: localFollowed,
+            }),
+          });
+          if (res.ok) {
+            const j = await res.json();
+            if (!cancelled) {
+              setLiked(new Set(j.liked ?? []));
+              setSaved(new Set(j.saved ?? []));
+              setFollowed(new Set(j.followed ?? []));
+              try {
+                localStorage.removeItem(KEY);
+              } catch {
+                /* ignore */
+              }
+              mergedRef.current = true;
+              setReady(true);
+              return;
+            }
+          }
+        }
+
+        const res = await fetch("/api/interactions", { cache: "no-store" });
+        if (res.ok) {
+          const j = await res.json();
+          if (!cancelled) {
+            setLiked(new Set(j.liked ?? []));
+            setSaved(new Set(j.saved ?? []));
+            setFollowed(new Set(j.followed ?? []));
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+      if (!cancelled) setReady(true);
     }
-  }, [liked, saved, followed, ready, user]);
+
+    setReady(false);
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, sessionLoading]);
 
   const requireAuth = useCallback(() => {
     if (user) return true;
@@ -86,6 +140,23 @@ export function InteractionsProvider({
     router.push(`/connexion?next=${next}`);
     return false;
   }, [user, router, pathname]);
+
+  const apiToggle = useCallback(
+    async (action: "like" | "save" | "follow", payload: Record<string, string>) => {
+      const res = await fetch("/api/interactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, ...payload }),
+      });
+      if (res.status === 401) {
+        requireAuth();
+        return null;
+      }
+      if (!res.ok) return null;
+      return (await res.json()) as { on: boolean };
+    },
+    [requireAuth],
+  );
 
   const value: Ctx = {
     ready,
@@ -96,22 +167,49 @@ export function InteractionsProvider({
       (id) => {
         if (!requireAuth()) return;
         setLiked((s) => toggle(s, id));
+        void apiToggle("like", { photoId: id }).then((r) => {
+          if (!r) return;
+          setLiked((s) => {
+            const next = new Set(s);
+            if (r.on) next.add(id);
+            else next.delete(id);
+            return next;
+          });
+        });
       },
-      [requireAuth],
+      [requireAuth, apiToggle],
     ),
     toggleSave: useCallback(
       (id) => {
         if (!requireAuth()) return;
         setSaved((s) => toggle(s, id));
+        void apiToggle("save", { photoId: id }).then((r) => {
+          if (!r) return;
+          setSaved((s) => {
+            const next = new Set(s);
+            if (r.on) next.add(id);
+            else next.delete(id);
+            return next;
+          });
+        });
       },
-      [requireAuth],
+      [requireAuth, apiToggle],
     ),
     toggleFollow: useCallback(
       (h) => {
         if (!requireAuth()) return;
         setFollowed((s) => toggle(s, h));
+        void apiToggle("follow", { handle: h }).then((r) => {
+          if (!r) return;
+          setFollowed((s) => {
+            const next = new Set(s);
+            if (r.on) next.add(h);
+            else next.delete(h);
+            return next;
+          });
+        });
       },
-      [requireAuth],
+      [requireAuth, apiToggle],
     ),
     likedIds: [...liked],
     savedIds: [...saved],
