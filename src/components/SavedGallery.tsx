@@ -1,32 +1,63 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import type { PhotoView } from "@/lib/types";
 import { PhotoCard } from "./PhotoCard";
-import { useInteractions } from "./Interactions";
+import { useSession } from "./Session";
 
-export function SavedGallery({ items }: { items: PhotoView[] }) {
-  const { savedIds, ready } = useInteractions();
+export function SavedGallery({ kind = "saved" }: { kind?: "saved" | "liked" }) {
+  const { user, loading: sessionLoading } = useSession();
+  const [items, setItems] = useState<PhotoView[] | null>(null);
 
-  if (!ready) {
+  useEffect(() => {
+    if (sessionLoading) return;
+    if (!user) {
+      setItems([]);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/library?kind=${kind}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (!cancelled) setItems(d.items || []);
+      })
+      .catch(() => {
+        if (!cancelled) setItems([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, sessionLoading, kind]);
+
+  if (sessionLoading || items === null) {
     return (
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
         {Array.from({ length: 10 }).map((_, i) => (
-          <div
-            key={i}
-            className="aspect-[4/5] skeleton rounded-xl"
-          />
+          <div key={i} className="aspect-[4/5] skeleton rounded-xl" />
         ))}
       </div>
     );
   }
 
-  const byId = new Map(items.map((i) => [i.id, i]));
-  const saved = savedIds
-    .map((id) => byId.get(id))
-    .filter((p): p is PhotoView => Boolean(p));
+  if (!user) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 py-24 text-center">
+        <p className="text-lg font-semibold">Connecte-toi</p>
+        <p className="max-w-sm text-sm text-[var(--color-ink-muted)]">
+          Tes enregistrements sont liés à ton compte.
+        </p>
+        <Link
+          href={`/connexion?next=/${kind === "liked" ? "pour-toi" : "favoris"}`}
+          className="mt-2 rounded-full bg-[var(--color-accent)] px-6 py-2.5 text-sm font-semibold text-white"
+        >
+          Connexion
+        </Link>
+      </div>
+    );
+  }
 
-  if (saved.length === 0) {
+  if (items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-24 text-center">
         <div className="grid h-14 w-14 place-items-center rounded-full bg-[var(--color-surface-2)] text-[var(--color-ink-faint)]">
@@ -34,14 +65,17 @@ export function SavedGallery({ items }: { items: PhotoView[] }) {
             <path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16l-7-4-7 4Z" />
           </svg>
         </div>
-        <p className="text-lg font-semibold">Rien d’enregistré</p>
+        <p className="text-lg font-semibold">
+          {kind === "liked" ? "Aucun like" : "Rien d’enregistré"}
+        </p>
         <p className="max-w-sm text-sm text-[var(--color-ink-muted)]">
-          Touche l’icône <span className="font-semibold">signet</span> sur une
-          photo ou une vidéo pour la retrouver ici.
+          {kind === "liked"
+            ? "Like des médias pour les retrouver ici."
+            : "Touche le signet sur une photo ou une vidéo pour la retrouver ici."}
         </p>
         <Link
           href="/"
-          className="mt-2 rounded-full bg-[var(--color-accent)] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[var(--color-accent-600)]"
+          className="mt-2 rounded-full bg-[var(--color-accent)] px-6 py-2.5 text-sm font-semibold text-white"
         >
           Explorer
         </Link>
@@ -52,10 +86,11 @@ export function SavedGallery({ items }: { items: PhotoView[] }) {
   return (
     <>
       <p className="mb-3 text-sm text-[var(--color-ink-muted)]">
-        {saved.length} enregistrement{saved.length > 1 ? "s" : ""}
+        {items.length} {kind === "liked" ? "like" : "enregistrement"}
+        {items.length > 1 ? "s" : ""}
       </p>
       <div className="columns-2 gap-3 sm:columns-3 lg:columns-4 xl:columns-5">
-        {saved.map((p) => (
+        {items.map((p) => (
           <div key={p.id} className="mb-3 break-inside-avoid">
             <PhotoCard photo={p} />
           </div>
