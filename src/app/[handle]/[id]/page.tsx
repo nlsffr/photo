@@ -16,6 +16,7 @@ import { VideoPlayer } from "@/components/VideoPlayer";
 import { Comments } from "@/components/Comments";
 import { JsonLd } from "@/components/JsonLd";
 import { BackLink } from "@/components/BackLink";
+import { RecordView } from "@/components/RecordView";
 
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").replace(/\/$/, "");
 
@@ -156,6 +157,7 @@ export default async function MediaByHandlePage({
   return (
     <div className="mx-auto max-w-[1600px] px-3 pb-8 pt-3 sm:px-6 sm:py-6">
       <JsonLd data={[mediaLd, breadcrumbLd]} />
+      <RecordView photoId={photo.id} />
 
       <BackLink fallback={creatorPath} label="Back" className="mb-3" />
 
