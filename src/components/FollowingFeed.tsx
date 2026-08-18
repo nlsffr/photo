@@ -1,43 +1,91 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import type { PhotoView } from "@/lib/types";
 import { PhotoCard } from "./PhotoCard";
-import { useInteractions } from "./Interactions";
+import { MediaImg } from "./MediaImg";
+import { useSession } from "./Session";
 
-export function FollowingFeed({ items }: { items: PhotoView[] }) {
-  const { followedHandles, ready } = useInteractions();
+type CreatorRow = {
+  handle: string;
+  name: string;
+  avatarUrl: string;
+  verified: boolean;
+  followers: number;
+  photoCount: number;
+};
 
-  if (!ready) {
+export function FollowingFeed() {
+  const { user, loading: sessionLoading } = useSession();
+  const [items, setItems] = useState<PhotoView[] | null>(null);
+  const [creators, setCreators] = useState<CreatorRow[] | null>(null);
+
+  useEffect(() => {
+    if (sessionLoading) return;
+    if (!user) {
+      setItems([]);
+      setCreators([]);
+      return;
+    }
+    let cancelled = false;
+    Promise.all([
+      fetch("/api/library?kind=following", { cache: "no-store" }).then((r) => r.json()),
+      fetch("/api/library?kind=creators", { cache: "no-store" }).then((r) => r.json()),
+    ])
+      .then(([posts, cres]) => {
+        if (cancelled) return;
+        setItems(Array.isArray(posts.items) ? posts.items : []);
+        setCreators(Array.isArray(cres.creators) ? cres.creators : []);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setItems([]);
+          setCreators([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, sessionLoading]);
+
+  if (sessionLoading || items === null || creators === null) {
     return (
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-        {Array.from({ length: 10 }).map((_, i) => (
+      <div className="media-grid">
+        {Array.from({ length: 6 }).map((_, i) => (
           <div key={i} className="aspect-[4/5] skeleton rounded-xl" />
         ))}
       </div>
     );
   }
 
-  const set = new Set(followedHandles);
-  const posts = items
-    .filter((p) => set.has(p.creatorHandle))
-    .sort((a, b) => a.ageMinutes - b.ageMinutes);
-
-  if (posts.length === 0) {
+  if (!user) {
     return (
-      <div className="flex flex-col items-center justify-center gap-3 py-24 text-center">
-        <div className="grid h-14 w-14 place-items-center rounded-full bg-[var(--color-surface-2)] text-[var(--color-ink-faint)]">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
-            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6" />
-          </svg>
-        </div>
+      <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+        <p className="text-lg font-semibold">Connecte-toi</p>
+        <p className="max-w-sm text-sm text-[var(--color-ink-muted)]">
+          Tes abonnements sont liés à ton compte.
+        </p>
+        <Link
+          href="/connexion?next=/abonnements"
+          className="mt-2 rounded-full bg-[var(--color-accent)] px-6 py-2.5 text-sm font-semibold text-white"
+        >
+          Connexion
+        </Link>
+      </div>
+    );
+  }
+
+  if (creators.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
         <p className="text-lg font-semibold">Tu ne suis personne… encore</p>
         <p className="max-w-sm text-sm text-[var(--color-ink-muted)]">
-          Suis des modèles pour voir leurs dernières publications ici.
+          Suis des modèles pour voir leurs publications ici.
         </p>
         <Link
           href="/models"
-          className="mt-2 rounded-full bg-[var(--color-accent)] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[var(--color-accent-600)]"
+          className="mt-2 rounded-full bg-[var(--color-accent)] px-6 py-2.5 text-sm font-semibold text-white"
         >
           Découvrir des modèles
         </Link>
@@ -46,19 +94,46 @@ export function FollowingFeed({ items }: { items: PhotoView[] }) {
   }
 
   return (
-    <>
-      <p className="mb-3 text-sm text-[var(--color-ink-muted)]">
-        {posts.length} publication{posts.length > 1 ? "s" : ""} de{" "}
-        {followedHandles.length} modèle{followedHandles.length > 1 ? "s" : ""} suivi
-        {followedHandles.length > 1 ? "s" : ""}
-      </p>
-      <div className="columns-2 gap-3 sm:columns-3 lg:columns-4 xl:columns-5">
-        {posts.map((p) => (
-          <div key={p.id} className="mb-3 break-inside-avoid">
-            <PhotoCard photo={p} />
-          </div>
+    <div>
+      <div className="mb-5 flex gap-3 overflow-x-auto pb-1">
+        {creators.map((c) => (
+          <Link
+            key={c.handle}
+            href={`/creator/${encodeURIComponent(c.handle)}`}
+            className="flex w-20 shrink-0 flex-col items-center gap-1.5"
+          >
+            <MediaImg
+              src={c.avatarUrl}
+              alt={c.name}
+              width={64}
+              height={64}
+              className="h-16 w-16 rounded-full object-cover object-top ring-2 ring-[var(--color-border)]"
+            />
+            <span className="w-full truncate text-center text-[11px] font-medium">
+              {c.name || c.handle}
+            </span>
+          </Link>
         ))}
       </div>
-    </>
+
+      <p className="mb-3 text-sm text-[var(--color-ink-muted)]">
+        {creators.length} modèle{creators.length > 1 ? "s" : ""} ·{" "}
+        {items.length} publication{items.length > 1 ? "s" : ""}
+      </p>
+
+      {items.length === 0 ? (
+        <p className="py-12 text-center text-sm text-[var(--color-ink-muted)]">
+          Aucune publication pour le moment.
+        </p>
+      ) : (
+        <div className="media-grid">
+          {items.map((p) => (
+            <div key={p.id} className="min-w-0">
+              <PhotoCard photo={p} />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

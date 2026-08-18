@@ -1,18 +1,17 @@
 import type { Metadata } from "next";
-import { getAllPhotoViews } from "@/lib/photos";
 import { FollowingFeed } from "@/components/FollowingFeed";
 
 export const metadata: Metadata = { title: "Abonnements" };
+export const dynamic = "force-dynamic";
 
-export default async function AbonnementsPage() {
-  const items = await getAllPhotoViews();
+export default function AbonnementsPage() {
   return (
     <div className="px-3 py-5 sm:px-5">
       <h1 className="mb-1 text-2xl font-bold tracking-tight">Abonnements</h1>
       <p className="mb-4 text-sm text-[var(--color-ink-faint)]">
-        Les dernières publications des modèles que tu suis.
+        Les modèles que tu suis et leurs publications.
       </p>
-      <FollowingFeed items={items} />
+      <FollowingFeed />
     </div>
   );
 }
