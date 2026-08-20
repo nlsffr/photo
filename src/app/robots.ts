@@ -18,11 +18,12 @@ export default function robots(): MetadataRoute.Robots {
           "/identite",
           "/favoris",
           "/premium",
+          "/abonnements",
         ],
       },
     ],
-    // Index multi-fichiers (comme leakgallery) + sitemap unique de secours
-    sitemap: [`${SITE}/sitemaps`, `${SITE}/sitemap.xml`],
+    // Index découpé (rapide) — pas le monolithe /sitemap.xml
+    sitemap: `${SITE}/sitemaps`,
     host: SITE.replace(/^https?:\/\//, ""),
   };
 }

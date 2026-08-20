@@ -9,8 +9,8 @@ const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").repl
   "",
 );
 
-const MEDIA_CHUNK = 10_000;
-const PAGE = 500;
+const MEDIA_CHUNK = 2_000;
+const PAGE = 250;
 
 export async function GET(
   _req: Request,
@@ -54,7 +54,7 @@ export async function GET(
       cursor = page.nextCursor;
     }
   } catch {
-    // empty
+    // empty chunk is ok
   }
 
   const body = `<?xml version="1.0" encoding="UTF-8"?>

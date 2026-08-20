@@ -8,10 +8,11 @@ const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").repl
   "",
 );
 
-const MEDIA_CHUNK = 10_000;
-const MAX_MEDIA_FILES = 50;
+/** URLs per media sitemap file (keep small to avoid 504). */
+const MEDIA_CHUNK = 2_000;
+const MAX_MEDIA_FILES = 100;
 
-/** Sitemap index (leakgallery-style): static + profiles + tags + media chunks. */
+/** Sitemap index: static + profiles + tags + media chunks. */
 export async function GET() {
   const now = new Date().toISOString();
 
