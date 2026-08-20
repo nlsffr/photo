@@ -58,7 +58,6 @@ const mediaCacheHeaders = [
   },
 ];
 
-/** Short public cache for crawlable HTML (not account/API). */
 const htmlCacheHeaders = [
   {
     key: "Cache-Control",
@@ -93,6 +92,15 @@ const nextConfig: NextConfig = {
         : []),
     ],
   },
+  async redirects() {
+    return [
+      {
+        source: "/creator/:handle",
+        destination: "/:handle",
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },
@@ -101,11 +109,9 @@ const nextConfig: NextConfig = {
       { source: "/icon", headers: mediaCacheHeaders },
       { source: "/apple-icon", headers: mediaCacheHeaders },
       { source: "/media/:path*", headers: mediaCacheHeaders },
-      // Public HTML — helps edge/CDN + bots (private routes stay dynamic via app code)
       { source: "/", headers: htmlCacheHeaders },
       { source: "/models", headers: htmlCacheHeaders },
       { source: "/models/:path*", headers: htmlCacheHeaders },
-      { source: "/creator/:path*", headers: htmlCacheHeaders },
       { source: "/trending-medias", headers: htmlCacheHeaders },
       { source: "/most-liked", headers: htmlCacheHeaders },
       { source: "/tag/:path*", headers: htmlCacheHeaders },

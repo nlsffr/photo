@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 import type { PhotoView } from "@/lib/types";
-import { mediaHref } from "@/lib/types";
+import { creatorHref, mediaHref } from "@/lib/types";
 import { formatCount, formatDuration } from "@/lib/format";
 import { VerifiedBadge } from "./VerifiedBadge";
 import { useInteractions } from "./Interactions";
@@ -114,7 +114,7 @@ export function PhotoCard({ photo }: { photo: PhotoView }) {
       </Link>
 
       <Link
-        href={`/creator/${photo.creatorHandle}`}
+        href={creatorHref(photo.creatorHandle)}
         className="absolute left-2 top-2 z-10 flex max-w-[calc(100%-0.75rem)] items-center gap-1.5"
       >
         <MediaImg
