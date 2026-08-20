@@ -8,6 +8,7 @@ import {
   withCreator,
 } from "@/lib/photos";
 import { formatAge, formatCount } from "@/lib/format";
+import { creatorHref } from "@/lib/types";
 import { PhotoCard } from "@/components/PhotoCard";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { FollowButton, PostActions } from "@/components/Interactions";
@@ -16,6 +17,7 @@ import { VideoPlayer } from "@/components/VideoPlayer";
 import { Comments } from "@/components/Comments";
 import { JsonLd } from "@/components/JsonLd";
 import { BackLink } from "@/components/BackLink";
+import { FloatingBack } from "@/components/FloatingBack";
 import { RecordView } from "@/components/RecordView";
 
 export const revalidate = 300;
@@ -108,13 +110,13 @@ export default async function MediaByHandlePage({
 
   const creator = await getCreator(raw.creatorHandle);
   const photo = withCreator(raw, creator);
-  const related = await getRelatedPhotos(raw);
+  const related = await getRelatedPhotos(raw, 36);
 
   const sid = photo.sourceId || id;
   const kind =
     photo.type === "video" ? "video" : photo.type === "pack" ? "pack" : "photo";
   const h1 = `${photo.creatorHandle} ${kind} #${sid}`;
-  const creatorPath = `/creator/${encodeURIComponent(photo.creatorHandle)}`;
+  const creatorPath = creatorHref(photo.creatorHandle);
   const mediaPath = `/${encodeURIComponent(photo.creatorHandle)}/${encodeURIComponent(sid)}`;
 
   const thumb = absUrl(photo.imageUrl);
@@ -190,8 +192,14 @@ export default async function MediaByHandlePage({
     <div className="mx-auto max-w-[1600px] px-3 pb-8 pt-3 sm:px-6 sm:py-6">
       <JsonLd data={[mediaLd, breadcrumbLd]} />
       <RecordView photoId={photo.id} />
+      <FloatingBack fallback={creatorPath} preferFallback label="Back to profile" />
 
-      <BackLink fallback={creatorPath} label="Back" className="mb-3" />
+      <BackLink
+        fallback={creatorPath}
+        preferFallback
+        label="Back"
+        className="mb-3"
+      />
 
       <div className="mb-4 flex items-center gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 lg:hidden">
         <Link href={creatorPath} className="flex min-w-0 flex-1 items-center gap-3">
@@ -336,7 +344,7 @@ export default async function MediaByHandlePage({
           </div>
           <div className="media-grid">
             {related.map((p) => (
-              <PhotoCard key={p.id} photo={p} />
+              <PhotoCard key={p.id} photo={p} replace />
             ))}
           </div>
         </section>
