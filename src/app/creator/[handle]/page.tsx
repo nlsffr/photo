@@ -11,7 +11,7 @@ import { MediaImg } from "@/components/MediaImg";
 import { BackLink } from "@/components/BackLink";
 import { JsonLd } from "@/components/JsonLd";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 180;
 
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").replace(/\/$/, "");
 const VALID_SORTS: SortKey[] = ["recent", "popular", "liked", "trending", "longest"];
@@ -19,6 +19,12 @@ const PAGE_SIZE = 30;
 
 function first(v?: string | string[]): string | undefined {
   return Array.isArray(v) ? v[0] : v;
+}
+
+function absUrl(path?: string | null): string | undefined {
+  if (!path) return undefined;
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${SITE}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
 export async function generateMetadata({
@@ -30,17 +36,17 @@ export async function generateMetadata({
   const creator = await getCreator(handle);
   if (!creator) return { title: "Profile not found", robots: { index: false, follow: true } };
 
-  const title = `${creator.name} (@${creator.handle}) — photos & videos`;
+  const title = `${creator.name} (@${creator.handle}) photos & videos — LeakFanHub`;
   const rawDesc =
     creator.bio?.slice(0, 140) ||
     `Browse free ${creator.handle} photos and videos on LeakFanHub. ${creator.name} (@${creator.handle}) — updated regularly. 18+ only.`;
   const description = rawDesc.length > 160 ? `${rawDesc.slice(0, 157)}...` : rawDesc;
   const path = `/creator/${encodeURIComponent(creator.handle)}`;
   const url = `${SITE}${path}`;
-  const image = creator.avatarUrl || undefined;
+  const image = absUrl(creator.avatarUrl);
 
   return {
-    title,
+    title: { absolute: title },
     description,
     keywords: [
       creator.handle,
@@ -135,7 +141,7 @@ export default async function CreatorPage({
     name: creator.name,
     alternateName: creator.handle,
     url: `${SITE}${base}`,
-    image: avatarSrc || undefined,
+    image: absUrl(avatarSrc) || undefined,
     description: creator.bio || `${creator.name} (@${creator.handle}) on LeakFanHub`,
     interactionStatistic: {
       "@type": "InteractionCounter",
@@ -243,7 +249,6 @@ export default async function CreatorPage({
             params={{ sort, creator: handle, type }}
           />
 
-          {/* Crawlable pagination — Google can follow without JS */}
           {nextHref && (
             <nav className="mt-8 flex justify-center" aria-label="Pagination">
               <Link

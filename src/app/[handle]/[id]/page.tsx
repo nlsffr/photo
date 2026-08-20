@@ -18,6 +18,8 @@ import { JsonLd } from "@/components/JsonLd";
 import { BackLink } from "@/components/BackLink";
 import { RecordView } from "@/components/RecordView";
 
+export const revalidate = 300;
+
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").replace(/\/$/, "");
 
 const RESERVED = new Set([
@@ -28,6 +30,12 @@ const RESERVED = new Set([
   "feed", "pour-toi", "classements", "recherche", "about", "dmca",
   "connexion", "inscription", "favoris", "abonnements",
 ]);
+
+function absUrl(path?: string | null): string | undefined {
+  if (!path) return undefined;
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${SITE}${path.startsWith("/") ? path : `/${path}`}`;
+}
 
 function durationIso(sec?: number): string | undefined {
   if (sec == null || sec <= 0 || !Number.isFinite(sec)) return undefined;
@@ -58,13 +66,14 @@ export async function generateMetadata({
   const kind =
     photo.type === "video" ? "video" : photo.type === "pack" ? "pack" : "photo";
   const sid = photo.sourceId || id;
-  const title = `@${h} — ${kind} #${sid}`;
-  const description = `${h} ${kind} on LeakFanHub. ${formatCount(photo.views)} views · more from @${h}. 18+ only.`;
+  const title = `${h} ${kind} #${sid} — LeakFanHub`;
+  const description = `Free ${h} ${kind} on LeakFanHub. ${formatCount(photo.views)} views · more from @${h}. Updated regularly. 18+ only.`;
   const path = `/${encodeURIComponent(h)}/${encodeURIComponent(sid)}`;
   const url = `${SITE}${path}`;
+  const ogImage = absUrl(photo.imageUrl);
 
   return {
-    title,
+    title: { absolute: title },
     description,
     alternates: { canonical: path },
     robots: { index: true, follow: true, "max-image-preview": "large" as const },
@@ -74,13 +83,13 @@ export async function generateMetadata({
       description,
       url,
       siteName: "LeakFanHub",
-      images: photo.imageUrl ? [{ url: photo.imageUrl }] : [],
+      images: ogImage ? [{ url: ogImage }] : [],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: photo.imageUrl ? [photo.imageUrl] : undefined,
+      images: ogImage ? [ogImage] : undefined,
     },
   };
 }
@@ -104,9 +113,20 @@ export default async function MediaByHandlePage({
   const sid = photo.sourceId || id;
   const kind =
     photo.type === "video" ? "video" : photo.type === "pack" ? "pack" : "photo";
-  const h1 = `@${photo.creatorHandle} — ${kind} #${sid}`;
+  const h1 = `${photo.creatorHandle} ${kind} #${sid}`;
   const creatorPath = `/creator/${encodeURIComponent(photo.creatorHandle)}`;
   const mediaPath = `/${encodeURIComponent(photo.creatorHandle)}/${encodeURIComponent(sid)}`;
+
+  const thumb = absUrl(photo.imageUrl);
+  const content = absUrl(photo.type === "video" ? photo.videoUrl : photo.imageUrl);
+
+  const personLd = {
+    "@type": "Person",
+    name: photo.creator.name || photo.creatorHandle,
+    alternateName: photo.creatorHandle,
+    url: `${SITE}${creatorPath}`,
+    image: absUrl(photo.creator.avatarUrl) || thumb,
+  };
 
   const mediaLd =
     photo.type === "video" && photo.videoUrl
@@ -114,11 +134,17 @@ export default async function MediaByHandlePage({
           "@context": "https://schema.org",
           "@type": "VideoObject",
           name: h1,
-          description: `${photo.creatorHandle} video on LeakFanHub`,
-          thumbnailUrl: photo.imageUrl,
-          contentUrl: photo.videoUrl,
-          uploadDate: undefined as string | undefined,
+          description: `${photo.creatorHandle} video on LeakFanHub — ${formatCount(photo.views)} views`,
+          thumbnailUrl: thumb,
+          contentUrl: content,
+          embedUrl: `${SITE}${mediaPath}`,
           duration: durationIso(photo.durationSec),
+          author: personLd,
+          publisher: {
+            "@type": "Organization",
+            name: "LeakFanHub",
+            url: SITE,
+          },
           interactionStatistic: {
             "@type": "InteractionCounter",
             interactionType: "https://schema.org/WatchAction",
@@ -129,9 +155,15 @@ export default async function MediaByHandlePage({
           "@context": "https://schema.org",
           "@type": "ImageObject",
           name: h1,
-          description: `${photo.creatorHandle} photo on LeakFanHub`,
-          contentUrl: photo.imageUrl,
-          thumbnailUrl: photo.imageUrl,
+          description: `${photo.creatorHandle} photo on LeakFanHub — ${formatCount(photo.views)} views`,
+          contentUrl: content || thumb,
+          thumbnailUrl: thumb,
+          author: personLd,
+          publisher: {
+            "@type": "Organization",
+            name: "LeakFanHub",
+            url: SITE,
+          },
         };
 
   const breadcrumbLd = {
