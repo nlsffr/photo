@@ -10,9 +10,16 @@ const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").repl
 
 /** URLs per media sitemap file (keep small to avoid 504). */
 const MEDIA_CHUNK = 2_000;
-const MAX_MEDIA_FILES = 100;
+const MAX_MEDIA_FILES = 200;
 
-/** Sitemap index: static + profiles + tags + media chunks. */
+/**
+ * Sitemap index — order matters for bots:
+ * 1) static hub pages
+ * 2) top/popular media (high value)
+ * 3) all creator profiles
+ * 4) tags
+ * 5) full media catalog in chunks (leakgallery-style volume)
+ */
 export async function GET() {
   const now = new Date().toISOString();
 
@@ -31,6 +38,7 @@ export async function GET() {
 
   const locs = [
     `${SITE}/sitemaps/static`,
+    `${SITE}/sitemaps/popular`,
     `${SITE}/sitemaps/profiles`,
     `${SITE}/sitemaps/tags`,
     ...Array.from({ length: mediaFiles }, (_, i) => `${SITE}/sitemaps/media/${i}`),

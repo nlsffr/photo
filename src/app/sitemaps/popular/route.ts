@@ -9,29 +9,22 @@ const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").repl
   "",
 );
 
-const MEDIA_CHUNK = 2_000;
+/** Top media by views — listed early in sitemap index. */
+const LIMIT = 2_000;
 const PAGE = 250;
 
-/** Full catalog chunks — all URLs, leakgallery-style volume. */
-export async function GET(
-  _req: Request,
-  ctx: { params: Promise<{ chunk: string }> | { chunk: string } },
-) {
-  const { chunk: chunkRaw } = await Promise.resolve(ctx.params);
-  const chunkIndex = Math.max(0, parseInt(chunkRaw, 10) || 0);
-  const offsetStart = chunkIndex * MEDIA_CHUNK;
-  const offsetEnd = offsetStart + MEDIA_CHUNK;
+export async function GET() {
   const now = new Date().toISOString();
-
   const entries: string[] = [];
   const seen = new Set<string>();
-  let cursor = offsetStart;
+  let cursor: number | undefined;
+  let count = 0;
 
   try {
-    while (cursor < offsetEnd) {
-      const limit = Math.min(PAGE, offsetEnd - cursor);
+    while (count < LIMIT) {
+      const limit = Math.min(PAGE, LIMIT - count);
       const page = await getPhotos({
-        sort: "recent",
+        sort: "popular",
         limit,
         cursor,
       });
@@ -45,17 +38,19 @@ export async function GET(
           `  <url>
     <loc>${SITE}${href}</loc>
     <lastmod>${now}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.6</priority>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
   </url>`,
         );
+        count++;
+        if (count >= LIMIT) break;
       }
 
       if (page.nextCursor == null) break;
       cursor = page.nextCursor;
     }
   } catch {
-    // empty chunk is ok
+    // empty ok
   }
 
   const body = `<?xml version="1.0" encoding="UTF-8"?>

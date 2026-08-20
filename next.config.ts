@@ -44,7 +44,6 @@ const securityHeaders = [
       ]),
 ];
 
-/** Immutable hashed assets — aggressive browser cache */
 const staticCacheHeaders = [
   {
     key: "Cache-Control",
@@ -52,11 +51,18 @@ const staticCacheHeaders = [
   },
 ];
 
-/** Thumbs / media — 7 days browser cache */
 const mediaCacheHeaders = [
   {
     key: "Cache-Control",
     value: "public, max-age=604800, stale-while-revalidate=86400",
+  },
+];
+
+/** Short public cache for crawlable HTML (not account/API). */
+const htmlCacheHeaders = [
+  {
+    key: "Cache-Control",
+    value: "public, s-maxage=120, stale-while-revalidate=600",
   },
 ];
 
@@ -95,6 +101,17 @@ const nextConfig: NextConfig = {
       { source: "/icon", headers: mediaCacheHeaders },
       { source: "/apple-icon", headers: mediaCacheHeaders },
       { source: "/media/:path*", headers: mediaCacheHeaders },
+      // Public HTML — helps edge/CDN + bots (private routes stay dynamic via app code)
+      { source: "/", headers: htmlCacheHeaders },
+      { source: "/models", headers: htmlCacheHeaders },
+      { source: "/models/:path*", headers: htmlCacheHeaders },
+      { source: "/creator/:path*", headers: htmlCacheHeaders },
+      { source: "/trending-medias", headers: htmlCacheHeaders },
+      { source: "/most-liked", headers: htmlCacheHeaders },
+      { source: "/tag/:path*", headers: htmlCacheHeaders },
+      { source: "/sitemaps", headers: htmlCacheHeaders },
+      { source: "/sitemaps/:path*", headers: htmlCacheHeaders },
+      { source: "/sitemap.xml", headers: htmlCacheHeaders },
     ];
   },
 };

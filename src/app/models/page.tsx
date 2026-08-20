@@ -8,6 +8,8 @@ const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").repl
 /** Cap first paint — full list kills TTFB with 800+ creators */
 const PAGE_SIZE = 48;
 
+export const revalidate = 120;
+
 export const metadata: Metadata = {
   title: "Models & creators",
   description:
