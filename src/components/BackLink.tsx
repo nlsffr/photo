@@ -6,10 +6,13 @@ export function BackLink({
   fallback = "/",
   label = "Retour",
   className = "",
+  /** Always go to fallback (e.g. creator profile) — avoid stacking media history. */
+  preferFallback = false,
 }: {
   fallback?: string;
   label?: string;
   className?: string;
+  preferFallback?: boolean;
 }) {
   const router = useRouter();
 
@@ -17,6 +20,10 @@ export function BackLink({
     <button
       type="button"
       onClick={() => {
+        if (preferFallback) {
+          router.push(fallback);
+          return;
+        }
         if (typeof window !== "undefined" && window.history.length > 1) {
           router.back();
         } else {

@@ -14,10 +14,16 @@ const SIZES =
 
 const PREVIEW_MAX_SEC = 8;
 
-/** Format unique pour toute la grille → plus de trous entre colonnes */
 const CARD_RATIO = "4 / 5";
 
-export function PhotoCard({ photo }: { photo: PhotoView }) {
+export function PhotoCard({
+  photo,
+  /** Use history.replace so media→media doesn't stack back history. */
+  replace = false,
+}: {
+  photo: PhotoView;
+  replace?: boolean;
+}) {
   const { isLiked, isSaved, toggleLike, toggleSave, ready } = useInteractions();
   const liked = ready && isLiked(photo.id);
   const saved = ready && isSaved(photo.id);
@@ -60,7 +66,12 @@ export function PhotoCard({ photo }: { photo: PhotoView }) {
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
     >
-      <Link href={href} className="absolute inset-0 overflow-hidden rounded-xl" aria-label={photo.title}>
+      <Link
+        href={href}
+        replace={replace}
+        className="absolute inset-0 overflow-hidden rounded-xl"
+        aria-label={photo.title}
+      >
         <MediaImg
           src={photo.imageUrl}
           alt={photo.title}
