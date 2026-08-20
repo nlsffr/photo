@@ -1,4 +1,5 @@
 import { getModels } from "@/lib/photos";
+import { creatorHref } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 3600;
@@ -20,7 +21,7 @@ export async function GET() {
   const urls = models
     .map(
       (m) => `  <url>
-    <loc>${SITE}/creator/${encodeURIComponent(m.handle)}</loc>
+    <loc>${SITE}${creatorHref(m.handle)}</loc>
     <lastmod>${now}</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>

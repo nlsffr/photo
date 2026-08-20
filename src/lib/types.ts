@@ -89,6 +89,11 @@ export function mediaPublicId(photo: Pick<Photo, "id" | "sourceId">): string {
     : photo.id;
 }
 
+/** Profile URL — leakgallery style: /{handle} (not /creator/{handle}). */
+export function creatorHref(handle: string): string {
+  return `/${encodeURIComponent(handle)}`;
+}
+
 export function mediaHref(
   photo: Pick<Photo, "id" | "sourceId" | "creatorHandle">,
 ): string {
