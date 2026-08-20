@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getModels } from "@/lib/photos";
+import { creatorHref } from "@/lib/types";
 import { MediaImg } from "./MediaImg";
 
 /** Only top N — never pull full creator list on home */
@@ -30,7 +31,7 @@ export async function FeaturedCreators() {
           return (
             <Link
               key={c.handle}
-              href={`/creator/${c.handle}`}
+              href={creatorHref(c.handle)}
               prefetch={true}
               className="flex w-[4.1rem] shrink-0 flex-col items-center gap-1.5 sm:w-[4.5rem]"
             >

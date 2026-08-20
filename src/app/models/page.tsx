@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getModels } from "@/lib/photos";
+import { creatorHref } from "@/lib/types";
 import { CreatorCard } from "@/components/CreatorCard";
 import { JsonLd } from "@/components/JsonLd";
 
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").replace(/\/$/, "");
-/** Cap first paint — full list kills TTFB with 800+ creators */
 const PAGE_SIZE = 48;
 
 export const revalidate = 120;
@@ -56,7 +56,7 @@ export default async function ModelsPage({
       itemListElement: models.slice(0, 50).map((m, i) => ({
         "@type": "ListItem",
         position: start + i + 1,
-        url: `${SITE}/creator/${encodeURIComponent(m.handle)}`,
+        url: `${SITE}${creatorHref(m.handle)}`,
         name: m.name || m.handle,
       })),
     },
