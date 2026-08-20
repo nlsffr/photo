@@ -10,6 +10,7 @@ import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { FollowButton } from "@/components/Interactions";
 import { MediaImg } from "@/components/MediaImg";
 import { BackLink } from "@/components/BackLink";
+import { FloatingBack } from "@/components/FloatingBack";
 import { JsonLd } from "@/components/JsonLd";
 
 export const revalidate = 180;
@@ -18,7 +19,6 @@ const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").repl
 const VALID_SORTS: SortKey[] = ["recent", "popular", "liked", "trending", "longest"];
 const PAGE_SIZE = 30;
 
-/** App routes that must never be treated as creator handles. */
 const RESERVED = new Set([
   "api", "creator", "models", "photo", "media", "_next",
   "favicon.ico", "robots.txt", "sitemap.xml", "sitemaps", "saved", "liked",
@@ -189,6 +189,7 @@ export default async function CreatorProfilePage({
   return (
     <div className="pb-4">
       <JsonLd data={[personLd, breadcrumbLd]} />
+      <FloatingBack fallback="/" label="Back" />
       <div className="px-3 pt-3 sm:px-5">
         <BackLink fallback="/" label="Back" />
       </div>
