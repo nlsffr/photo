@@ -4,15 +4,15 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 /**
- * Fixed back control after scroll — avoids climbing back to the top
- * just to leave a long creator / media page.
+ * Fixed back control after scroll.
+ * Uses real browser history – never forces profile (that caused the loop).
  */
 export function FloatingBack({
   fallback = "/",
-  preferFallback = false,
   label = "Back",
 }: {
   fallback?: string;
+  /** @deprecated Do not use – caused infinite loop */
   preferFallback?: boolean;
   label?: string;
 }) {
@@ -33,10 +33,6 @@ export function FloatingBack({
       type="button"
       aria-label={label}
       onClick={() => {
-        if (preferFallback) {
-          router.push(fallback);
-          return;
-        }
         if (typeof window !== "undefined" && window.history.length > 1) {
           router.back();
         } else {
