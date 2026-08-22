@@ -2,16 +2,21 @@
 
 import { useRouter } from "next/navigation";
 
+/**
+ * Smart back button.
+ * - Uses real browser history when possible (router.back)
+ * - Only falls back to the given URL when there is no history
+ * - NEVER forces preferFallback to profile (that caused the infinite loop)
+ */
 export function BackLink({
   fallback = "/",
   label = "Retour",
   className = "",
-  /** Always go to fallback (e.g. creator profile) — avoid stacking media history. */
-  preferFallback = false,
 }: {
   fallback?: string;
   label?: string;
   className?: string;
+  /** @deprecated Do not use – caused video ↔ profile infinite loop */
   preferFallback?: boolean;
 }) {
   const router = useRouter();
@@ -20,10 +25,7 @@ export function BackLink({
     <button
       type="button"
       onClick={() => {
-        if (preferFallback) {
-          router.push(fallback);
-          return;
-        }
+        // Always prefer real history. Only push fallback if we have almost no history.
         if (typeof window !== "undefined" && window.history.length > 1) {
           router.back();
         } else {
