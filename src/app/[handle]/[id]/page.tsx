@@ -192,14 +192,9 @@ export default async function MediaByHandlePage({
     <div className="mx-auto max-w-[1600px] px-3 pb-8 pt-3 sm:px-6 sm:py-6">
       <JsonLd data={[mediaLd, breadcrumbLd]} />
       <RecordView photoId={photo.id} />
-      <FloatingBack fallback={creatorPath} preferFallback label="Back to profile" />
-
-      <BackLink
-        fallback={creatorPath}
-        preferFallback
-        label="Back"
-        className="mb-3"
-      />
+      {/* History back — never force profile (caused video ↔ profile loop) */}
+      <FloatingBack fallback="/" label="Retour" />
+      <BackLink fallback="/" label="Retour" className="mb-3" />
 
       <div className="mb-4 flex items-center gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 lg:hidden">
         <Link href={creatorPath} className="flex min-w-0 flex-1 items-center gap-3">
