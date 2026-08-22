@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { PhotoView } from "@/lib/types";
+import { creatorHref } from "@/lib/types";
 import { PhotoCard } from "./PhotoCard";
 import { MediaImg } from "./MediaImg";
 import { useSession } from "./Session";
@@ -81,7 +82,9 @@ export function FollowingFeed() {
       <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
         <p className="text-lg font-semibold">Tu ne suis personne… encore</p>
         <p className="max-w-sm text-sm text-[var(--color-ink-muted)]">
-          Suis des modèles pour voir leurs publications ici.
+          Cette page affiche uniquement les créatrices/créateurs que tu suis
+          (bouton Suivre sur un profil). Être créatrice soi-même n’ajoute pas
+          automatiquement ton contenu ici.
         </p>
         <Link
           href="/models"
@@ -99,7 +102,7 @@ export function FollowingFeed() {
         {creators.map((c) => (
           <Link
             key={c.handle}
-            href={`/creator/${encodeURIComponent(c.handle)}`}
+            href={creatorHref(c.handle)}
             className="flex w-20 shrink-0 flex-col items-center gap-1.5"
           >
             <MediaImg
@@ -117,13 +120,16 @@ export function FollowingFeed() {
       </div>
 
       <p className="mb-3 text-sm text-[var(--color-ink-muted)]">
-        {creators.length} modèle{creators.length > 1 ? "s" : ""} ·{" "}
-        {items.length} publication{items.length > 1 ? "s" : ""}
+        {creators.length} modèle{creators.length > 1 ? "s" : ""} suivi
+        {creators.length > 1 ? "s" : ""} · {items.length} publication
+        {items.length > 1 ? "s" : ""}
       </p>
 
       {items.length === 0 ? (
         <p className="py-12 text-center text-sm text-[var(--color-ink-muted)]">
-          Aucune publication pour le moment.
+          Tu suis {creators.length} profil
+          {creators.length > 1 ? "s" : ""}, mais aucune publication récente en
+          base pour eux.
         </p>
       ) : (
         <div className="media-grid">

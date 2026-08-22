@@ -1,10 +1,11 @@
 "use client";
 
 import Image from "next/image";
+import { useState } from "react";
 
 /**
- * Renders gallery media. Paths under /media/ are served by nginx→MinIO and must
- * bypass the Next.js image optimizer (which can't reach MinIO from the app container).
+ * Gallery media. /media/* bypasses Next optimizer (nginx → B2).
+ * On 403/404 shows a neutral placeholder (never BrandLogo).
  */
 export function MediaImg({
   src,
@@ -25,21 +26,54 @@ export function MediaImg({
   className?: string;
   priority?: boolean;
 }) {
+  const [failed, setFailed] = useState(false);
+  const safeSrc = (src || "").trim();
   const isLocalMedia =
-    src.startsWith("/media/") ||
-    src.startsWith("/media?") ||
-    src.includes("://") === false && src.includes("/media/");
+    safeSrc.startsWith("/media/") ||
+    safeSrc.startsWith("/media?") ||
+    (!safeSrc.includes("://") && safeSrc.includes("/media/"));
 
-  if (isLocalMedia || src.startsWith("/media")) {
+  if (!safeSrc || failed) {
+    if (fill) {
+      return (
+        <div
+          className={`absolute inset-0 grid place-items-center bg-[var(--color-surface-2)] text-[var(--color-ink-faint)] ${className || ""}`}
+          aria-hidden
+        >
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <rect x="3" y="5" width="18" height="14" rx="2" />
+            <circle cx="8.5" cy="10" r="1.5" />
+            <path d="m21 15-5-5L5 21" />
+          </svg>
+        </div>
+      );
+    }
+    return (
+      <div
+        className={`grid place-items-center bg-[var(--color-surface-2)] text-[var(--color-ink-faint)] ${className || ""}`}
+        style={{ width: width || 48, height: height || 48 }}
+        aria-hidden
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <rect x="3" y="5" width="18" height="14" rx="2" />
+          <circle cx="8.5" cy="10" r="1.5" />
+          <path d="m21 15-5-5L5 21" />
+        </svg>
+      </div>
+    );
+  }
+
+  if (isLocalMedia || safeSrc.startsWith("/media")) {
     if (fill) {
       return (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={src}
+          src={safeSrc}
           alt={alt}
           className={className}
           loading={priority ? "eager" : "lazy"}
           decoding="async"
+          onError={() => setFailed(true)}
           style={{
             position: "absolute",
             inset: 0,
@@ -53,20 +87,21 @@ export function MediaImg({
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={src}
+        src={safeSrc}
         alt={alt}
         width={width}
         height={height}
         className={className}
         loading={priority ? "eager" : "lazy"}
         decoding="async"
+        onError={() => setFailed(true)}
       />
     );
   }
 
   return (
     <Image
-      src={src}
+      src={safeSrc}
       alt={alt}
       fill={fill}
       width={fill ? undefined : width}
@@ -75,6 +110,7 @@ export function MediaImg({
       className={className}
       priority={priority}
       unoptimized
+      onError={() => setFailed(true)}
     />
   );
 }

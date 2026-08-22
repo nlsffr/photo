@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { PhotoView } from "@/lib/types";
 import { PhotoCard } from "./PhotoCard";
 import { useSession } from "./Session";
@@ -9,6 +9,7 @@ import { useSession } from "./Session";
 export function SavedGallery({ kind = "saved" }: { kind?: "saved" | "liked" }) {
   const { user, loading: sessionLoading } = useSession();
   const [items, setItems] = useState<PhotoView[] | null>(null);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     if (sessionLoading) return;
@@ -17,18 +18,30 @@ export function SavedGallery({ kind = "saved" }: { kind?: "saved" | "liked" }) {
       return;
     }
     let cancelled = false;
+    setLoadError(false);
     fetch(`/api/library?kind=${kind}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => {
         if (!cancelled) setItems(Array.isArray(d.items) ? d.items : []);
       })
       .catch(() => {
-        if (!cancelled) setItems([]);
+        if (!cancelled) {
+          setItems([]);
+          setLoadError(true);
+        }
       });
     return () => {
       cancelled = true;
     };
   }, [user, sessionLoading, kind]);
+
+  const visible = useMemo(
+    () =>
+      (items || []).filter(
+        (p) => p && p.id && (p.imageUrl || p.videoUrl),
+      ),
+    [items],
+  );
 
   if (sessionLoading || items === null) {
     return (
@@ -57,7 +70,18 @@ export function SavedGallery({ kind = "saved" }: { kind?: "saved" | "liked" }) {
     );
   }
 
-  if (items.length === 0) {
+  if (loadError) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+        <p className="text-lg font-semibold">Chargement impossible</p>
+        <p className="max-w-sm text-sm text-[var(--color-ink-muted)]">
+          Réessaie dans un instant.
+        </p>
+      </div>
+    );
+  }
+
+  if (visible.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
         <p className="text-lg font-semibold">
@@ -81,11 +105,11 @@ export function SavedGallery({ kind = "saved" }: { kind?: "saved" | "liked" }) {
   return (
     <div>
       <p className="mb-3 text-sm text-[var(--color-ink-muted)]">
-        {items.length} {kind === "liked" ? "like" : "enregistrement"}
-        {items.length > 1 ? "s" : ""}
+        {visible.length} {kind === "liked" ? "like" : "enregistrement"}
+        {visible.length > 1 ? "s" : ""}
       </p>
       <div className="media-grid">
-        {items.map((p) => (
+        {visible.map((p) => (
           <div key={p.id} className="min-w-0">
             <PhotoCard photo={p} />
           </div>

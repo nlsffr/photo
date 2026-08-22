@@ -46,6 +46,8 @@ export function VideoPlayer({
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [current, setCurrent] = useState(0);
+  const [buffering, setBuffering] = useState(false);
+  const [error, setError] = useState(false);
   const [ratio, setRatio] = useState<number | null>(() => {
     if (width && height && width > 0 && height > 0) return width / height;
     return null;
@@ -53,14 +55,30 @@ export function VideoPlayer({
 
   const togglePlay = useCallback(() => {
     const v = videoRef.current;
-    if (!v) return;
+    if (!v || error) return;
     if (v.paused) {
-      void v.play();
-      setPlaying(true);
+      setBuffering(true);
+      void v.play().then(() => setPlaying(true)).catch(() => {
+        setPlaying(false);
+        setBuffering(false);
+      });
     } else {
       v.pause();
       setPlaying(false);
     }
+  }, [error]);
+
+  const retry = useCallback(() => {
+    const v = videoRef.current;
+    setError(false);
+    setBuffering(true);
+    if (!v) return;
+    v.load();
+    void v.play().then(() => setPlaying(true)).catch(() => {
+      setPlaying(false);
+      setBuffering(false);
+      setError(true);
+    });
   }, []);
 
   const toggleMute = useCallback(() => {
@@ -105,7 +123,6 @@ export function VideoPlayer({
     }
   }, []);
 
-  /** iOS Safari = webkitEnterFullscreen on <video>; Android/desktop = Fullscreen API */
   const enterFs = useCallback(() => {
     const v = videoRef.current;
     if (!v) return;
@@ -118,10 +135,12 @@ export function VideoPlayer({
         anyV.webkitEnterFullscreen();
         return;
       }
-      const shell = shellRef.current as (HTMLElement & {
-        webkitRequestFullscreen?: () => void;
-        msRequestFullscreen?: () => void;
-      }) | null;
+      const shell = shellRef.current as
+        | (HTMLElement & {
+            webkitRequestFullscreen?: () => void;
+            msRequestFullscreen?: () => void;
+          })
+        | null;
       const target = shell ?? v;
       if (target.requestFullscreen) {
         void target.requestFullscreen();
@@ -138,8 +157,16 @@ export function VideoPlayer({
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
+    setError(false);
+    setBuffering(false);
     v.muted = muted;
-    if (autoPlay) void v.play().catch(() => setPlaying(false));
+    if (autoPlay) {
+      setBuffering(true);
+      void v.play().catch(() => {
+        setPlaying(false);
+        setBuffering(false);
+      });
+    }
   }, [autoPlay, muted, src]);
 
   const aspectStyle =
@@ -161,6 +188,19 @@ export function VideoPlayer({
         preload="metadata"
         muted={muted}
         onTimeUpdate={onTime}
+        onWaiting={() => setBuffering(true)}
+        onStalled={() => setBuffering(true)}
+        onPlaying={() => {
+          setBuffering(false);
+          setError(false);
+          setPlaying(true);
+        }}
+        onCanPlay={() => setBuffering(false)}
+        onError={() => {
+          setError(true);
+          setBuffering(false);
+          setPlaying(false);
+        }}
         onLoadedMetadata={() => {
           const v = videoRef.current;
           if (!v) return;
@@ -175,7 +215,30 @@ export function VideoPlayer({
         className="absolute inset-0 h-full w-full object-contain"
       />
 
-      {!playing && (
+      {error && (
+        <div className="absolute inset-0 z-[8] flex flex-col items-center justify-center gap-3 bg-black/80 px-4 text-center">
+          <p className="text-sm font-medium text-white">Impossible de lire la vidéo</p>
+          <p className="text-xs text-white/70">Fichier lourd ou réseau lent — réessaie.</p>
+          <button
+            type="button"
+            onClick={retry}
+            className="rounded-full bg-[var(--color-accent)] px-5 py-2 text-sm font-semibold text-white"
+          >
+            Réessayer
+          </button>
+        </div>
+      )}
+
+      {buffering && !error && (
+        <div className="pointer-events-none absolute inset-0 z-[6] grid place-items-center bg-black/35">
+          <div className="flex flex-col items-center gap-2">
+            <span className="h-10 w-10 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+            <span className="text-xs font-medium text-white/90">Chargement de la vidéo…</span>
+          </div>
+        </div>
+      )}
+
+      {!playing && !error && !buffering && (
         <button
           type="button"
           onClick={togglePlay}
