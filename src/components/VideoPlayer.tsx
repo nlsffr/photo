@@ -185,6 +185,7 @@ export function VideoPlayer({
         src={src}
         poster={poster}
         playsInline
+        loop
         preload="metadata"
         muted={muted}
         onTimeUpdate={onTime}
