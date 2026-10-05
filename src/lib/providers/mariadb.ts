@@ -1,6 +1,8 @@
 /**
  * MariaDB / MySQL implementation of DataProvider.
  * Algorithmes distincts par sort — pas les mêmes listes partout.
+ *
+ * Note perf: do NOT join bot_ingested on list queries. photos.source_id is enough.
  */
 
 import mysql from "mysql2/promise";
@@ -124,7 +126,7 @@ function windowSql(window: TrendWindow | undefined): string {
 }
 
 const PHOTO_SELECT = `
-  p.id, b.source_id AS source_id,
+  p.id, p.source_id AS source_id,
   p.title, p.image_url, p.video_url, p.external_url, p.type, p.duration_sec, p.item_count,
   p.width, p.height, p.views_count, p.likes_count, p.created_at,
   COALESCE(p.is_ai, 0) AS is_ai,
@@ -135,7 +137,6 @@ const PHOTO_SELECT = `
 const PHOTO_FROM = `
   FROM photos p
   JOIN creators c ON c.id = p.creator_id
-  LEFT JOIN bot_ingested b ON b.photo_id = p.id
 `;
 
 /** Normalize for fuzzy match: lowercase, strip non-alnum */
@@ -381,11 +382,11 @@ export class MariaDBProvider implements DataProvider {
       isNumeric
         ? `SELECT ${PHOTO_SELECT}
            ${PHOTO_FROM}
-           WHERE b.source_id = :sid LIMIT 1`
+           WHERE p.source_id = :sid LIMIT 1`
         : `SELECT ${PHOTO_SELECT}
            ${PHOTO_FROM}
            WHERE p.id = :id LIMIT 1`,
-      isNumeric ? { sid: Number(id) } : { id },
+      isNumeric ? { sid: String(id) } : { id },
     );
     const r = (rows as unknown as PhotoRow[])[0];
     if (!r) return undefined;
