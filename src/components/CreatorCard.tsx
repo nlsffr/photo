@@ -10,7 +10,7 @@ export function CreatorCard({ creator }: { creator: CreatorWithStats }) {
 
   return (
     <Link
-      href={creatorHref(creator.handle)}
+      href={creatorHref(creator.handle, creator.urlVersion)}
       className="group block overflow-hidden rounded-2xl bg-[var(--color-surface)] ring-1 ring-[var(--color-border)] transition hover:ring-[var(--color-accent)]/60"
     >
       <div className="relative aspect-[3/4] overflow-hidden bg-[var(--color-surface-2)]">

@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { getCreator, getCreatorStats, getPhotos } from "@/lib/photos";
 import { formatCount } from "@/lib/format";
 import type { MediaType, SortKey } from "@/lib/types";
-import { creatorHref } from "@/lib/types";
+import { creatorHref, parseVersionedSlug } from "@/lib/types";
 import { InfiniteGallery } from "@/components/InfiniteGallery";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { FollowButton } from "@/components/Interactions";
@@ -40,24 +40,43 @@ function absUrl(path?: string | null): string | undefined {
   return `${SITE}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
+function currentVersion(urlVersion?: number | null): number {
+  const n = Number(urlVersion ?? 1);
+  return Number.isInteger(n) && n > 1 ? n : 1;
+}
+
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ handle: string }>;
 }): Promise<Metadata> {
-  const { handle } = await params;
-  if (RESERVED.has(handle.toLowerCase())) {
+  const { handle: handleParam } = await params;
+  const parsed = parseVersionedSlug(handleParam);
+  if (
+    RESERVED.has(handleParam.toLowerCase()) ||
+    RESERVED.has(parsed.base.toLowerCase())
+  ) {
     return { title: "Not found", robots: { index: false, follow: true } };
   }
-  const creator = await getCreator(handle);
+  const creator = await getCreator(parsed.base);
   if (!creator) return { title: "Profile not found", robots: { index: false, follow: true } };
+
+  const version = currentVersion(creator.urlVersion);
+  const isCurrent =
+    version <= 1
+      ? parsed.version == null || parsed.version === 1
+      : parsed.version === version;
+  const isLegacyBare = parsed.version == null && version > 1;
+  if (creator.removedFromIndexAt && (parsed.version == null || !isCurrent)) {
+    return { title: "Gone", robots: { index: false, follow: false } };
+  }
 
   const title = `${creator.name} (@${creator.handle}) photos & videos — LeakFanHub`;
   const rawDesc =
     creator.bio?.slice(0, 140) ||
     `Browse free ${creator.handle} photos and videos on LeakFanHub. ${creator.name} (@${creator.handle}) — updated regularly. 18+ only.`;
   const description = rawDesc.length > 160 ? `${rawDesc.slice(0, 157)}...` : rawDesc;
-  const path = creatorHref(creator.handle);
+  const path = creatorHref(creator.handle, version);
   const url = `${SITE}${path}`;
   const image = absUrl(creator.avatarUrl);
 
@@ -72,7 +91,11 @@ export async function generateMetadata({
       "LeakFanHub",
     ],
     alternates: { canonical: path },
-    robots: { index: true, follow: true, "max-image-preview": "large" as const },
+    robots: {
+      index: isCurrent && !isLegacyBare,
+      follow: true,
+      "max-image-preview": "large" as const,
+    },
     openGraph: {
       type: "profile",
       title,
@@ -97,12 +120,27 @@ export default async function CreatorProfilePage({
   params: Promise<{ handle: string }>;
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const { handle } = await params;
-  if (RESERVED.has(handle.toLowerCase())) notFound();
+  const { handle: handleParam } = await params;
+  const parsed = parseVersionedSlug(handleParam);
+  const handle = parsed.base;
+  if (RESERVED.has(handleParam.toLowerCase()) || RESERVED.has(handle.toLowerCase())) {
+    notFound();
+  }
 
   const sp = await searchParams;
   const creator = await getCreator(handle);
   if (!creator) notFound();
+
+  const version = currentVersion(creator.urlVersion);
+  const isCurrent =
+    version <= 1
+      ? parsed.version == null || parsed.version === 1
+      : parsed.version === version;
+
+  // Ancienne /{handle} : 410 seulement si removed_from_index_at est posé
+  // (le middleware pose le statut ; notFound est le filet si le middleware ne tourne pas).
+  if (creator.removedFromIndexAt && parsed.version == null) notFound();
+  if (parsed.version != null && !isCurrent) notFound();
 
   const typeRaw = first(sp.type);
   const type: MediaType | undefined =
@@ -133,7 +171,7 @@ export default async function CreatorProfilePage({
       ? creator.avatarUrl
       : page.items[0]?.imageUrl || "";
 
-  const base = creatorHref(handle);
+  const base = creatorHref(creator.handle, version);
   const q = (opts: { type?: string | null; sort?: string; cursor?: number | null }) => {
     const p = new URLSearchParams();
     if (opts.type) p.set("type", opts.type);

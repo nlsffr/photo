@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getRankings } from "@/lib/photos";
 import { formatCount } from "@/lib/format";
+import { creatorHref } from "@/lib/types";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { MediaImg } from "@/components/MediaImg";
 
@@ -33,7 +34,7 @@ export default async function RankingsPage() {
             return (
               <Link
                 key={c.handle}
-                href={`/creator/${c.handle}`}
+                href={creatorHref(c.handle, c.urlVersion)}
                 className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 transition-colors hover:border-[var(--color-accent)]/50"
               >
                 <span

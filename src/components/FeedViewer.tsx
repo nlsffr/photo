@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PhotoPage, PhotoView } from "@/lib/types";
 import { formatCount } from "@/lib/format";
+import { creatorHref } from "@/lib/types";
 import { VerifiedBadge } from "./VerifiedBadge";
 import { FollowPill, useInteractions } from "./Interactions";
 import { MediaImg } from "./MediaImg";
@@ -142,7 +143,7 @@ function FeedSlide({
       <div className="absolute inset-x-0 bottom-0 z-10 flex items-end justify-between gap-3 p-4 pr-2 pb-6">
         <div className="min-w-0 flex-1 pointer-events-auto">
           <div className="flex items-center gap-2">
-            <Link href={`/creator/${item.creatorHandle}`} className="flex items-center gap-2">
+            <Link href={creatorHref(item.creator.handle, item.creator.urlVersion)} className="flex items-center gap-2">
               <MediaImg
                 src={item.creator.avatarUrl || item.imageUrl}
                 alt={item.creator.name}

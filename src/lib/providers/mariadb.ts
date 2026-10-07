@@ -17,6 +17,7 @@ import type {
   SortKey,
   TrendWindow,
 } from "../types";
+import { toIso } from "../types";
 import type { DataProvider } from "../data-provider";
 
 type Params = Record<string, unknown>;
@@ -55,10 +56,14 @@ type PhotoRow = {
   likes_count: number;
   is_ai: number | null;
   created_at: Date;
+  url_version: number | null;
+  updated_at: Date | string | null;
+  removed_from_index_at: Date | string | null;
   creator_handle: string;
   creator_name: string;
   creator_avatar: string;
   creator_verified: number;
+  creator_url_version: number | null;
 };
 
 function rowToView(row: PhotoRow, tags: string[]): PhotoView {
@@ -93,6 +98,9 @@ function rowToView(row: PhotoRow, tags: string[]): PhotoView {
     ageMinutes,
     trending,
     isAi: Boolean(row.is_ai),
+    urlVersion: Number(row.url_version) || 1,
+    updatedAt: toIso(row.updated_at),
+    removedFromIndexAt: toIso(row.removed_from_index_at),
     creatorHandle: row.creator_handle,
     tags,
     creator: {
@@ -100,7 +108,24 @@ function rowToView(row: PhotoRow, tags: string[]): PhotoView {
       name: row.creator_name,
       avatarUrl: row.creator_avatar,
       verified: Boolean(row.creator_verified),
+      urlVersion: Number(row.creator_url_version) || 1,
     },
+  };
+}
+
+function creatorFromRow(r: RowDataPacket): Creator {
+  return {
+    handle: r.handle as string,
+    name: r.name as string,
+    avatarUrl: (r.avatar_url as string) || "",
+    coverUrl: (r.cover_url as string) || undefined,
+    bio: (r.bio as string) ?? "",
+    location: (r.location as string) ?? "",
+    followers: Number(r.followers_count) || 0,
+    verified: Boolean(r.verified),
+    urlVersion: Number(r.url_version) || 1,
+    updatedAt: toIso(r.updated_at),
+    removedFromIndexAt: toIso(r.removed_from_index_at),
   };
 }
 
@@ -130,8 +155,12 @@ const PHOTO_SELECT = `
   p.title, p.image_url, p.video_url, p.external_url, p.type, p.duration_sec, p.item_count,
   p.width, p.height, p.views_count, p.likes_count, p.created_at,
   COALESCE(p.is_ai, 0) AS is_ai,
+  COALESCE(p.url_version, 1) AS url_version,
+  p.updated_at AS updated_at,
+  p.removed_from_index_at AS removed_from_index_at,
   c.handle AS creator_handle, c.name AS creator_name,
-  c.avatar_url AS creator_avatar, c.verified AS creator_verified
+  c.avatar_url AS creator_avatar, c.verified AS creator_verified,
+  COALESCE(c.url_version, 1) AS creator_url_version
 `;
 
 const PHOTO_FROM = `
@@ -199,37 +228,19 @@ export class MariaDBProvider implements DataProvider {
 
   async getCreators(): Promise<Creator[]> {
     const rows = await this.q<RowDataPacket>(
-      "SELECT handle, name, avatar_url, cover_url, bio, location, followers_count, verified FROM creators",
+      "SELECT handle, name, avatar_url, cover_url, bio, location, followers_count, verified, COALESCE(url_version, 1) AS url_version, updated_at, removed_from_index_at FROM creators",
     );
-    return rows.map((r) => ({
-      handle: r.handle as string,
-      name: r.name as string,
-      avatarUrl: r.avatar_url as string,
-      coverUrl: (r.cover_url as string) || undefined,
-      bio: (r.bio as string) ?? "",
-      location: (r.location as string) ?? "",
-      followers: Number(r.followers_count) || 0,
-      verified: Boolean(r.verified),
-    }));
+    return rows.map((r) => creatorFromRow(r));
   }
 
   async getCreator(handle: string): Promise<Creator | undefined> {
     const rows = await this.q<RowDataPacket>(
-      "SELECT handle, name, avatar_url, cover_url, bio, location, followers_count, verified FROM creators WHERE handle = :handle LIMIT 1",
+      "SELECT handle, name, avatar_url, cover_url, bio, location, followers_count, verified, COALESCE(url_version, 1) AS url_version, updated_at, removed_from_index_at FROM creators WHERE handle = :handle LIMIT 1",
       { handle },
     );
     const r = rows[0];
     if (!r) return undefined;
-    return {
-      handle: r.handle as string,
-      name: r.name as string,
-      avatarUrl: r.avatar_url as string,
-      coverUrl: (r.cover_url as string) || undefined,
-      bio: (r.bio as string) ?? "",
-      location: (r.location as string) ?? "",
-      followers: Number(r.followers_count) || 0,
-      verified: Boolean(r.verified),
-    };
+    return creatorFromRow(r);
   }
 
   async searchCreators(q: string, limit = 12): Promise<Creator[]> {
@@ -242,7 +253,8 @@ export class MariaDBProvider implements DataProvider {
     // Prefetch candidates: prefix, contains, first chars
     const head = raw.slice(0, Math.min(3, raw.length));
     const rows = await this.q<RowDataPacket>(
-      `SELECT handle, name, avatar_url, cover_url, bio, location, followers_count, verified
+      `SELECT handle, name, avatar_url, cover_url, bio, location, followers_count, verified,
+              COALESCE(url_version, 1) AS url_version, updated_at, removed_from_index_at
        FROM creators
        WHERE handle LIKE :prefix OR name LIKE :prefix
           OR handle LIKE :mid OR name LIKE :mid
@@ -286,6 +298,9 @@ export class MariaDBProvider implements DataProvider {
         location: (r.location as string) ?? "",
         followers,
         verified: Boolean(r.verified),
+        urlVersion: Number(r.url_version) || 1,
+        updatedAt: toIso(r.updated_at),
+        removedFromIndexAt: toIso(r.removed_from_index_at),
         _score: score,
       });
     }
@@ -456,6 +471,7 @@ export class MariaDBProvider implements DataProvider {
       sort === "views" ? "totalViews DESC" : "c.followers_count DESC, totalViews DESC";
     const rows = await this.q<RowDataPacket>(
       `SELECT c.handle, c.name, c.avatar_url, c.cover_url, c.bio, c.location, c.followers_count, c.verified,
+              COALESCE(c.url_version, 1) AS url_version, c.updated_at, c.removed_from_index_at,
               COUNT(p.id) AS photoCount,
               COALESCE(SUM(p.views_count), 0) AS totalViews,
               COALESCE(SUM(p.likes_count), 0) AS totalLikes,
@@ -482,6 +498,9 @@ export class MariaDBProvider implements DataProvider {
       location: (r.location as string) ?? "",
       followers: Number(r.followers_count) || 0,
       verified: Boolean(r.verified),
+      urlVersion: Number(r.url_version) || 1,
+      updatedAt: toIso(r.updated_at),
+      removedFromIndexAt: toIso(r.removed_from_index_at),
       photoCount: Number(r.photoCount) || 0,
       totalViews: Number(r.totalViews) || 0,
       totalLikes: Number(r.totalLikes) || 0,
@@ -493,6 +512,7 @@ export class MariaDBProvider implements DataProvider {
     const lim = Math.min(Math.max(Number(limit) || 20, 1), 100);
     const rows = await this.q<RowDataPacket>(
       `SELECT c.handle, c.name, c.avatar_url, c.bio, c.location, c.followers_count, c.verified,
+              COALESCE(c.url_version, 1) AS url_version, c.updated_at, c.removed_from_index_at,
               COALESCE(SUM(p.views_count), 0) AS views,
               COALESCE(SUM(p.likes_count), 0) AS likes,
               (COALESCE(c.followers_count,0) * 10
@@ -513,6 +533,9 @@ export class MariaDBProvider implements DataProvider {
       location: (r.location as string) ?? "",
       followers: Number(r.followers_count) || 0,
       verified: Boolean(r.verified),
+      urlVersion: Number(r.url_version) || 1,
+      updatedAt: toIso(r.updated_at),
+      removedFromIndexAt: toIso(r.removed_from_index_at),
       views: Number(r.views) || 0,
       likes: Number(r.likes) || 0,
       score: Number(r.score) || 0,

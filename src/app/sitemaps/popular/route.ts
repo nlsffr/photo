@@ -1,5 +1,5 @@
 import { getPhotos } from "@/lib/photos";
-import { mediaHref } from "@/lib/types";
+import { mediaHref, toIso } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 3600;
@@ -9,9 +9,17 @@ const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").repl
   "",
 );
 
-/** Top media by views — listed early in sitemap index. */
+/** Top media by views — version courante uniquement. */
 const LIMIT = 2_000;
 const PAGE = 250;
+
+function xmlEscape(value: string): string {
+  return value
+    .replace(/&/g, "&")
+    .replace(/</g, "<")
+    .replace(/>/g, ">")
+    .replace(/"/g, """);
+}
 
 export async function GET() {
   const now = new Date().toISOString();
@@ -31,13 +39,15 @@ export async function GET() {
       if (!page.items.length) break;
 
       for (const p of page.items) {
+        if (p.removedFromIndexAt) continue;
         const href = mediaHref(p);
         if (seen.has(href)) continue;
         seen.add(href);
+        const lastmod = toIso(p.updatedAt) ?? now;
         entries.push(
           `  <url>
-    <loc>${SITE}${href}</loc>
-    <lastmod>${now}</lastmod>
+    <loc>${xmlEscape(`${SITE}${href}`)}</loc>
+    <lastmod>${lastmod}</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>`,

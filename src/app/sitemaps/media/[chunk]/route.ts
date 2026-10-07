@@ -1,5 +1,5 @@
 import { getPhotos } from "@/lib/photos";
-import { mediaHref } from "@/lib/types";
+import { mediaHref, toIso } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 3600;
@@ -12,7 +12,15 @@ const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").repl
 const MEDIA_CHUNK = 2_000;
 const PAGE = 250;
 
-/** Full catalog chunks — all URLs, leakgallery-style volume. */
+function xmlEscape(value: string): string {
+  return value
+    .replace(/&/g, "&")
+    .replace(/</g, "<")
+    .replace(/>/g, ">")
+    .replace(/"/g, """);
+}
+
+/** Full catalog chunks — URLs de la version courante uniquement. */
 export async function GET(
   _req: Request,
   ctx: { params: Promise<{ chunk: string }> | { chunk: string } },
@@ -38,13 +46,15 @@ export async function GET(
       if (!page.items.length) break;
 
       for (const p of page.items) {
+        if (p.removedFromIndexAt) continue;
         const href = mediaHref(p);
         if (seen.has(href)) continue;
         seen.add(href);
+        const lastmod = toIso(p.updatedAt) ?? now;
         entries.push(
           `  <url>
-    <loc>${SITE}${href}</loc>
-    <lastmod>${now}</lastmod>
+    <loc>${xmlEscape(`${SITE}${href}`)}</loc>
+    <lastmod>${lastmod}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
   </url>`,

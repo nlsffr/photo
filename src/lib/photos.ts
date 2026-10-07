@@ -12,6 +12,7 @@ import type {
   SortKey,
   MediaType,
 } from "./types";
+import { parseVersionedSlug } from "./types";
 import { getDataProvider } from "./data-provider";
 import { ensureDataProvider } from "./bootstrap";
 import { cacheGet, cacheSet, cacheKey } from "./cache";
@@ -36,7 +37,9 @@ export async function getPhotos(query: {
 }
 
 export async function getPhotoById(id: string): Promise<Photo | undefined> {
-  return (await getProvider()).getPhoto(id);
+  // Suffixe facultatif "-v{N}" : ignoré pour la requête DB (source_id reste la base).
+  const { base } = parseVersionedSlug(id);
+  return (await getProvider()).getPhoto(base);
 }
 
 export async function getAllPhotoViews(): Promise<PhotoView[]> {
@@ -131,7 +134,8 @@ export async function getAllTags(): Promise<string[]> {
 }
 
 export async function getCreator(handle: string) {
-  return (await getProvider()).getCreator(handle);
+  const { base } = parseVersionedSlug(handle);
+  return (await getProvider()).getCreator(base);
 }
 
 export function withCreator(p: Photo, creator?: Creator): PhotoView {
@@ -146,6 +150,7 @@ export function withCreator(p: Photo, creator?: Creator): PhotoView {
       name: creator?.name ?? fallbackName,
       avatarUrl: creator?.avatarUrl ?? "",
       verified: creator?.verified ?? false,
+      urlVersion: creator?.urlVersion ?? 1,
     },
   };
 }

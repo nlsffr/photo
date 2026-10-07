@@ -125,7 +125,7 @@ export function PhotoCard({
       </Link>
 
       <Link
-        href={creatorHref(photo.creatorHandle)}
+        href={creatorHref(photo.creator.handle, photo.creator.urlVersion)}
         className="absolute left-2 top-2 z-10 flex max-w-[calc(100%-0.75rem)] items-center gap-1.5"
       >
         <MediaImg

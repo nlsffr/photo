@@ -31,7 +31,7 @@ export async function FeaturedCreators() {
           return (
             <Link
               key={c.handle}
-              href={creatorHref(c.handle)}
+              href={creatorHref(c.handle, c.urlVersion)}
               prefetch={true}
               className="flex w-[4.1rem] shrink-0 flex-col items-center gap-1.5 sm:w-[4.5rem]"
             >

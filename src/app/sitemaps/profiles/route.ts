@@ -1,5 +1,5 @@
 import { getModels } from "@/lib/photos";
-import { creatorHref } from "@/lib/types";
+import { creatorHref, toIso } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 3600;
@@ -9,9 +9,22 @@ const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").repl
   "",
 );
 
+function xmlEscape(value: string): string {
+  return value
+    .replace(/&/g, "&")
+    .replace(/</g, "<")
+    .replace(/>/g, ">")
+    .replace(/"/g, """);
+}
+
 export async function GET() {
   const now = new Date().toISOString();
-  let models: { handle: string }[] = [];
+  let models: {
+    handle: string;
+    urlVersion?: number;
+    updatedAt?: string | null;
+    removedFromIndexAt?: string | null;
+  }[] = [];
   try {
     models = await getModels("followers");
   } catch {
@@ -19,14 +32,17 @@ export async function GET() {
   }
 
   const urls = models
-    .map(
-      (m) => `  <url>
-    <loc>${SITE}${creatorHref(m.handle)}</loc>
-    <lastmod>${now}</lastmod>
+    .filter((m) => !m.removedFromIndexAt)
+    .map((m) => {
+      const href = creatorHref(m.handle, m.urlVersion);
+      const lastmod = toIso(m.updatedAt) ?? now;
+      return `  <url>
+    <loc>${xmlEscape(`${SITE}${href}`)}</loc>
+    <lastmod>${lastmod}</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
-  </url>`,
-    )
+  </url>`;
+    })
     .join("\n");
 
   const body = `<?xml version="1.0" encoding="UTF-8"?>
