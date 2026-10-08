@@ -11,10 +11,10 @@ const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").repl
 
 function xmlEscape(value: string): string {
   return value
-    .replace(/&/g, "&")
-    .replace(/</g, "<")
-    .replace(/>/g, ">")
-    .replace(/"/g, """);
+    .replace(/&/g, "&" + "amp;")
+    .replace(/</g, "&" + "lt;")
+    .replace(/>/g, "&" + "gt;")
+    .replace(/"/g, "&" + "quot;");
 }
 
 export async function GET() {
