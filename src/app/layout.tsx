@@ -1,3 +1,4 @@
+import InternalLinks from "@/components/InternalLinks";
 import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 import "./globals.css";
@@ -107,6 +108,7 @@ export default function RootLayout({
             </PremiumProvider>
           </SessionProvider>
         </LocaleProvider>
+        <div className="max-w-7xl mx-auto px-4"><InternalLinks /></div>
       </body>
     </html>
   );
