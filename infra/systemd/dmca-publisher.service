@@ -1,0 +1,11 @@
+[Unit]
+Description=DMCA publisher Google + IndexNow
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/photo/dmca
+Environment=DMCA_PUBLISH_MAX=150
+ExecStart=/usr/bin/flock --nonblock /run/dmca-publisher.lock /bin/bash -lc 'set -a && . /opt/photo/dmca/.env && set +a && exec python3 /opt/photo/dmca/dmca_publisher.py'
+TimeoutStartSec=30min
