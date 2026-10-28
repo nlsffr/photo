@@ -24,11 +24,19 @@ type Params = Record<string, unknown>;
 
 const PAGE_SIZE = 24;
 
-function makePool(): mysql.Pool {
+const globalForMariaDB = globalThis as typeof globalThis & {
+  __photoMariaDBPool?: mysql.Pool;
+};
+
+function getPool(): mysql.Pool {
+  if (globalForMariaDB.__photoMariaDBPool) {
+    return globalForMariaDB.__photoMariaDBPool;
+  }
+
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL is not set");
 
-  return mysql.createPool({
+  const pool = mysql.createPool({
     uri: url,
     ssl:
       process.env.DB_SSL === "true"
@@ -38,6 +46,9 @@ function makePool(): mysql.Pool {
     waitForConnections: true,
     namedPlaceholders: true,
   });
+
+  globalForMariaDB.__photoMariaDBPool = pool;
+  return pool;
 }
 
 type PhotoRow = {
@@ -200,7 +211,7 @@ export class MariaDBProvider implements DataProvider {
   private pool: mysql.Pool;
 
   constructor() {
-    this.pool = makePool();
+    this.pool = getPool();
   }
 
   private async q<T extends RowDataPacket>(
