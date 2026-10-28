@@ -1,17 +1,7 @@
 import "server-only";
-import mysql from "mysql2/promise";
 import type { RowDataPacket } from "mysql2";
 import { randomUUID } from "node:crypto";
-
-function getPool(): mysql.Pool | null {
-  const url = process.env.DATABASE_URL;
-  if (!url) return null;
-  return mysql.createPool({
-    uri: url,
-    connectionLimit: Number(process.env.DB_POOL_SIZE ?? 10),
-    waitForConnections: true,
-  });
-}
+import { getDbPool as getPool } from "./db-pool";
 
 export interface InteractionState {
   liked: string[];

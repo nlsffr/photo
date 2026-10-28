@@ -5,8 +5,9 @@
  * Note perf: do NOT join bot_ingested on list queries. photos.source_id is enough.
  */
 
-import mysql from "mysql2/promise";
+import type { Pool } from "mysql2/promise";
 import type { RowDataPacket } from "mysql2";
+import { requireDbPool } from "../db-pool";
 import type {
   Creator,
   CreatorWithStats,
@@ -23,33 +24,6 @@ import type { DataProvider } from "../data-provider";
 type Params = Record<string, unknown>;
 
 const PAGE_SIZE = 24;
-
-const globalForMariaDB = globalThis as typeof globalThis & {
-  __photoMariaDBPool?: mysql.Pool;
-};
-
-function getPool(): mysql.Pool {
-  if (globalForMariaDB.__photoMariaDBPool) {
-    return globalForMariaDB.__photoMariaDBPool;
-  }
-
-  const url = process.env.DATABASE_URL;
-  if (!url) throw new Error("DATABASE_URL is not set");
-
-  const pool = mysql.createPool({
-    uri: url,
-    ssl:
-      process.env.DB_SSL === "true"
-        ? { rejectUnauthorized: true, ca: process.env.DB_SSL_CA }
-        : undefined,
-    connectionLimit: Number(process.env.DB_POOL_SIZE ?? 10),
-    waitForConnections: true,
-    namedPlaceholders: true,
-  });
-
-  globalForMariaDB.__photoMariaDBPool = pool;
-  return pool;
-}
 
 type PhotoRow = {
   id: string;
@@ -208,10 +182,10 @@ function editDist(a: string, b: string): number {
 }
 
 export class MariaDBProvider implements DataProvider {
-  private pool: mysql.Pool;
+  private pool: Pool;
 
   constructor() {
-    this.pool = getPool();
+    this.pool = requireDbPool();
   }
 
   private async q<T extends RowDataPacket>(

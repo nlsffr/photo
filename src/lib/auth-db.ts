@@ -6,9 +6,9 @@
  */
 
 import "server-only";
-import mysql from "mysql2/promise";
 import type { RowDataPacket } from "mysql2";
 import { randomUUID } from "node:crypto";
+import { getDbPool as getPool } from "./db-pool";
 import {
   hashPassword,
   verifyPassword,
@@ -21,26 +21,6 @@ export interface SessionUser {
   email: string;
   username: string | null;
   isCreator: boolean;
-}
-
-let pool: mysql.Pool | null = null;
-
-/** Lazily build a pool. Returns null when no DB is configured. */
-function getPool(): mysql.Pool | null {
-  if (pool) return pool;
-  const url = process.env.DATABASE_URL;
-  if (!url) return null;
-  pool = mysql.createPool({
-    uri: url,
-    ssl:
-      process.env.DB_SSL === "true"
-        ? { rejectUnauthorized: true, ca: process.env.DB_SSL_CA }
-        : undefined,
-    connectionLimit: Number(process.env.DB_POOL_SIZE ?? 10),
-    waitForConnections: true,
-    namedPlaceholders: true,
-  });
-  return pool;
 }
 
 export function isAuthDbConfigured(): boolean {

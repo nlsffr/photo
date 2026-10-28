@@ -1,17 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import mysql from "mysql2/promise";
 import type { RowDataPacket } from "mysql2";
 import { getSessionUser } from "@/lib/auth-db";
 import { SESSION_COOKIE } from "@/lib/auth";
+import { getDbPool } from "@/lib/db-pool";
 
 export const dynamic = "force-dynamic";
-
-async function pool() {
-  const url = process.env.DATABASE_URL;
-  if (!url) return null;
-  return mysql.createPool({ uri: url, connectionLimit: 5, waitForConnections: true });
-}
 
 function mapPhoto(r: RowDataPacket) {
   return {
@@ -53,7 +47,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "auth_required", items: [], creators: [] }, { status: 401 });
   }
 
-  const db = await pool();
+  const db = getDbPool();
   if (!db) return NextResponse.json({ items: [], creators: [] });
 
   try {

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import mysql from "mysql2/promise";
 import { cookies } from "next/headers";
 import { getSessionUser } from "@/lib/auth-db";
 import { SESSION_COOKIE } from "@/lib/auth";
+import { getDbPool } from "@/lib/db-pool";
 
 export const dynamic = "force-dynamic";
 
@@ -19,12 +19,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "invalid" }, { status: 400 });
   }
 
-  const url = process.env.DATABASE_URL;
-  if (!url) return NextResponse.json({ ok: false }, { status: 500 });
+  const db = getDbPool();
+  if (!db) return NextResponse.json({ ok: false }, { status: 500 });
 
   try {
-    const conn = await mysql.createConnection(url);
-    await conn.execute(
+    await db.execute(
       `UPDATE photos SET views_count = views_count + 1 WHERE id = ?`,
       [photoId],
     );
@@ -37,14 +36,13 @@ export async function POST(req: NextRequest) {
         const u = await getSessionUser(token);
         userId = u?.id ?? null;
       }
-      await conn.execute(
+      await db.execute(
         `INSERT INTO media_views (photo_id, user_id) VALUES (?, ?)`,
         [photoId, userId],
       );
     } catch {
       /* media_views may miss columns — ignore */
     }
-    await conn.end();
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[view]", e);

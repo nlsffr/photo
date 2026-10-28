@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
-import mysql from "mysql2/promise";
 import { sendEmail, isEmailConfigured } from "@/lib/email";
+import { getDbPool } from "@/lib/db-pool";
 import {
   notifyContact,
   isDiscordConfigured,
@@ -18,20 +18,6 @@ const KINDS: Record<string, string> = {
 };
 
 const MAX = { field: 300, message: 5000 };
-
-let pool: mysql.Pool | null = null;
-
-function getPool(): mysql.Pool | null {
-  if (pool) return pool;
-  const url = process.env.DATABASE_URL;
-  if (!url) return null;
-  pool = mysql.createPool({
-    uri: url,
-    connectionLimit: 5,
-    waitForConnections: true,
-  });
-  return pool;
-}
 
 function clean(v: unknown, max: number): string {
   if (typeof v !== "string") return "";
@@ -104,7 +90,7 @@ export async function POST(request: Request) {
   const text = lines.join("\n");
 
   let saved = false;
-  const db = getPool();
+  const db = getDbPool();
   if (db) {
     try {
       await db.execute(

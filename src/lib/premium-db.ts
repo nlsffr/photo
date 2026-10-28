@@ -1,18 +1,8 @@
 import "server-only";
-import mysql from "mysql2/promise";
 import type { RowDataPacket } from "mysql2";
 import { randomUUID } from "node:crypto";
 import { getPlan, type PlanId } from "./premium-plans";
-
-function getPool(): mysql.Pool | null {
-  const url = process.env.DATABASE_URL;
-  if (!url) return null;
-  return mysql.createPool({
-    uri: url,
-    connectionLimit: Number(process.env.DB_POOL_SIZE ?? 10),
-    waitForConnections: true,
-  });
-}
+import { getDbPool as getPool } from "./db-pool";
 
 export async function isUserPremium(userId: string): Promise<boolean> {
   const db = getPool();
