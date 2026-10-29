@@ -91,7 +91,7 @@ function NavContent({ onNavigate }: { onNavigate?: () => void }) {
               <Link
                 key={item.href + item.labelKey}
                 href={item.href}
-                prefetch={true}
+                prefetch={false}
                 onClick={onNavigate}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2 text-[15px] font-medium transition-colors ${color} ${bg}`}
               >
@@ -183,7 +183,7 @@ function BottomTabs() {
           <Link
             key={tab.href}
             href={tab.href}
-            prefetch={true}
+            prefetch={false}
             className={`flex flex-1 flex-col items-center justify-center gap-1 text-[10px] font-medium leading-none ${
               active ? "text-[var(--color-accent)]" : "text-[var(--color-ink-muted)]"
             }`}
@@ -200,13 +200,10 @@ function BottomTabs() {
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const [openPath, setOpenPath] = useState<string | null>(null);
+  const open = openPath === pathname;
   const isFeed = pathname.startsWith("/feed") || pathname.startsWith("/tiktok");
-
-  useEffect(() => {
-    setOpen(false);
-  }, [pathname]);
 
   useEffect(() => {
     if (!open) return;
@@ -222,7 +219,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <header className="sticky top-0 z-40 flex min-h-14 items-center gap-2 border-b border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-bg)_90%,transparent)] px-3 pt-[env(safe-area-inset-top)] backdrop-blur-xl sm:gap-3 sm:px-4">
         <button
           type="button"
-          onClick={() => setOpen(true)}
+          onClick={() => setOpenPath(pathname)}
           aria-label="Menu"
           className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-2)] lg:hidden"
         >
@@ -290,18 +287,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {open && (
         <div className="fixed inset-0 z-[60] lg:hidden">
-          <button type="button" className="absolute inset-0 bg-black/50" aria-label="Close menu" onClick={() => setOpen(false)} />
+          <button type="button" className="absolute inset-0 bg-black/50" aria-label="Close menu" onClick={() => setOpenPath(null)} />
           <div className="absolute inset-y-0 left-0 flex w-[min(20rem,88vw)] flex-col bg-[var(--color-bg)] shadow-2xl">
             <div className="flex items-center justify-between gap-2 border-b border-[var(--color-border)] p-3 pb-2">
               <BrandLogo />
-              <button onClick={() => setOpen(false)} aria-label="Close" className="grid h-8 w-8 place-items-center rounded-lg text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-2)]">
+              <button onClick={() => setOpenPath(null)} aria-label="Close" className="grid h-8 w-8 place-items-center rounded-lg text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-2)]">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
                   <path d="M18 6 6 18M6 6l12 12" />
                 </svg>
               </button>
             </div>
             <div className="flex-1 overflow-y-auto overscroll-contain px-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
-              <NavContent onNavigate={() => setOpen(false)} />
+              <NavContent onNavigate={() => setOpenPath(null)} />
               <div className="mt-4 border-t border-[var(--color-border)] pt-4">
                 <p className="mb-2 px-1 text-xs font-bold uppercase tracking-wide text-[var(--color-ink-faint)]">Langue</p>
                 <LanguageSwitcher className="w-full" placement="up" />
