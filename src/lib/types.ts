@@ -35,6 +35,12 @@ export interface Photo {
   tags: string[];
   views: number;
   likes: number;
+  /** Popularity imported from the upstream source by ingestion. */
+  sourceViews?: number;
+  /** Likes imported from the upstream source by ingestion. */
+  sourceLikes?: number;
+  /** First-party views recorded by this site. */
+  localViews?: number;
   ageMinutes: number;
   trending: number;
   type: MediaType;
@@ -52,6 +58,7 @@ export interface Photo {
 }
 
 export type SortKey =
+  | "discover"
   | "recent"
   | "trending"
   | "popular"

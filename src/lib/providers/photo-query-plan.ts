@@ -1,10 +1,19 @@
-import type { SortKey } from "../types";
+import type { MediaType, SortKey } from "../types";
+
+type DiscoveryFilters = {
+  creator?: string;
+  type?: MediaType;
+  tag?: string;
+  legacyTag?: string;
+  isAi?: boolean;
+};
 
 type PhotoListPlanInput = {
   sort: SortKey;
   seed?: number;
   selectiveFilter?: boolean;
   textSearch?: boolean;
+  discoveryFilters?: DiscoveryFilters;
 };
 
 export type PhotoListPlan = {
@@ -52,6 +61,49 @@ const TRENDING_CANDIDATES_SQL = `FROM (
 ) candidates
 STRAIGHT_JOIN photos p ON p.id = candidates.id
 STRAIGHT_JOIN creators c ON c.id = p.creator_id`;
+
+function discoveryArm(
+  photo: string,
+  creator: string,
+  index: string,
+  orderBy: string,
+  filters: DiscoveryFilters,
+): string {
+  const where = [
+    `${photo}.removed_from_index_at IS NULL`,
+    `${creator}.removed_from_index_at IS NULL`,
+  ];
+  if (filters.creator) where.push(`${creator}.handle = :creator`);
+  if (filters.type) where.push(`${photo}.type = :type`);
+  if (filters.isAi !== undefined) {
+    where.push(`COALESCE(${photo}.is_ai, 0) = :isAi`);
+  }
+  if (filters.tag && filters.legacyTag) {
+    where.push(
+      `EXISTS (SELECT 1 FROM photo_tags ${photo}t
+               WHERE ${photo}t.photo_id = ${photo}.id
+                 AND (${photo}t.tag = :tag OR ${photo}t.tag LIKE :legacyTag))`,
+    );
+  }
+  return `(SELECT ${photo}.id
+   FROM photos ${photo} FORCE INDEX (${index})
+   STRAIGHT_JOIN creators ${creator} ON ${creator}.id = ${photo}.creator_id
+   WHERE ${where.join("\n     AND ")}
+   ORDER BY ${orderBy}
+   LIMIT 400)`;
+}
+
+function discoveryCandidatesSql(filters: DiscoveryFilters): string {
+  return `FROM (
+  ${discoveryArm("pv", "cv", "idx_photos_source_views_id", "pv.source_views_count DESC, pv.id ASC", filters)}
+  UNION DISTINCT
+  ${discoveryArm("pl", "cl", "idx_photos_source_likes_id", "pl.source_likes_count DESC, pl.id ASC", filters)}
+  UNION DISTINCT
+  ${discoveryArm("pr", "cr", "idx_photos_created_id", "pr.created_at DESC, pr.id ASC", filters)}
+) candidates
+STRAIGHT_JOIN photos p ON p.id = candidates.id
+STRAIGHT_JOIN creators c ON c.id = p.creator_id`;
+}
 
 const SEARCH_CANDIDATES_SQL = `FROM (
   (SELECT pv.id
@@ -109,6 +161,7 @@ export function buildPhotoListPlan({
   seed,
   selectiveFilter = false,
   textSearch = false,
+  discoveryFilters = {},
 }: PhotoListPlanInput): PhotoListPlan {
   if (textSearch) {
     const indexed = sort in INDEXED_SORTS
@@ -123,6 +176,26 @@ export function buildPhotoListPlan({
          / POW(GREATEST(TIMESTAMPDIFF(HOUR, p.created_at, NOW()), 1) / 24.0 + 2, 1.4)
          DESC, p.id ASC`,
       params: {},
+    };
+  }
+
+  if (sort === "discover") {
+    const params: Record<string, number | string> = {};
+    if (discoveryFilters.creator) params.creator = discoveryFilters.creator;
+    if (discoveryFilters.type) params.type = discoveryFilters.type;
+    if (discoveryFilters.tag && discoveryFilters.legacyTag) {
+      params.tag = discoveryFilters.tag;
+      params.legacyTag = discoveryFilters.legacyTag;
+    }
+    if (discoveryFilters.isAi !== undefined) {
+      params.isAi = discoveryFilters.isAi ? 1 : 0;
+    }
+    return {
+      indexName: null,
+      fromSql: discoveryCandidatesSql(discoveryFilters),
+      extraWhere: null,
+      orderBy: "p.id ASC",
+      params,
     };
   }
 

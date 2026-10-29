@@ -12,6 +12,7 @@ import type {
   SortKey,
 } from "../types";
 import type { DataProvider } from "../data-provider";
+import { rankHomeFeed, resolveHomeSeed } from "../home-feed";
 
 function mulberry32(seed: number) {
   return function () {
@@ -58,6 +59,9 @@ const PHOTOS: Photo[] = Array.from({ length: 140 }).map((_, i) => {
   const creator = CREATORS[Math.floor(rng() * CREATORS.length)];
   const nTags = 1 + Math.floor(rng() * 3);
   const tags = Array.from({ length: nTags }, () => TAGS[Math.floor(rng() * TAGS.length)]);
+  const sourceViews = Math.floor(rng() * 500000);
+  const sourceLikes = Math.floor(rng() * 40000);
+  const localViews = Math.floor(rng() * 250);
   return {
     id: `demo-${i}`,
     title: ["Séance studio", "Portrait naturel", "Éditorial mode", "En extérieur", "Backstage"][i % 5],
@@ -66,8 +70,11 @@ const PHOTOS: Photo[] = Array.from({ length: 140 }).map((_, i) => {
     height: h,
     creatorHandle: creator.handle,
     tags: [...new Set(tags)],
-    views: Math.floor(rng() * 500000),
-    likes: Math.floor(rng() * 40000),
+    views: sourceViews + localViews,
+    likes: sourceLikes,
+    sourceViews,
+    sourceLikes,
+    localViews,
     ageMinutes: Math.floor(rng() * 60 * 24 * 30),
     trending: Math.floor(rng() * 100),
     type,
@@ -103,6 +110,9 @@ function hashId(id: string, seed: number): number {
 }
 
 const SORTERS: Record<SortKey, (a: Photo, b: Photo) => number> = {
+  discover: (a, b) =>
+    (b.sourceViews ?? b.views) - (a.sourceViews ?? a.views) ||
+    (a.id < b.id ? 1 : -1),
   recent: (a, b) => a.ageMinutes - b.ageMinutes || (a.id < b.id ? 1 : -1),
   trending: (a, b) =>
     b.views + b.likes * 3 - (a.views + a.likes * 3) || (a.id < b.id ? 1 : -1),
@@ -156,23 +166,30 @@ export class DemoProvider implements DataProvider {
     }
     const sort = query.sort ?? "recent";
     const seed =
-      sort === "random"
+      sort === "discover"
+        ? resolveHomeSeed(query.seed)
+        : sort === "random"
         ? Number.isFinite(query.seed)
           ? (query.seed as number)
           : 424242
         : undefined;
 
-    if (sort === "random" && seed !== undefined) {
+    let views: PhotoView[];
+    if (sort === "discover" && seed !== undefined) {
+      views = rankHomeFeed(list.map(withCreator), { seed });
+    } else if (sort === "random" && seed !== undefined) {
       list.sort((a, b) => hashId(a.id, seed) - hashId(b.id, seed));
+      views = list.map(withCreator);
     } else {
       list.sort(SORTERS[sort]);
+      views = list.map(withCreator);
     }
 
     const cursor = query.cursor ?? 0;
     const limit = query.limit ?? 30;
-    const items = list.slice(cursor, cursor + limit).map(withCreator);
-    const nextCursor = cursor + limit < list.length ? cursor + limit : null;
-    return { items, nextCursor, total: list.length, seed };
+    const items = views.slice(cursor, cursor + limit);
+    const nextCursor = cursor + limit < views.length ? cursor + limit : null;
+    return { items, nextCursor, total: views.length, seed };
   }
   async getPhoto(id: string) {
     return PHOTOS.find((p) => p.id === id);

@@ -13,6 +13,7 @@ import type {
   MediaType,
 } from "./types";
 import { parseVersionedSlug } from "./types";
+import { resolveHomeSeed } from "./home-feed";
 import { getDataProvider } from "./data-provider";
 import { ensureDataProvider } from "./bootstrap";
 import {
@@ -52,8 +53,8 @@ export async function getPhotos(query: PhotoQuery): Promise<PhotoPage> {
     ...(query.isAi === undefined ? {} : { isAi: query.isAi }),
     cursor: query.cursor ?? 0,
     limit: query.limit ?? 24,
-    ...(query.sort === "random"
-      ? { seed: query.seed ?? Math.floor(Math.random() * 1_000_000) }
+    ...(query.sort === "random" || query.sort === "discover"
+      ? { seed: resolveHomeSeed(query.seed) }
       : query.seed === undefined
         ? {}
         : { seed: query.seed }),

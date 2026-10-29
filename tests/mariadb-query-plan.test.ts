@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 async function loadQueryPlan() {
@@ -70,6 +71,57 @@ test("global trending pages rank a bounded union of indexed candidates", async (
   assert.match(plan.fromSql, /LIMIT 500/);
   assert.match(plan.fromSql, /STRAIGHT_JOIN photos p ON p\.id = candidates\.id/);
   assert.match(plan.orderBy, /TIMESTAMPDIFF/);
+});
+
+test("discovery reads a bounded indexed union of source views, source likes, and recent media", async () => {
+  const { buildPhotoListPlan } = await loadQueryPlan();
+  const plan = buildPhotoListPlan({ sort: "discover" });
+
+  assert.match(plan.fromSql, /idx_photos_source_views_id/);
+  assert.match(plan.fromSql, /source_views_count DESC/);
+  assert.match(plan.fromSql, /idx_photos_source_likes_id/);
+  assert.match(plan.fromSql, /source_likes_count DESC/);
+  assert.match(plan.fromSql, /idx_photos_created_id/);
+  assert.equal((plan.fromSql.match(/LIMIT 400/g) ?? []).length, 3);
+  assert.match(plan.fromSql, /STRAIGHT_JOIN photos p ON p\.id = candidates\.id/);
+  for (const [photo, creator] of [["pv", "cv"], ["pl", "cl"], ["pr", "cr"]]) {
+    assert.match(plan.fromSql, new RegExp(`${photo}\\.removed_from_index_at IS NULL`));
+    assert.match(plan.fromSql, new RegExp(`${creator}\\.removed_from_index_at IS NULL`));
+  }
+  assert.doesNotMatch(`${plan.fromSql}\n${plan.orderBy}`, /RAND\s*\(/i);
+});
+
+test("discovery applies every active filter inside each bounded candidate arm", async () => {
+  const { buildPhotoListPlan } = await loadQueryPlan();
+  const plan = buildPhotoListPlan({
+    sort: "discover",
+    discoveryFilters: {
+      creator: "creator-a",
+      type: "video",
+      tag: "portrait",
+      legacyTag: "%portrait%",
+      isAi: false,
+    },
+  });
+
+  assert.equal((plan.fromSql.match(/\.type = :type/g) ?? []).length, 3);
+  assert.equal((plan.fromSql.match(/\.handle = :creator/g) ?? []).length, 3);
+  assert.equal((plan.fromSql.match(/EXISTS \(SELECT 1 FROM photo_tags/g) ?? []).length, 3);
+  assert.equal((plan.fromSql.match(/COALESCE\([^)]*\.is_ai, 0\) = :isAi/g) ?? []).length, 3);
+  assert.deepEqual(plan.params, {
+    creator: "creator-a",
+    type: "video",
+    tag: "portrait",
+    legacyTag: "%portrait%",
+    isAi: 0,
+  });
+
+  const provider = await readFile(
+    new URL("../src/lib/providers/mariadb.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(provider, /"p\.removed_from_index_at IS NULL"/);
+  assert.match(provider, /"c\.removed_from_index_at IS NULL"/);
 });
 
 test("text search ranks a bounded candidate set including matching creators", async () => {

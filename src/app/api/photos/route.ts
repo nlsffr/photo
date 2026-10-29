@@ -7,6 +7,7 @@ import {
 import { cacheGet, cacheSet, cacheKey } from "@/lib/cache";
 
 const SORTS: SortKey[] = [
+  "discover",
   "recent",
   "trending",
   "popular",
@@ -70,6 +71,7 @@ export async function GET(request: Request) {
     !q &&
     !tag &&
     !creator &&
+    sort !== "discover" &&
     sort !== "random" &&
     cursor < 3;
 

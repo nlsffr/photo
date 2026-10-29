@@ -22,6 +22,16 @@ import { toIso } from "../types";
 import { legacyTagPrefix, normalizeTagSlug } from "../seo-policy";
 import type { DataProvider } from "../data-provider";
 import { buildPhotoListPlan } from "./photo-query-plan";
+import { normalizeEngagement } from "../source-engagement";
+import {
+  paginateHomeFeed,
+  rankHomeFeed,
+  resolveHomeSeed,
+} from "../home-feed";
+import {
+  homeFeedSnapshotKey,
+  homeFeedSnapshots,
+} from "../home-feed-snapshot";
 
 type Params = Record<string, unknown>;
 
@@ -41,6 +51,9 @@ type PhotoRow = {
   height: number;
   views_count: number;
   likes_count: number;
+  source_views_count?: number | string | null;
+  source_likes_count?: number | string | null;
+  local_views_count?: number | string | null;
   is_ai: number | null;
   created_at: Date;
   url_version: number | null;
@@ -58,8 +71,14 @@ function rowToView(row: PhotoRow, tags: string[]): PhotoView {
     0,
     Math.round((Date.now() - new Date(row.created_at).getTime()) / 60000),
   );
-  const views = Number(row.views_count) || 0;
-  const likes = Number(row.likes_count) || 0;
+  const engagement = normalizeEngagement({
+    sourceViews: row.source_views_count,
+    sourceLikes: row.source_likes_count,
+    localViews: row.local_views_count,
+    legacyViews: row.views_count,
+    legacyLikes: row.likes_count,
+  });
+  const { views, likes, sourceViews, sourceLikes, localViews } = engagement;
   const ageDays = Math.max(ageMinutes / 1440, 0.1);
   const velocity = (views + likes * 12) / Math.pow(ageDays + 2, 1.3);
   const trending = Math.min(100, Math.round(Math.log10(velocity + 1) * 25));
@@ -82,6 +101,9 @@ function rowToView(row: PhotoRow, tags: string[]): PhotoView {
     height: row.height,
     views,
     likes,
+    sourceViews,
+    sourceLikes,
+    localViews,
     ageMinutes,
     trending,
     isAi: Boolean(row.is_ai),
@@ -127,7 +149,8 @@ function windowSql(window: TrendWindow | undefined): string {
 const PHOTO_SELECT = `
   p.id, p.source_id AS source_id,
   p.title, p.image_url, p.video_url, p.external_url, p.type, p.duration_sec, p.item_count,
-  p.width, p.height, p.views_count, p.likes_count, p.created_at,
+  p.width, p.height, p.views_count, p.likes_count,
+  p.source_views_count, p.source_likes_count, p.local_views_count, p.created_at,
   COALESCE(p.is_ai, 0) AS is_ai,
   COALESCE(p.url_version, 1) AS url_version,
   p.updated_at AS updated_at,
@@ -197,6 +220,53 @@ export class MariaDBProvider implements DataProvider {
       map.set(r.photo_id, list);
     }
     return map;
+  }
+
+  private async discoveryPageFromSnapshot(
+    snapshotIds: string[],
+    cursor: number,
+    limit: number,
+    seed: number,
+  ): Promise<PhotoPage> {
+    const selected: PhotoRow[] = [];
+    let position = cursor;
+
+    while (position < snapshotIds.length && selected.length < limit) {
+      const needed = limit - selected.length;
+      const requested = snapshotIds.slice(position, position + needed);
+      position += requested.length;
+      const params = Object.fromEntries(
+        requested.map((id, index) => [`snapshot${index}`, id]),
+      );
+      const placeholders = requested
+        .map((_, index) => `:snapshot${index}`)
+        .join(", ");
+      const rows = await this.q<RowDataPacket>(
+        `SET STATEMENT max_statement_time=5 FOR
+         SELECT ${PHOTO_SELECT}
+         FROM photos p
+         STRAIGHT_JOIN creators c ON c.id = p.creator_id
+         WHERE p.id IN (${placeholders})
+           AND p.removed_from_index_at IS NULL
+           AND c.removed_from_index_at IS NULL`,
+        params,
+      );
+      const byId = new Map(
+        (rows as unknown as PhotoRow[]).map((row) => [row.id, row]),
+      );
+      for (const id of requested) {
+        const row = byId.get(id);
+        if (row) selected.push(row);
+      }
+    }
+
+    const tagsMap = await this.tagsFor(selected.map((row) => row.id));
+    return {
+      items: selected.map((row) => rowToView(row, tagsMap.get(row.id) ?? [])),
+      nextCursor: position < snapshotIds.length ? position : null,
+      total: snapshotIds.length,
+      seed,
+    };
   }
 
   async getCreators(): Promise<Creator[]> {
@@ -301,11 +371,15 @@ export class MariaDBProvider implements DataProvider {
     const limit = query.limit ?? PAGE_SIZE;
     const cursor = query.cursor ?? 0;
     const seed =
-      sort === "random"
-        ? Number.isFinite(query.seed)
-          ? (query.seed as number)
-          : Math.floor(Math.random() * 1_000_000)
+      sort === "random" || sort === "discover"
+        ? resolveHomeSeed(query.seed)
         : undefined;
+
+    const tag = query.tag ? normalizeTagSlug(query.tag) : null;
+    const legacyTag = tag ? legacyTagPrefix(tag) : null;
+    if (query.tag && (!tag || !legacyTag)) {
+      return { items: [], nextCursor: null, total: 0, seed };
+    }
 
     const selectiveFilter = Boolean(
       query.creator || query.tag || query.q || query.isAi === true,
@@ -315,8 +389,19 @@ export class MariaDBProvider implements DataProvider {
       seed,
       selectiveFilter,
       textSearch: Boolean(query.q),
+      discoveryFilters: {
+        creator: query.creator,
+        type: query.type,
+        tag: tag ?? undefined,
+        legacyTag: legacyTag ?? undefined,
+        isAi: query.isAi,
+      },
     });
     const where: string[] = plan.extraWhere ? [plan.extraWhere] : [];
+    where.push(
+      "p.removed_from_index_at IS NULL",
+      "c.removed_from_index_at IS NULL",
+    );
     const params: Record<string, unknown> = { ...plan.params };
     if (query.creator) {
       where.push("c.handle = :creator");
@@ -340,11 +425,6 @@ export class MariaDBProvider implements DataProvider {
       params.q2 = `${qq}%`;
     }
     if (query.tag) {
-      const tag = normalizeTagSlug(query.tag);
-      const legacyTag = tag ? legacyTagPrefix(tag) : null;
-      if (!tag || !legacyTag) {
-        return { items: [], nextCursor: null, total: 0, seed };
-      }
       where.push(
         "p.id IN (SELECT photo_id FROM photo_tags WHERE tag = :tag OR tag LIKE :legacyTag)",
       );
@@ -363,17 +443,55 @@ export class MariaDBProvider implements DataProvider {
     const lim = Math.min(Math.max(Number(limit) || PAGE_SIZE, 1), 100);
     const off = Math.max(Number(cursor) || 0, 0);
 
+    const discovery = sort === "discover";
+    const snapshotKey = discovery && seed !== undefined
+      ? homeFeedSnapshotKey({
+          seed,
+          creator: query.creator,
+          type: query.type,
+          tag: tag ?? undefined,
+          isAi: query.isAi,
+          q: query.q,
+        })
+      : null;
+    const frozenIds = snapshotKey ? homeFeedSnapshots.get(snapshotKey) : undefined;
+    if (frozenIds && seed !== undefined) {
+      return this.discoveryPageFromSnapshot(frozenIds, off, lim, seed);
+    }
+
     const rows = await this.q<RowDataPacket>(
       `SET STATEMENT max_statement_time=5 FOR
        SELECT ${PHOTO_SELECT}
        ${plan.fromSql}
        ${whereSql}
        ORDER BY ${plan.orderBy}
-       LIMIT ${lim + 1} OFFSET ${off}`,
+       LIMIT ${discovery ? 1200 : lim + 1}${discovery ? "" : ` OFFSET ${off}`}`,
       params,
     );
 
     const photoRowsAll = rows as unknown as PhotoRow[];
+    if (discovery && seed !== undefined) {
+      const ranked = rankHomeFeed(
+        photoRowsAll.map((row) => rowToView(row, [])),
+        { seed },
+      );
+      if (snapshotKey) {
+        homeFeedSnapshots.set(snapshotKey, ranked.map((item) => item.id));
+      }
+      const page = paginateHomeFeed(ranked, {
+        cursor: off,
+        limit: lim,
+        seed,
+      });
+      const tagsMap = await this.tagsFor(page.items.map((item) => item.id));
+      return {
+        ...page,
+        items: page.items.map((item) => ({
+          ...item,
+          tags: tagsMap.get(item.id) ?? [],
+        })),
+      };
+    }
     const hasMore = photoRowsAll.length > lim;
     const photoRows = hasMore ? photoRowsAll.slice(0, lim) : photoRowsAll;
     const tagsMap = await this.tagsFor(photoRows.map((r) => r.id));

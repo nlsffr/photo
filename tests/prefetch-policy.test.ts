@@ -3,8 +3,8 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const HOTSPOT_FILES = [
-  "src/app/page.tsx",
   "src/components/AppShell.tsx",
+  "src/components/HomeFilters.tsx",
   "src/components/TagChips.tsx",
 ];
 

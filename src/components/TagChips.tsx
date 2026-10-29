@@ -3,9 +3,13 @@ import Link from "next/link";
 export function TagChips({
   tags,
   activeTag,
+  hrefForTag,
+  label = "Filtres par intérêt",
 }: {
   tags: string[];
   activeTag?: string;
+  hrefForTag?: (tag?: string) => string;
+  label?: string;
 }) {
   const chip =
     "shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-medium capitalize transition-colors";
@@ -14,9 +18,13 @@ export function TagChips({
     "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]";
 
   return (
-    <div className="no-scrollbar -mx-3 mb-4 flex gap-2 overflow-x-auto px-3 sm:mx-0 sm:px-0">
+    <nav
+      className="no-scrollbar -mx-2 flex gap-2 overflow-x-auto px-2 sm:mx-0 sm:px-0"
+      aria-label={label}
+    >
       <Link
-        href="/"
+        href={hrefForTag ? hrefForTag(undefined) : "/"}
+        scroll={false}
         prefetch={false}
         className={`${chip} ${!activeTag ? on : off}`}
       >
@@ -25,13 +33,14 @@ export function TagChips({
       {tags.map((tag) => (
         <Link
           key={tag}
-          href={`/?tag=${encodeURIComponent(tag)}`}
+          href={hrefForTag ? hrefForTag(tag) : `/?tag=${encodeURIComponent(tag)}`}
+          scroll={false}
           prefetch={false}
           className={`${chip} ${tag === activeTag ? on : off}`}
         >
           {tag}
         </Link>
       ))}
-    </div>
+    </nav>
   );
 }
