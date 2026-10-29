@@ -29,6 +29,7 @@ import { MediaImg } from "@/components/MediaImg";
 import { BackLink } from "@/components/BackLink";
 import { FloatingBack } from "@/components/FloatingBack";
 import { JsonLd } from "@/components/JsonLd";
+import { buildCreatorStructuredData } from "@/lib/creator-structured-data";
 
 const SITE = (
   process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com"
@@ -263,20 +264,10 @@ export async function CreatorCollectionPage(props: CreatorCollectionPageProps) {
     : numberedHref(numberedPage + 1);
   const tabs = COLLECTIONS.filter((item) => collectionIsEligible(item, stats));
   const labels = ui.tabs;
-  const personLd = {
-    "@context": "https://schema.org",
-    "@type": "Person",
-    name: creator.name,
-    alternateName: handle,
-    url: `${SITE}${base}`,
-    image: absUrl(avatarSrc),
-    description: creator.bio || copy.description,
-    interactionStatistic: {
-      "@type": "InteractionCounter",
-      interactionType: "https://schema.org/FollowAction",
-      userInteractionCount: creator.followers,
-    },
-  };
+  const creatorLd = buildCreatorStructuredData({
+    site: SITE, creator, stats, items: page.items, collection, locale,
+    page: pagination.page,
+  });
   const breadcrumbLd = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
@@ -313,7 +304,7 @@ export async function CreatorCollectionPage(props: CreatorCollectionPageProps) {
   };
   return (
     <div className="pb-4">
-      <JsonLd data={[personLd, breadcrumbLd]} />
+      <JsonLd data={[...creatorLd, breadcrumbLd]} />
       <FloatingBack
         fallback={locale ? `/${locale}` : "/"}
         label={ui.back}

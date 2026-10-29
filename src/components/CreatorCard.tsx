@@ -1,16 +1,18 @@
 import Link from "next/link";
 import type { CreatorWithStats } from "@/lib/types";
 import { creatorHref } from "@/lib/types";
+import type { Locale } from "@/lib/i18n/config";
+import { creatorCollectionPath } from "@/lib/creator-collections";
 import { formatCount } from "@/lib/format";
 import { VerifiedBadge } from "./VerifiedBadge";
 import { MediaImg } from "./MediaImg";
 
-export function CreatorCard({ creator }: { creator: CreatorWithStats }) {
+export function CreatorCard({ creator, locale }: { creator: CreatorWithStats; locale?: Locale }) {
   const img = creator.avatarUrl || creator.coverUrl;
 
   return (
     <Link
-      href={creatorHref(creator.handle, creator.urlVersion)}
+      href={locale ? creatorCollectionPath(creator.handle, creator.urlVersion ?? 1, "overview", locale) : creatorHref(creator.handle, creator.urlVersion)}
       prefetch={false}
       className="group block overflow-hidden rounded-2xl bg-[var(--color-surface)] ring-1 ring-[var(--color-border)] transition hover:ring-[var(--color-accent)]/60"
     >

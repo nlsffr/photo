@@ -24,7 +24,8 @@ import { getDictionary } from "@/lib/i18n/dictionaries";
 import { buildLocalizedMetadata } from "@/lib/i18n/metadata";
 import { buildModelsPagePayload, MODELS_PAGE_SIZE } from "@/lib/models-pagination";
 import { getAllTags, getModelCount, getModels, getPhotos, getRankings } from "@/lib/photos";
-import { creatorHref, type MediaType, type SortKey } from "@/lib/types";
+import { type MediaType, type SortKey } from "@/lib/types";
+import { creatorCollectionPath } from "@/lib/creator-collections";
 import AddMediaPage from "@/app/(default)/add/page";
 import FeedPage from "@/app/(default)/feed/page";
 import PremiumPage from "@/app/(default)/premium/page";
@@ -247,6 +248,7 @@ async function LocalizedHome({ locale, searchParams }: { locale: Locale; searchP
         title={dictionary.home.featured}
         viewAll={dictionary.home.viewAll}
         modelsHref={localePath(locale, "/models")}
+        locale={locale}
       />
       <HomeFilters tags={tags} sort={sort} type={type} tag={tag} />
       <InfiniteGallery
@@ -283,7 +285,7 @@ async function LocalizedModels({ locale, searchParams }: { locale: Locale; searc
       itemListElement: page.items.slice(0, 50).map((model, index) => ({
         "@type": "ListItem",
         position: start + index + 1,
-        url: `${SITE}${creatorHref(model.handle, model.urlVersion)}`,
+        url: `${SITE}${creatorCollectionPath(model.handle, model.urlVersion ?? 1, "overview", locale)}`,
         name: model.name || model.handle,
       })),
     },
@@ -308,6 +310,7 @@ async function LocalizedModels({ locale, searchParams }: { locale: Locale; searc
         initialHasMore={page.hasMore}
         initialNextOffset={page.nextOffset}
         sort={sort}
+        locale={locale}
       />
     </div>
   );
@@ -372,7 +375,7 @@ async function LocalizedRankings({ locale }: { locale: Locale }) {
         <ol className="flex flex-col gap-2">
           {ranked.map((creator, index) => (
             <li key={creator.handle}>
-              <Link href={creatorHref(creator.handle, creator.urlVersion)} className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+              <Link href={creatorCollectionPath(creator.handle, creator.urlVersion ?? 1, "overview", locale)} className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
                 <span className="w-8 text-center text-lg font-black">{index + 1}</span>
                 <MediaImg src={creator.avatarUrl || ""} alt={creator.name} width={48} height={48} className="h-12 w-12 rounded-full object-cover" />
                 <div className="min-w-0 flex-1">
@@ -396,7 +399,7 @@ async function LocalizedInfluencers({ locale }: { locale: Locale }) {
       <h1 className="text-2xl font-bold tracking-tight">{locale === "fr" ? "Créateurs en tendance" : "Trending creators"} 🔥</h1>
       <p className="mb-5 text-sm text-[var(--color-ink-muted)]">{locale === "fr" ? "Les modèles dont le contenu grimpe le plus en ce moment." : "Models whose content is gaining the most views right now."}</p>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-        {models.map((creator) => <CreatorCard key={creator.handle} creator={creator} />)}
+        {models.map((creator) => <CreatorCard key={creator.handle} creator={creator} locale={locale} />)}
       </div>
     </div>
   );

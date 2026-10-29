@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { getModels } from "@/lib/photos";
 import { creatorHref } from "@/lib/types";
+import type { Locale } from "@/lib/i18n/config";
+import { creatorCollectionPath } from "@/lib/creator-collections";
 import { MediaImg } from "./MediaImg";
 
 /** Only top N — never pull full creator list on home */
@@ -10,10 +12,12 @@ export async function FeaturedCreators({
   title = "Modèles en vedette",
   viewAll = "Voir tout",
   modelsHref = "/models",
+  locale,
 }: {
   title?: string;
   viewAll?: string;
   modelsHref?: string;
+  locale?: Locale;
 } = {}) {
   const creators = await getModels("views", FEATURED);
 
@@ -39,7 +43,7 @@ export async function FeaturedCreators({
           return (
             <Link
               key={c.handle}
-              href={creatorHref(c.handle, c.urlVersion)}
+              href={locale ? creatorCollectionPath(c.handle, c.urlVersion ?? 1, "overview", locale) : creatorHref(c.handle, c.urlVersion)}
               prefetch={false}
               className="flex w-[4.1rem] shrink-0 flex-col items-center gap-1.5 sm:w-[4.5rem]"
             >

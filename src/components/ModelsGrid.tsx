@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { CreatorWithStats } from "@/lib/types";
+import type { Locale } from "@/lib/i18n/config";
 import type { ModelsPagePayload, ModelsSort } from "@/lib/models-pagination";
 import { appendUniqueCreators } from "@/lib/models-pagination";
 import { CreatorCard } from "./CreatorCard";
@@ -12,6 +13,7 @@ type Props = {
   initialHasMore: boolean;
   initialNextOffset: number | null;
   sort: ModelsSort;
+  locale?: Locale;
 };
 
 export function ModelsGrid({
@@ -19,6 +21,7 @@ export function ModelsGrid({
   initialHasMore,
   initialNextOffset,
   sort,
+  locale,
 }: Props) {
   const { t } = useLocale();
   const [models, setModels] = useState(initialModels);
@@ -70,7 +73,7 @@ export function ModelsGrid({
         aria-busy={loading}
       >
         {models.map((creator) => (
-          <CreatorCard key={creator.handle} creator={creator} />
+          <CreatorCard key={creator.handle} creator={creator} locale={locale} />
         ))}
       </div>
 
