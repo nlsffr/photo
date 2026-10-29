@@ -141,12 +141,13 @@ The measurements have deliberately separate meanings:
 - daily visitors are random first-party visitor cookies aggregated by UTC day;
 - live presence is a heartbeat observed during the last five minutes.
 
-Run the operator-only report from the host or app environment:
+Run the operator-only report inside the production app container (the VPS host
+does not need a separate Node.js installation):
 
 ```bash
-DATABASE_URL="$DATABASE_URL" node scripts/analytics-report.mjs
+docker exec photo-app-1 node scripts/analytics-report.mjs
 # Optional UTC day:
-DATABASE_URL="$DATABASE_URL" node scripts/analytics-report.mjs 2026-10-29
+docker exec photo-app-1 node scripts/analytics-report.mjs 2026-10-29
 ```
 
 Before this migration, nginx logs and `media_views` can only provide estimates:
