@@ -4,11 +4,13 @@ import type { ReactNode } from "react";
 export function LegalPage({
   title,
   updated,
+  updatedLabel = "Dernière mise à jour",
   intro,
   sections,
 }: {
   title: string;
   updated: string;
+  updatedLabel?: string;
   intro?: string;
   sections: { heading: string; body: ReactNode }[];
 }) {
@@ -16,7 +18,7 @@ export function LegalPage({
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
       <h1 className="text-3xl font-black tracking-tight">{title}</h1>
       <p className="mt-2 text-sm text-[var(--color-ink-faint)]">
-        Dernière mise à jour : {updated}
+        {updatedLabel}: {updated}
       </p>
       {intro && (
         <p className="mt-4 text-lg text-[var(--color-ink-muted)]">{intro}</p>

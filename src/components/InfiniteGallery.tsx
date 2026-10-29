@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, Fragment } from "react";
 import { PhotoCard } from "./PhotoCard";
 import { AdSlot } from "./AdSlot";
 import type { MediaType, PhotoPage, PhotoView, SortKey } from "@/lib/types";
+import { useLocale } from "./LocaleProvider";
 
 interface Props {
   initial: PhotoPage;
@@ -21,6 +22,7 @@ interface Props {
 const AD_EVERY = 24;
 
 export function InfiniteGallery({ initial, params, premium = false }: Props) {
+  const { t } = useLocale();
   const [items, setItems] = useState<PhotoView[]>(initial.items);
   const [cursor, setCursor] = useState<number | null>(initial.nextCursor);
   const [errored, setErrored] = useState(false);
@@ -110,9 +112,9 @@ export function InfiniteGallery({ initial, params, premium = false }: Props) {
   if (items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-24 text-center">
-        <p className="text-lg font-semibold">Aucun résultat</p>
+        <p className="text-lg font-semibold">{t("home.gallery.emptyTitle")}</p>
         <p className="max-w-sm text-sm text-[var(--color-ink-muted)]">
-          Essaie un autre mot-clé ou retire les filtres.
+          {t("home.gallery.emptyBody")}
         </p>
       </div>
     );
@@ -144,13 +146,13 @@ export function InfiniteGallery({ initial, params, premium = false }: Props) {
           {loading && (
             <span
               className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--color-surface-3)] border-t-[var(--color-accent)]"
-              aria-label="Chargement"
+              aria-label={t("home.gallery.loading")}
               role="status"
             />
           )}
           {errored && (
             <p className="text-sm text-[var(--color-ink-muted)]">
-              Impossible de charger la suite.
+              {t("home.gallery.loadError")}
             </p>
           )}
           <button
@@ -162,14 +164,18 @@ export function InfiniteGallery({ initial, params, premium = false }: Props) {
             }}
             className="rounded-full bg-[var(--color-accent)] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[var(--color-accent-600)] disabled:opacity-60"
           >
-            {loading ? "Chargement…" : errored ? "Réessayer" : "Charger plus"}
+            {loading
+              ? `${t("home.gallery.loading")}…`
+              : errored
+                ? t("home.gallery.retry")
+                : t("home.gallery.loadMore")}
           </button>
         </div>
       )}
 
       {cursor === null && (
         <p className="py-10 text-center text-sm text-[var(--color-ink-faint)]">
-          Tu as tout vu — {items.length} médias.
+          {t("home.gallery.end")} — {items.length} {t("home.gallery.media")}.
         </p>
       )}
     </>

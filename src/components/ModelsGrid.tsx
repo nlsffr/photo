@@ -5,6 +5,7 @@ import type { CreatorWithStats } from "@/lib/types";
 import type { ModelsPagePayload, ModelsSort } from "@/lib/models-pagination";
 import { appendUniqueCreators } from "@/lib/models-pagination";
 import { CreatorCard } from "./CreatorCard";
+import { useLocale } from "./LocaleProvider";
 
 type Props = {
   initialModels: CreatorWithStats[];
@@ -19,6 +20,7 @@ export function ModelsGrid({
   initialNextOffset,
   sort,
 }: Props) {
+  const { t } = useLocale();
   const [models, setModels] = useState(initialModels);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [nextOffset, setNextOffset] = useState(initialNextOffset);
@@ -51,10 +53,10 @@ export function ModelsGrid({
       setModels(merged);
       setHasMore(page.hasMore);
       setNextOffset(page.nextOffset);
-      setAnnouncement(`${merged.length - before} créateurs ajoutés.`);
+      setAnnouncement(`${merged.length - before} ${t("models.added")}`);
     } catch {
       setError(true);
-      setAnnouncement("Impossible de charger plus de créateurs.");
+      setAnnouncement(t("models.loadError"));
     } finally {
       setLoading(false);
     }
@@ -78,7 +80,7 @@ export function ModelsGrid({
 
       {error && (
         <p role="alert" className="mt-4 text-center text-sm text-[var(--color-ink-muted)]">
-          Impossible de charger la suite. Réessaie dans un instant.
+          {t("models.loadError")}
         </p>
       )}
 
@@ -91,7 +93,11 @@ export function ModelsGrid({
             aria-controls="models-grid"
             className="rounded-full bg-[var(--color-accent)] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[var(--color-accent-600)] disabled:cursor-wait disabled:opacity-60"
           >
-            {loading ? "Chargement…" : error ? "Réessayer" : "Voir plus"}
+            {loading
+              ? t("models.loading")
+              : error
+                ? t("models.retry")
+                : t("models.loadMore")}
           </button>
         </div>
       )}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useLocale } from "./LocaleProvider";
 
 type Field = {
   name: string;
@@ -12,22 +13,11 @@ type Field = {
 
 type Status = "idle" | "sending" | "sent" | "error";
 
-const ERRORS: Record<string, string> = {
-  invalid_email: "L’adresse e-mail semble invalide.",
-  empty_message: "Le message est trop court.",
-  rate_limited: "Trop de tentatives. Réessaie dans quelques minutes.",
-  not_configured:
-    "L’envoi n’est pas encore activé sur ce site. Écris directement à l’adresse indiquée sur la page.",
-  send_failed: "L’envoi a échoué. Réessaie, ou utilise l’adresse e-mail indiquée.",
-  bad_request: "Requête invalide.",
-  network: "Connexion impossible. Vérifie ta connexion et réessaie.",
-};
-
 export function ContactForm({
   kind,
   fields,
   reasons,
-  submitLabel = "Envoyer",
+  submitLabel,
 }: {
   /** Which form this is — labels the email on the server. */
   kind: string;
@@ -35,6 +25,7 @@ export function ContactForm({
   reasons?: string[];
   submitLabel?: string;
 }) {
+  const { t } = useLocale();
   const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -59,11 +50,21 @@ export function ContactForm({
         form.reset();
         setStatus("sent");
       } else {
-        setErrorMsg(ERRORS[json.error ?? ""] ?? ERRORS.send_failed);
+        const errorKey = json.error && [
+          "invalid_email",
+          "empty_message",
+          "rate_limited",
+          "not_configured",
+          "send_failed",
+          "bad_request",
+        ].includes(json.error)
+          ? json.error
+          : "send_failed";
+        setErrorMsg(t(`contactForm.errors.${errorKey}`));
         setStatus("error");
       }
     } catch {
-      setErrorMsg(ERRORS.network);
+      setErrorMsg(t("contactForm.errors.network"));
       setStatus("error");
     }
   }
@@ -76,16 +77,16 @@ export function ContactForm({
             <path d="M20 6 9 17l-5-5" />
           </svg>
         </div>
-        <p className="mt-3 text-lg font-bold">Message envoyé</p>
+        <p className="mt-3 text-lg font-bold">{t("contactForm.sentTitle")}</p>
         <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-          Merci — on revient vers toi dès que possible.
+          {t("contactForm.sentBody")}
         </p>
         <button
           type="button"
           onClick={() => setStatus("idle")}
           className="mt-4 rounded-full border border-[var(--color-border)] px-5 py-2 text-sm font-semibold text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
         >
-          Envoyer un autre message
+          {t("contactForm.another")}
         </button>
       </div>
     );
@@ -117,7 +118,7 @@ export function ContactForm({
       {reasons && reasons.length > 0 && (
         <label className="flex flex-col gap-1.5">
           <span className="text-sm font-semibold">
-            Motif<span className="text-[var(--color-accent)]"> *</span>
+            {t("contactForm.reason")}<span className="text-[var(--color-accent)]"> *</span>
           </span>
           <select name="reason" required disabled={sending} className={input}>
             {reasons.map((r) => (
@@ -131,14 +132,14 @@ export function ContactForm({
 
       <label className="flex flex-col gap-1.5">
         <span className="text-sm font-semibold">
-          Message<span className="text-[var(--color-accent)]"> *</span>
+          {t("contactForm.message")}<span className="text-[var(--color-accent)]"> *</span>
         </span>
         <textarea
           name="message"
           required
           rows={6}
           disabled={sending}
-          placeholder="Décris ta demande en détail…"
+          placeholder={t("contactForm.messagePlaceholder")}
           className={`${input} resize-y`}
         />
       </label>
@@ -160,13 +161,11 @@ export function ContactForm({
             aria-hidden
           />
         )}
-        {sending ? "Envoi…" : submitLabel}
+        {sending ? t("contactForm.sending") : submitLabel ?? t("contactForm.submit")}
       </button>
 
       <p className="text-xs text-[var(--color-ink-faint)]">
-        En envoyant ce formulaire, tu acceptes que ta demande soit traitée
-        conformément à notre politique de confidentialité. Aucune donnée n’est
-        partagée avec des tiers.
+        {t("contactForm.privacy")}
       </p>
     </form>
   );

@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
-import { readdir } from "node:fs/promises";
+import { access, readFile, readdir } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 import test from "node:test";
 
+const APP_ROUTES = new URL("../src/app", import.meta.url).pathname;
 const MEDIA_ROUTES = new URL("../src/app/sitemaps/media", import.meta.url).pathname;
 
 async function routePaths(directory: string): Promise<string[]> {
@@ -31,4 +32,19 @@ test("legacy and stable media sitemap routes have no dynamic slug conflict", asy
   assert.doesNotThrow(() => getSortedRoutes(routes));
   assert.ok(routes.includes("/sitemaps/media/[chunk]"));
   assert.ok(routes.includes("/sitemaps/media/stable/[date]/[cursor]"));
+});
+
+test("the route-owned sitemap index delegates localized pages to the static child", async () => {
+  await assert.rejects(access(join(APP_ROUTES, "sitemap.ts")), { code: "ENOENT" });
+
+  const [indexRoute, staticRoute, robots] = await Promise.all([
+    readFile(join(APP_ROUTES, "sitemap.xml/route.ts"), "utf8"),
+    readFile(join(APP_ROUTES, "sitemaps/static/route.ts"), "utf8"),
+    readFile(join(APP_ROUTES, "robots.ts"), "utf8"),
+  ]);
+
+  assert.match(indexRoute, /getSitemapMediaPartitions/);
+  assert.match(indexRoute, /\$\{SITE\}\/sitemaps\/static/);
+  assert.match(staticRoute, /renderLocalizedStaticSitemapXml/);
+  assert.match(robots, /\$\{SITE\}\/sitemap\.xml/);
 });

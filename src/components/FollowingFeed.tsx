@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { LocalizedLink as Link } from "./LocalizedLink";
 import { useEffect, useState } from "react";
 import type { PhotoView } from "@/lib/types";
 import { creatorHref } from "@/lib/types";

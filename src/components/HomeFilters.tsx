@@ -5,6 +5,8 @@ import { useId, useMemo, useRef, useState } from "react";
 import type { MediaType, SortKey } from "@/lib/types";
 import { buildHomeHref } from "@/lib/home-filter-links";
 import { TagChips } from "./TagChips";
+import { useLocale } from "./LocaleProvider";
+import { localePath } from "@/lib/i18n/config";
 
 type Props = {
   tags: string[];
@@ -21,6 +23,8 @@ const idleChip =
   "border-[var(--color-border)] bg-[var(--color-surface-2)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]";
 
 export function HomeFilters({ tags, sort, type, tag }: Props) {
+  const { locale, t } = useLocale();
+  const homePath = localePath(locale, "/");
   const dialogRef = useRef<HTMLDialogElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const dialogId = useId();
@@ -52,34 +56,34 @@ export function HomeFilters({ tags, sort, type, tag }: Props) {
 
   const quickFilters = [
     {
-      label: "Découvrir",
+      label: t("home.filters.discover"),
       active: sort === "discover",
-      href: buildHomeHref(state, { sort: "discover" }),
+      href: buildHomeHref(state, { sort: "discover" }, homePath),
     },
     {
-      label: "Tendances",
+      label: t("home.filters.trending"),
       active: sort === "trending",
-      href: buildHomeHref(state, { sort: "trending" }),
+      href: buildHomeHref(state, { sort: "trending" }, homePath),
     },
     {
-      label: "Récents",
+      label: t("home.filters.recent"),
       active: sort === "recent",
-      href: buildHomeHref(state, { sort: "recent" }),
+      href: buildHomeHref(state, { sort: "recent" }, homePath),
     },
     {
-      label: "Photos",
+      label: t("home.filters.photos"),
       active: type === "photo",
-      href: buildHomeHref(state, { type: type === "photo" ? null : "photo" }),
+      href: buildHomeHref(state, { type: type === "photo" ? null : "photo" }, homePath),
     },
     {
-      label: "Vidéos",
+      label: t("home.filters.videos"),
       active: type === "video",
-      href: buildHomeHref(state, { type: type === "video" ? null : "video" }),
+      href: buildHomeHref(state, { type: type === "video" ? null : "video" }, homePath),
     },
   ];
 
   return (
-    <section className="mb-4 space-y-2.5" aria-label="Filtres de découverte">
+    <section className="mb-4 space-y-2.5" aria-label={t("home.filters.label")}>
       <div className="no-scrollbar -mx-2 flex gap-2 overflow-x-auto px-2 sm:mx-0 sm:px-0">
         {quickFilters.map((filter) => (
           <Link
@@ -101,10 +105,10 @@ export function HomeFilters({ tags, sort, type, tag }: Props) {
           onClick={showDialog}
           className={`${chip} ${tag ? activeChip : idleChip}`}
         >
-          Tous les filtres{activeCount > 0 ? ` · ${activeCount}` : ""}
+          {t("home.filters.all")}{activeCount > 0 ? ` · ${activeCount}` : ""}
         </button>
         <Link
-          href="/feed"
+          href={localePath(locale, "/feed")}
           prefetch={false}
           className={`${chip} ml-auto ${idleChip}`}
         >
@@ -116,27 +120,27 @@ export function HomeFilters({ tags, sort, type, tag }: Props) {
         <TagChips
           tags={priorityTags}
           activeTag={tag}
-          hrefForTag={(nextTag) => buildHomeHref(state, { tag: nextTag ?? null })}
-          label="Intérêts populaires"
+          hrefForTag={(nextTag) => buildHomeHref(state, { tag: nextTag ?? null }, homePath)}
+          label={t("home.filters.popularInterests")}
         />
       ) : null}
 
       {activeCount > 0 ? (
         <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-ink-muted)]">
           <span>
-            Filtres actifs : {[
+            {t("home.filters.active")} : {[
               sort !== "discover" ? sort : null,
               type,
               tag,
             ].filter(Boolean).join(" · ")}
           </span>
           <Link
-            href={buildHomeHref(state, { clearAll: true })}
+            href={buildHomeHref(state, { clearAll: true }, homePath)}
             scroll={false}
             prefetch={false}
             className="font-semibold text-[var(--color-accent)] hover:underline"
           >
-            Tout effacer
+            {t("home.filters.clear")}
           </Link>
         </div>
       ) : null}
@@ -151,15 +155,15 @@ export function HomeFilters({ tags, sort, type, tag }: Props) {
         <div className="sticky top-0 z-10 border-b border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 id={titleId} className="text-lg font-bold">Tous les filtres</h2>
+              <h2 id={titleId} className="text-lg font-bold">{t("home.filters.title")}</h2>
               <p className="mt-0.5 text-sm text-[var(--color-ink-muted)]">
-                Choisis un intérêt pour personnaliser la galerie.
+                {t("home.filters.description")}
               </p>
             </div>
             <form method="dialog">
               <button
                 type="submit"
-                aria-label="Fermer les filtres"
+                aria-label={t("home.filters.close")}
                 className="tap-lg rounded-full border border-[var(--color-border)] px-3 text-lg text-[var(--color-ink-muted)]"
               >
                 ×
@@ -167,13 +171,13 @@ export function HomeFilters({ tags, sort, type, tag }: Props) {
             </form>
           </div>
           <label className="mt-4 block">
-            <span className="sr-only">Rechercher un filtre</span>
+            <span className="sr-only">{t("home.filters.search")}</span>
             <input
               ref={searchRef}
               type="search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Rechercher un intérêt…"
+              placeholder={t("home.filters.searchPlaceholder")}
               autoFocus
               className="w-full rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-2)] px-4 py-3 text-sm outline-none placeholder:text-[var(--color-ink-faint)] focus:border-[var(--color-accent)]"
             />
@@ -186,7 +190,7 @@ export function HomeFilters({ tags, sort, type, tag }: Props) {
             return (
               <Link
                 key={item}
-                href={buildHomeHref(state, { tag: active ? null : item })}
+                href={buildHomeHref(state, { tag: active ? null : item }, homePath)}
                 scroll={false}
                 prefetch={false}
                 aria-current={active ? "page" : undefined}
@@ -201,7 +205,7 @@ export function HomeFilters({ tags, sort, type, tag }: Props) {
           })}
           {filteredTags.length === 0 ? (
             <p className="col-span-full py-10 text-center text-sm text-[var(--color-ink-muted)]">
-              Aucun filtre trouvé.
+              {t("home.filters.empty")}
             </p>
           ) : null}
         </div>

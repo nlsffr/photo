@@ -121,3 +121,42 @@ test("a full worst-case media partition stays below the 50 MiB XML limit", async
 
   assert.ok(Buffer.byteLength(xml, "utf8") < 50 * 1024 * 1024);
 });
+
+async function loadLocalizedSitemap() {
+  // @ts-expect-error Node's native type stripping requires the explicit .ts suffix.
+  return import("../src/lib/i18n/sitemap.ts");
+}
+
+test("localized sitemap entries submit both translations with reciprocal alternates", async () => {
+  const { buildLocalizedSitemapEntries } = await loadLocalizedSitemap();
+  const entries = buildLocalizedSitemapEntries("https://leakfanhub.com");
+  const englishModels = entries.find((entry) => entry.url.endsWith("/en/models"));
+  const frenchModels = entries.find((entry) => entry.url.endsWith("/fr/models"));
+
+  assert.ok(englishModels);
+  assert.ok(frenchModels);
+  assert.deepEqual(englishModels.alternates.languages, {
+    en: "https://leakfanhub.com/en/models",
+    fr: "https://leakfanhub.com/fr/models",
+    "x-default": "https://leakfanhub.com/models",
+  });
+  assert.deepEqual(frenchModels.alternates, englishModels.alternates);
+  assert.equal(entries.some((entry) => /\/[^/]+\/[^/]+-v\d+$/.test(entry.url)), false);
+});
+
+test("custom static sitemap XML declares xhtml and reciprocal hreflang links", async () => {
+  const { renderLocalizedStaticSitemapXml } = await loadLocalizedSitemap();
+  const xml = renderLocalizedStaticSitemapXml("https://leakfanhub.com");
+
+  assert.match(xml, /xmlns:xhtml="http:\/\/www\.w3\.org\/1999\/xhtml"/);
+  assert.match(xml, /<loc>https:\/\/leakfanhub\.com\/en<\/loc>/);
+  assert.match(
+    xml,
+    /hreflang="fr" href="https:\/\/leakfanhub\.com\/fr"/,
+  );
+  assert.match(
+    xml,
+    /hreflang="x-default" href="https:\/\/leakfanhub\.com\/"/,
+  );
+  assert.doesNotMatch(xml, /<loc>https:\/\/leakfanhub\.com\/models<\/loc>/);
+});

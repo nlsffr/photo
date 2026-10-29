@@ -6,7 +6,15 @@ import { MediaImg } from "./MediaImg";
 /** Only top N — never pull full creator list on home */
 const FEATURED = 14;
 
-export async function FeaturedCreators() {
+export async function FeaturedCreators({
+  title = "Modèles en vedette",
+  viewAll = "Voir tout",
+  modelsHref = "/models",
+}: {
+  title?: string;
+  viewAll?: string;
+  modelsHref?: string;
+} = {}) {
   const creators = await getModels("views", FEATURED);
 
   if (creators.length === 0) return null;
@@ -15,14 +23,14 @@ export async function FeaturedCreators() {
     <section className="mb-4">
       <div className="mb-2 flex items-center justify-between px-0.5">
         <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--color-ink-faint)]">
-          Modèles en vedette
+          {title}
         </h2>
         <Link
-          href="/models"
+          href={modelsHref}
           prefetch={true}
           className="text-xs font-semibold text-[var(--color-accent)]"
         >
-          Voir tout
+          {viewAll}
         </Link>
       </div>
       <div className="no-scrollbar -mx-2 flex gap-3 overflow-x-auto px-2 pb-1 sm:mx-0 sm:gap-3.5 sm:px-0">

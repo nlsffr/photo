@@ -2,10 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { localePath } from "@/lib/i18n/config";
+import { useLocale } from "./LocaleProvider";
 
 const KEY = "lfh:cookies:v1";
 
 export function CookieBanner() {
+  const { locale, t } = useLocale();
   const [show, setShow] = useState(false);
 
   useEffect(() => {
@@ -31,10 +34,9 @@ export function CookieBanner() {
     <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-50 mx-auto max-w-lg px-3 lg:bottom-4">
       <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-2xl">
         <p className="text-sm text-[var(--color-ink-muted)]">
-          Nous utilisons un stockage local minimal (préférences, likes). Pas de
-          trackers publicitaires tiers.{" "}
-          <Link href="/confidentialite" className="text-[var(--color-accent)] hover:underline">
-            En savoir plus
+          {t("shell.cookies.body")} {" "}
+          <Link href={localePath(locale, "/confidentialite")} className="text-[var(--color-accent)] hover:underline">
+            {t("shell.cookies.more")}
           </Link>
         </p>
         <button

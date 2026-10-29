@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useSession } from "./Session";
+import { useLocale } from "./LocaleProvider";
+import { localePath } from "@/lib/i18n/config";
 
 /**
  * Email + username + password auth form (login / signup), wired to the real
@@ -13,6 +15,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const isSignup = mode === "signup";
   const router = useRouter();
   const { refresh } = useSession();
+  const { locale, t } = useLocale();
 
   const [identifier, setIdentifier] = useState(""); // login: email or username
   const [email, setEmail] = useState("");
@@ -29,7 +32,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     setError(null);
 
     if (isSignup && password !== confirm) {
-      setError("Les mots de passe ne correspondent pas.");
+      setError(t("auth.mismatch"));
       return;
     }
 
@@ -50,14 +53,14 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
       };
       if (res.ok && json.ok) {
         await refresh();
-        router.push("/");
+        router.push(localePath(locale, "/"));
         router.refresh();
       } else {
-        setError(json.message ?? "Une erreur est survenue. Réessaie.");
+        setError(json.message ?? t("auth.genericError"));
         setBusy(false);
       }
     } catch {
-      setError("Connexion impossible. Vérifie ta connexion et réessaie.");
+      setError(t("auth.networkError"));
       setBusy(false);
     }
   }
@@ -69,19 +72,19 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     <div className="mx-auto w-full max-w-md">
       <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 sm:p-8">
         <h1 className="text-2xl font-bold tracking-tight">
-          {isSignup ? "Créer un compte" : "Connexion"}
+          {isSignup ? t("auth.signupTitle") : t("auth.loginTitle")}
         </h1>
         <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
           {isSignup
-            ? "Rejoins LumenGallery en quelques secondes."
-            : "Content de te revoir."}
+            ? t("auth.signupIntro")
+            : t("auth.loginIntro")}
         </p>
 
         <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-3">
           {isSignup ? (
             <>
               <label className="flex flex-col gap-1.5">
-                <span className="text-sm font-medium">Nom d’utilisateur</span>
+                <span className="text-sm font-medium">{t("auth.username")}</span>
                 <input
                   type="text"
                   required
@@ -90,20 +93,20 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
                   maxLength={32}
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="ton_pseudo"
+                  placeholder={t("auth.usernamePlaceholder")}
                   disabled={busy}
                   className={input}
                 />
               </label>
               <label className="flex flex-col gap-1.5">
-                <span className="text-sm font-medium">E-mail</span>
+                <span className="text-sm font-medium">{t("auth.email")}</span>
                 <input
                   type="email"
                   required
                   autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="toi@exemple.com"
+                  placeholder={t("auth.emailPlaceholder")}
                   disabled={busy}
                   className={input}
                 />
@@ -111,14 +114,14 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
             </>
           ) : (
             <label className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium">E-mail ou nom d’utilisateur</span>
+              <span className="text-sm font-medium">{t("auth.identifier")}</span>
               <input
                 type="text"
                 required
                 autoComplete="username"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
-                placeholder="toi@exemple.com"
+                placeholder={t("auth.emailPlaceholder")}
                 disabled={busy}
                 className={input}
               />
@@ -126,7 +129,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
           )}
 
           <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium">Mot de passe</span>
+            <span className="text-sm font-medium">{t("auth.password")}</span>
             <div className="relative">
               <input
                 type={show ? "text" : "password"}
@@ -144,7 +147,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
                 onClick={() => setShow((s) => !s)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[var(--color-ink-muted)]"
               >
-                {show ? "Masquer" : "Afficher"}
+                {show ? t("auth.hide") : t("auth.show")}
               </button>
             </div>
           </label>
@@ -152,7 +155,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
           {isSignup && (
             <label className="flex flex-col gap-1.5">
               <span className="text-sm font-medium">
-                Confirmer le mot de passe
+                {t("auth.confirmPassword")}
               </span>
               <input
                 type={show ? "text" : "password"}
@@ -183,32 +186,32 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
               <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden />
             )}
             {busy
-              ? "Un instant…"
+              ? t("auth.busy")
               : isSignup
-                ? "Créer mon compte"
-                : "Se connecter"}
+                ? t("auth.submitSignup")
+                : t("auth.submitLogin")}
           </button>
         </form>
 
         <p className="mt-6 text-center text-sm text-[var(--color-ink-muted)]">
           {isSignup ? (
             <>
-              Déjà un compte ?{" "}
+              {t("auth.already")} {" "}
               <Link
-                href="/connexion"
+                href={localePath(locale, "/connexion")}
                 className="font-semibold text-[var(--color-accent)] hover:underline"
               >
-                Se connecter
+                {t("auth.submitLogin")}
               </Link>
             </>
           ) : (
             <>
-              Pas encore de compte ?{" "}
+              {t("auth.needAccount")} {" "}
               <Link
-                href="/inscription"
+                href={localePath(locale, "/inscription")}
                 className="font-semibold text-[var(--color-accent)] hover:underline"
               >
-                Créer un compte
+                {t("auth.signupTitle")}
               </Link>
             </>
           )}
@@ -216,9 +219,9 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
       </div>
 
       <p className="mt-4 text-center text-xs text-[var(--color-ink-faint)]">
-        Tu préfères rester anonyme ?{" "}
+        {t("auth.anonymousPrompt")} {" "}
         <Link href="/identite" className="text-[var(--color-accent)] hover:underline">
-          Utilise une identité sans e-mail
+          {t("auth.anonymousLink")}
         </Link>
         .
       </p>
