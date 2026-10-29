@@ -1,7 +1,11 @@
 import unittest
 from datetime import datetime, timezone
 
-from notification_worker import NotificationWorker, retry_delay_seconds
+from notification_worker import (
+    NotificationWorker,
+    retry_delay_seconds,
+    run_iteration,
+)
 
 
 class FakeStore:
@@ -31,6 +35,16 @@ class FakeApi:
         if self.fail:
             raise RuntimeError("telegram down token=must-not-be-stored")
         return {"message_id": 1}
+
+
+class FakeLoopWorker:
+    def __init__(self, processed):
+        self.processed = processed
+        self.calls = 0
+
+    def run_once(self):
+        self.calls += 1
+        return self.processed
 
 
 class NotificationWorkerTests(unittest.TestCase):
@@ -74,6 +88,24 @@ class NotificationWorkerTests(unittest.TestCase):
         self.assertEqual(retry_delay_seconds(2), 60)
         self.assertEqual(retry_delay_seconds(7), 1920)
         self.assertEqual(retry_delay_seconds(20), 3600)
+
+    def test_processed_events_are_throttled_before_claiming_the_next_one(self):
+        worker = FakeLoopWorker(True)
+        sleeps = []
+
+        self.assertEqual(run_iteration(worker, sleep=sleeps.append), True)
+
+        self.assertEqual(worker.calls, 1)
+        self.assertEqual(sleeps, [1.1])
+
+    def test_empty_queue_keeps_the_existing_two_second_poll_delay(self):
+        worker = FakeLoopWorker(False)
+        sleeps = []
+
+        self.assertEqual(run_iteration(worker, sleep=sleeps.append), False)
+
+        self.assertEqual(worker.calls, 1)
+        self.assertEqual(sleeps, [2.0])
 
 
 if __name__ == "__main__":

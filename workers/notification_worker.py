@@ -15,10 +15,28 @@ from telegram_premium_worker import database_config, db_time, log_event, utc_now
 
 
 MAX_ATTEMPTS = 8
+PROCESSED_EVENT_DELAY_SECONDS = 1.1
+EMPTY_QUEUE_DELAY_SECONDS = 2.0
 
 
 def retry_delay_seconds(attempts: int) -> int:
     return min(3600, 30 * (2 ** max(0, attempts - 1)))
+
+
+def run_iteration(
+    worker: Any,
+    *,
+    sleep: Callable[[float], None] = time.sleep,
+) -> bool:
+    """Process at most one event and pace the next Telegram API call."""
+
+    processed = worker.run_once()
+    sleep(
+        PROCESSED_EVENT_DELAY_SECONDS
+        if processed
+        else EMPTY_QUEUE_DELAY_SECONDS
+    )
+    return processed
 
 
 class MariaOutboxStore:
@@ -185,8 +203,7 @@ def main() -> None:
     log_event("notification_worker_started")
     while True:
         try:
-            if not worker.run_once():
-                time.sleep(2)
+            run_iteration(worker)
         except Exception as exc:
             log_event("notification_worker_error", error=type(exc).__name__)
             time.sleep(3)
