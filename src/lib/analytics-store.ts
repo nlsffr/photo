@@ -37,14 +37,14 @@ export async function recordAnalyticsEventWithPool(
       await connection.execute(
         `INSERT INTO analytics_daily_visitors
          (day, visitor_hash, page_views, first_seen_at, last_seen_at,
-          first_path, last_path, referrer_host, `source`)
+          first_path, last_path, referrer_host, \`source\`)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
            page_views = page_views + 1,
            last_seen_at = VALUES(last_seen_at),
            last_path = VALUES(last_path),
            referrer_host = COALESCE(referrer_host, VALUES(referrer_host)),
-           `source` = COALESCE(`source`, VALUES(`source`))`,
+           \`source\` = COALESCE(\`source\`, VALUES(\`source\`))`,
         [
           analyticsUtcDay(now),
           input.visitorHash,

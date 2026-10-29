@@ -10,8 +10,13 @@ import {
   parseAnalyticsPayload,
 } from "@/lib/analytics-policy";
 import { rateLimitRequest, sweep } from "@/lib/ratelimit";
+import {
+  isAllowedAnalyticsOrigin,
+  readBoundedJson,
+} from "@/lib/analytics-request";
 
 export const dynamic = "force-dynamic";
+const MAX_ANALYTICS_BODY_BYTES = 4_096;
 
 function noContent(visitorToken?: string) {
   const response = new NextResponse(null, {
@@ -34,9 +39,26 @@ export async function POST(request: NextRequest) {
   sweep();
   if (isAnalyticsBot(request.headers.get("user-agent"))) return noContent();
 
-  const contentLength = Number(request.headers.get("content-length") ?? 0);
-  if (Number.isFinite(contentLength) && contentLength > 4_096) {
-    return NextResponse.json({ error: "payload_too_large" }, { status: 413 });
+  if (
+    !isAllowedAnalyticsOrigin(
+      request.url,
+      request.headers,
+      process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com",
+    )
+  ) {
+    return NextResponse.json({ error: "forbidden_origin" }, { status: 403 });
+  }
+
+  const secret =
+    process.env.ANALYTICS_HASH_SECRET?.trim() ||
+    process.env.SESSION_SECRET?.trim() ||
+    "";
+  if (secret.length < 16) {
+    console.error("[analytics] hash secret is not configured");
+    return NextResponse.json(
+      { error: "analytics_not_configured" },
+      { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "60" } },
+    );
   }
 
   const limit = rateLimitRequest(request, {
@@ -49,8 +71,14 @@ export async function POST(request: NextRequest) {
 
   let body: unknown;
   try {
-    body = await request.json();
-  } catch {
+    body = await readBoundedJson(request, MAX_ANALYTICS_BODY_BYTES);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message === "analytics_payload_too_large"
+    ) {
+      return NextResponse.json({ error: "payload_too_large" }, { status: 413 });
+    }
     return NextResponse.json({ error: "bad_request" }, { status: 400 });
   }
   const event = parseAnalyticsPayload(body);
@@ -61,13 +89,6 @@ export async function POST(request: NextRequest) {
     ? existing
     : createAnalyticsVisitorToken();
   const newVisitorToken = visitorToken === existing ? undefined : visitorToken;
-  const secret =
-    process.env.ANALYTICS_HASH_SECRET?.trim() ||
-    process.env.SESSION_SECRET?.trim() ||
-    "";
-
-  if (secret.length < 16) return noContent(newVisitorToken);
-
   try {
     const visitorHash = hashAnalyticsVisitorToken(visitorToken, secret);
     await recordAnalyticsEvent(visitorHash, event);
