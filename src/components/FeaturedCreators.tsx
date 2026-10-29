@@ -32,7 +32,7 @@ export async function FeaturedCreators() {
             <Link
               key={c.handle}
               href={creatorHref(c.handle, c.urlVersion)}
-              prefetch={true}
+              prefetch={false}
               className="flex w-[4.1rem] shrink-0 flex-col items-center gap-1.5 sm:w-[4.5rem]"
             >
               <span className="rounded-full bg-gradient-to-tr from-[var(--color-accent)] to-orange-400 p-[2px]">
@@ -40,6 +40,7 @@ export async function FeaturedCreators() {
                   {src ? (
                     <MediaImg
                       src={src}
+                      fallbackSrc={c.coverUrl}
                       alt={c.name}
                       width={58}
                       height={58}

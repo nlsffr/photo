@@ -158,3 +158,13 @@ export function toIso(value: unknown): string | null {
   const d = value instanceof Date ? value : new Date(String(value));
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
+
+/** Ordered image candidates, normalized once so a failed source can fall back safely. */
+export function normalizeMediaSources(
+  ...sources: Array<string | null | undefined>
+): string[] {
+  const normalized = sources
+    .map((source) => (source || "").trim())
+    .filter(Boolean);
+  return [...new Set(normalized)];
+}

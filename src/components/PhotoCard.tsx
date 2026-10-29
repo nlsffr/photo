@@ -69,6 +69,7 @@ export function PhotoCard({
       <Link
         href={href}
         replace={replace}
+        prefetch={false}
         className="absolute inset-0 overflow-hidden rounded-xl"
         aria-label={photo.title}
       >
@@ -77,7 +78,7 @@ export function PhotoCard({
           alt={photo.title}
           fill
           sizes={SIZES}
-          className={`animate-fade-in object-cover object-center transition-opacity duration-300 ${hovering && isVideo ? "opacity-0" : "opacity-100"}`}
+          className={`pointer-events-none animate-fade-in object-cover object-center transition-opacity duration-300 ${hovering && isVideo ? "opacity-0" : "opacity-100"}`}
         />
 
         {isVideo && (
@@ -89,7 +90,7 @@ export function PhotoCard({
             preload="none"
             loop
             onTimeUpdate={onTimeUpdate}
-            className={`absolute inset-0 h-full w-full object-cover object-center transition-opacity duration-300 ${hovering ? "opacity-100" : "opacity-0"}`}
+            className={`pointer-events-none absolute inset-0 h-full w-full object-cover object-center transition-opacity duration-300 ${hovering ? "opacity-100" : "opacity-0"}`}
           />
         )}
 
@@ -126,10 +127,12 @@ export function PhotoCard({
 
       <Link
         href={creatorHref(photo.creator.handle, photo.creator.urlVersion)}
+        prefetch={false}
         className="absolute left-2 top-2 z-10 flex max-w-[calc(100%-0.75rem)] items-center gap-1.5"
       >
         <MediaImg
           src={photo.creator.avatarUrl || photo.imageUrl}
+          fallbackSrc={photo.imageUrl}
           alt={photo.creator.name}
           width={24}
           height={24}
@@ -141,13 +144,13 @@ export function PhotoCard({
         </span>
       </Link>
 
-      <div className="absolute inset-x-0 bottom-0 z-10 flex items-center gap-2 p-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-center gap-2 p-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
         <button
           type="button"
           onClick={() => toggleLike(photo.id)}
           aria-pressed={liked}
           aria-label="J’aime"
-          className="flex items-center gap-1 text-xs font-semibold text-white active:scale-90"
+          className="pointer-events-auto flex items-center gap-1 text-xs font-semibold text-white active:scale-90"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill={liked ? "var(--color-accent)" : "none"} stroke={liked ? "var(--color-accent)" : "currentColor"} strokeWidth="2" aria-hidden>
             <path d="M12 21s-7.5-4.6-10-9.3C.4 8.4 2 5 5.4 5c2 0 3.3 1.1 4.6 2.6C11.3 6.1 12.6 5 14.6 5 18 5 19.6 8.4 22 11.7 19.5 16.4 12 21 12 21Z" />
@@ -168,7 +171,7 @@ export function PhotoCard({
           onClick={() => toggleSave(photo.id)}
           aria-pressed={saved}
           aria-label="Enregistrer"
-          className="ml-auto text-white active:scale-90"
+          className="pointer-events-auto ml-auto text-white active:scale-90"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill={saved ? "var(--color-accent)" : "none"} stroke={saved ? "var(--color-accent)" : "currentColor"} strokeWidth="2" aria-hidden>
             <path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16l-7-4-7 4Z" />
