@@ -1,11 +1,7 @@
-import { randomUUID } from "crypto";
 import { sendEmail, isEmailConfigured } from "@/lib/email";
 import { getDbPool } from "@/lib/db-pool";
-import {
-  notifyContact,
-  isDiscordConfigured,
-  isTelegramConfigured,
-} from "@/lib/telegram";
+import { readBoundedJson } from "@/lib/analytics-request";
+import { storeContactWithOutbox } from "@/lib/notification-outbox";
 import { rateLimitRequest, sweep } from "@/lib/ratelimit";
 
 const KINDS: Record<string, string> = {
@@ -48,9 +44,17 @@ export async function POST(request: Request) {
 
   let body: Record<string, unknown>;
   try {
-    body = await request.json();
-  } catch {
-    return Response.json({ ok: false, error: "bad_request" }, { status: 400 });
+    const parsed = await readBoundedJson(request, 8192);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("invalid_payload");
+    }
+    body = parsed as Record<string, unknown>;
+  } catch (error) {
+    const tooLarge = error instanceof Error && error.message === "analytics_payload_too_large";
+    return Response.json(
+      { ok: false, error: tooLarge ? "payload_too_large" : "bad_request" },
+      { status: tooLarge ? 413 : 400 },
+    );
   }
 
   const kind = clean(body.kind, 40) || "contact";
@@ -93,26 +97,25 @@ export async function POST(request: Request) {
   const text = lines.join("\n");
 
   let saved = false;
+  let queued = false;
   const db = getDbPool();
   if (db) {
     try {
-      await db.execute(
-        `INSERT INTO contact_messages (id, kind, email, message, meta_json)
-         VALUES (?, ?, ?, ?, ?)`,
-        [randomUUID(), kind, email, message, JSON.stringify(extras)],
-      );
+      await storeContactWithOutbox(db, {
+        kind,
+        email,
+        message,
+        extras,
+        notificationText: text,
+      });
       saved = true;
+      queued = true;
     } catch (e) {
-      console.error("[contact] db save failed", e);
+      console.error("[contact] atomic save/outbox failed", e);
     }
   }
 
   let notified = false;
-  if (isDiscordConfigured() || isTelegramConfigured()) {
-    const n = await notifyContact(text);
-    if (n.ok) notified = true;
-  }
-
   if (isEmailConfigured()) {
     const em = await sendEmail({
       subject: `[LeakFanHub] ${label} — ${email}`,
@@ -123,10 +126,10 @@ export async function POST(request: Request) {
   }
 
   if (saved) {
-    return Response.json({ ok: true, stored: true, notified });
+    return Response.json({ ok: true, stored: true, queued, notified });
   }
   if (notified) {
-    return Response.json({ ok: true, stored: false, notified: true });
+    return Response.json({ ok: true, stored: false, queued: false, notified: true });
   }
 
   return Response.json({ ok: false, error: "send_failed" }, { status: 502 });

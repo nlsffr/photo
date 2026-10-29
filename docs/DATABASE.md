@@ -100,6 +100,24 @@ Presence rows are ephemeral operational state and may be pruned after 24 hours.
 They are unrelated to authentication sessions, which can remain valid for 30
 days even while the user is offline.
 
+### Telegram Stars premium
+
+Apply `migrations/017-telegram-stars-outbox.sql` after migration 011.
+
+- `premium_orders` freezes the selected plan, exact XTR amount, hash-only
+  launch token, expiry, Telegram binding, invoice payload, and payment state.
+- `telegram_payments` is the immutable idempotency ledger. Order, update, and
+  Telegram charge identifiers are independently unique.
+- `telegram_worker_state` persists the last acknowledged long-poll update.
+- `subscriptions` permits historical rows and indexes the current entitlement
+  lookup by user, status, and period end.
+
+### notification_outbox
+
+Contact and report writes insert their outbox event in the same transaction.
+The host worker leases due rows, marks success only after Telegram accepts the
+message, and retries transient errors with bounded exponential backoff.
+
 ## Indexes
 
 See `migrations/002-add-indexes.sql` for production indexes on:

@@ -154,6 +154,55 @@ Before this migration, nginx logs and `media_views` can only provide estimates:
 proxy addresses, bots, cached responses, and missing anonymous identifiers make
 them unsuitable for an exact unique-visitor count.
 
+### Telegram Stars premium and durable form notifications
+
+The implementation follows Telegram's official digital-goods flow:
+
+- `sendInvoice` uses currency `XTR`, exactly one price, and omits
+  `provider_token`: https://core.telegram.org/bots/api#sendinvoice
+- every pre-checkout query is validated and answered within Telegram's
+  ten-second deadline: https://core.telegram.org/bots/api#answerprecheckoutquery
+- Premium activates only after `successful_payment`, whose Telegram charge ID
+  is persisted for idempotency/refunds:
+  https://core.telegram.org/bots/api#successfulpayment
+- the update offset is saved only after successful processing, following
+  `getUpdates`: https://core.telegram.org/bots/api#getupdates
+
+No bot token or database password is added to the repository. Reuse the
+existing values in `/opt/photo/.env`; do not rotate them for this rollout. If
+the existing `DATABASE_URL` uses the Docker hostname `mariadb`, add
+`TELEGRAM_WORKER_DATABASE_URL` with the same current username/password and
+host `127.0.0.1` because MariaDB is already bound to host loopback.
+
+```bash
+cd /opt/photo-seo-fix
+docker exec -i photo-mariadb-1 mariadb -u"$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" \
+  < migrations/017-telegram-stars-outbox.sql
+
+python3 -m pip install -r workers/requirements.txt
+install -m 0644 infra/systemd/leakfanhub-telegram-premium.service /etc/systemd/system/
+install -m 0644 infra/systemd/leakfanhub-notification-worker.service /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now leakfanhub-telegram-premium.service
+systemctl enable --now leakfanhub-notification-worker.service
+```
+
+Verify without making a real purchase:
+
+```bash
+systemctl is-active leakfanhub-telegram-premium.service leakfanhub-notification-worker.service
+journalctl -u leakfanhub-telegram-premium.service -n 30 --no-pager
+journalctl -u leakfanhub-notification-worker.service -n 30 --no-pager
+```
+
+Then sign in, open `/premium`, create one order, and verify that the deep link
+opens `@LeakFanHubBot` with the exact Stars invoice. Do not mark an order paid
+manually: activation is accepted only from Telegram's `successful_payment`.
+
+Rollback is reversible: stop and disable both units, then roll back the app
+image. Migration 017 is additive and may remain in place; pending orders expire
+after 30 minutes and no existing credentials are changed.
+
 ## Local development
 
 ```bash

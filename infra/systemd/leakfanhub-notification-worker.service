@@ -1,0 +1,22 @@
+[Unit]
+Description=LeakFanHub durable Telegram notification worker
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/photo-seo-fix/workers
+EnvironmentFile=-/opt/photo/.env
+EnvironmentFile=-/opt/photo/.env.prod
+Environment=PYTHONUNBUFFERED=1
+Environment=TZ=UTC
+ExecStart=/usr/bin/python3 /opt/photo-seo-fix/workers/notification_worker.py
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+
+[Install]
+WantedBy=multi-user.target
