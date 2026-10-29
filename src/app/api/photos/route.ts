@@ -1,9 +1,7 @@
 import { getPhotos } from "@/lib/photos";
 import type { MediaType, SortKey } from "@/lib/types";
 import {
-  anonKey,
-  rateLimit,
-  requestRateLimitKey,
+  rateLimitRequest,
   sweep,
 } from "@/lib/ratelimit";
 import { cacheGet, cacheSet, cacheKey } from "@/lib/cache";
@@ -22,8 +20,12 @@ const CACHE_TTL_MS = 20_000;
 
 export async function GET(request: Request) {
   sweep();
-  const coarse = requestRateLimitKey(request);
-  const { allowed, remaining, resetAt } = rateLimit(anonKey(coarse), 300, 60_000);
+  const { allowed, remaining, resetAt } = rateLimitRequest(request, {
+    scope: "photos",
+    limit: 300,
+    peerLimit: 3_000,
+    windowMs: 60_000,
+  });
   if (!allowed) {
     return Response.json(
       { error: "rate_limited" },

@@ -4,19 +4,18 @@ import {
   parseModelsPageRequest,
 } from "@/lib/models-pagination";
 import {
-  anonKey,
-  rateLimit,
-  requestRateLimitKey,
+  rateLimitRequest,
   sweep,
 } from "@/lib/ratelimit";
 
 export async function GET(request: Request) {
   sweep();
-  const { allowed, remaining, resetAt } = rateLimit(
-    anonKey(`models:${requestRateLimitKey(request)}`),
-    120,
-    60_000,
-  );
+  const { allowed, remaining, resetAt } = rateLimitRequest(request, {
+    scope: "models",
+    limit: 120,
+    peerLimit: 1_200,
+    windowMs: 60_000,
+  });
   if (!allowed) {
     return Response.json(
       { error: "rate_limited" },

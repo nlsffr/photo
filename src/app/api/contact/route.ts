@@ -6,7 +6,7 @@ import {
   isDiscordConfigured,
   isTelegramConfigured,
 } from "@/lib/telegram";
-import { anonKey, rateLimit, sweep } from "@/lib/ratelimit";
+import { rateLimitRequest, sweep } from "@/lib/ratelimit";
 
 const KINDS: Record<string, string> = {
   support: "Support",
@@ -30,9 +30,12 @@ function isEmailish(v: string): boolean {
 
 export async function POST(request: Request) {
   sweep();
-  const coarse =
-    request.headers.get("x-ratelimit-bucket") ?? "shared-contact-bucket";
-  const { allowed, resetAt } = rateLimit(anonKey(`contact:${coarse}`), 5, 600_000);
+  const { allowed, resetAt } = rateLimitRequest(request, {
+    scope: "contact",
+    limit: 5,
+    peerLimit: 100,
+    windowMs: 600_000,
+  });
   if (!allowed) {
     return Response.json(
       { ok: false, error: "rate_limited" },

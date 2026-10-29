@@ -1,13 +1,17 @@
 import { cookies } from "next/headers";
 import { verifyCredentials, createSession } from "@/lib/auth-db";
 import { SESSION_COOKIE, SESSION_TTL_DAYS } from "@/lib/auth";
-import { anonKey, rateLimit, sweep } from "@/lib/ratelimit";
+import { rateLimitRequest, sweep } from "@/lib/ratelimit";
 
 export async function POST(request: Request) {
   sweep();
-  const coarse = request.headers.get("x-ratelimit-bucket") ?? "shared-auth-bucket";
   // Stricter than register: brute-force protection. 10 tries / 10 min.
-  const { allowed } = rateLimit(anonKey(`login:${coarse}`), 10, 600_000);
+  const { allowed } = rateLimitRequest(request, {
+    scope: "login",
+    limit: 10,
+    peerLimit: 200,
+    windowMs: 600_000,
+  });
   if (!allowed) {
     return Response.json(
       { ok: false, error: "rate_limited", message: "Trop de tentatives, réessaie plus tard." },

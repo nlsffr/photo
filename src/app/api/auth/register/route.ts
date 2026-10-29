@@ -7,7 +7,7 @@ import {
   validateEmail,
   validatePassword,
 } from "@/lib/auth";
-import { anonKey, rateLimit, sweep } from "@/lib/ratelimit";
+import { rateLimitRequest, sweep } from "@/lib/ratelimit";
 
 const MESSAGES: Record<string, string> = {
   email_taken: "Cet e-mail est déjà utilisé.",
@@ -18,8 +18,12 @@ const MESSAGES: Record<string, string> = {
 
 export async function POST(request: Request) {
   sweep();
-  const coarse = request.headers.get("x-ratelimit-bucket") ?? "shared-auth-bucket";
-  const { allowed } = rateLimit(anonKey(`register:${coarse}`), 10, 600_000);
+  const { allowed } = rateLimitRequest(request, {
+    scope: "register",
+    limit: 10,
+    peerLimit: 100,
+    windowMs: 600_000,
+  });
   if (!allowed) {
     return Response.json({ ok: false, error: "rate_limited", message: "Trop de tentatives, réessaie plus tard." }, { status: 429 });
   }
