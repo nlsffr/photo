@@ -18,7 +18,7 @@ test("the runtime image includes the replayable engagement backfill", async () =
   assert.match(dockerfile, /FROM deps AS ops-deps/);
   assert.match(
     dockerfile,
-    /pnpm --dir \/ops-runtime add mysql2@3\.23\.1 --prod --offline/,
+    /pnpm --dir \/ops-runtime add mysql2@3\.23\.1 --prod/,
   );
   assert.match(
     dockerfile,
