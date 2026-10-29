@@ -24,9 +24,9 @@ function xmlEscape(value: string): string {
 /** Full catalog chunks — one slim query, no tag hydration or N+1 paging. */
 export async function GET(
   _req: Request,
-  ctx: { params: Promise<{ chunk: string }> | { chunk: string } },
+  ctx: { params: Promise<{ chunk: string }> },
 ) {
-  const { chunk: chunkRaw } = await Promise.resolve(ctx.params);
+  const { chunk: chunkRaw } = await ctx.params;
   if (!/^(0|[1-9]\d*)$/.test(chunkRaw)) {
     return new Response("Not found\n", { status: 404 });
   }
