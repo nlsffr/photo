@@ -2,11 +2,14 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { useLocale } from "@/components/LocaleProvider";
 import { useSession } from "@/components/Session";
+import { localePath } from "@/lib/i18n/config";
 
 type CreatorHit = { handle: string; name: string; avatarUrl: string };
 
 export default function AddMediaPage() {
+  const { locale, t } = useLocale();
   const { user, loading } = useSession();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -48,7 +51,7 @@ export default function AddMediaPage() {
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (!file || !creator) {
-        setStatus("Choisis un fichier et un créateur existant.");
+        setStatus(t("addMedia.missingFields"));
         return;
       }
       setBusy(true);
@@ -61,21 +64,21 @@ export default function AddMediaPage() {
         const res = await fetch("/api/media/upload", { method: "POST", body: fd });
         const data = (await res.json()) as { ok?: boolean; error?: string; id?: string };
         if (!res.ok || data.error) {
-          setStatus(data.error || "Échec de l’envoi");
+          setStatus(data.error || t("addMedia.uploadFailed"));
         } else {
-          setStatus("Média envoyé — en attente de modération / publication.");
+          setStatus(t("addMedia.uploadSuccess"));
           setFile(null);
           setTitle("");
           setCreator(null);
           setQ("");
         }
       } catch {
-        setStatus("Erreur réseau");
+        setStatus(t("addMedia.networkError"));
       } finally {
         setBusy(false);
       }
     },
-    [file, creator, title],
+    [file, creator, t, title],
   );
 
   if (loading) {
@@ -85,15 +88,15 @@ export default function AddMediaPage() {
   if (!user) {
     return (
       <div className="mx-auto max-w-md px-4 py-16 text-center">
-        <h1 className="text-2xl font-black">Ajouter un média</h1>
+        <h1 className="text-2xl font-black">{t("addMedia.title")}</h1>
         <p className="mt-2 text-sm text-[var(--color-ink-muted)]">
-          Connecte-toi pour publier une photo ou une vidéo.
+          {t("addMedia.guestBody")}
         </p>
         <Link
-          href="/connexion?next=/add"
+          href={`${localePath(locale, "/connexion")}?next=${encodeURIComponent(localePath(locale, "/add"))}`}
           className="mt-6 inline-flex rounded-full bg-[var(--color-accent)] px-6 py-2.5 text-sm font-bold text-white"
         >
-          Connexion
+          {t("addMedia.login")}
         </Link>
       </div>
     );
@@ -101,9 +104,9 @@ export default function AddMediaPage() {
 
   return (
     <div className="mx-auto max-w-lg px-4 py-8 sm:px-6">
-      <h1 className="text-2xl font-black tracking-tight">Ajouter un média</h1>
+      <h1 className="text-2xl font-black tracking-tight">{t("addMedia.title")}</h1>
       <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
-        Le créateur doit déjà exister dans la base (autocomplete).
+        {t("addMedia.intro")}
       </p>
 
       <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4">
@@ -113,7 +116,7 @@ export default function AddMediaPage() {
             <img src={preview} alt="" className="max-h-48 rounded-lg object-contain" />
           ) : (
             <span className="text-sm text-[var(--color-ink-muted)]">
-              Photo ou vidéo — clique pour choisir
+              {t("addMedia.chooseFile")}
             </span>
           )}
           <input
@@ -125,7 +128,7 @@ export default function AddMediaPage() {
         </label>
 
         <div className="relative">
-          <label className="text-xs font-semibold text-[var(--color-ink-faint)]">Créateur</label>
+          <label className="text-xs font-semibold text-[var(--color-ink-faint)]">{t("addMedia.creator")}</label>
           {creator ? (
             <div className="mt-1 flex items-center justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2">
               <span className="font-semibold">@{creator.handle}</span>
@@ -137,7 +140,7 @@ export default function AddMediaPage() {
                   setQ("");
                 }}
               >
-                Changer
+                {t("addMedia.change")}
               </button>
             </div>
           ) : (
@@ -145,7 +148,7 @@ export default function AddMediaPage() {
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Tape les premières lettres…"
+                placeholder={t("addMedia.creatorPlaceholder")}
                 className="mt-1 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm outline-none focus:border-[var(--color-accent)]"
               />
               {hits.length > 0 && (
@@ -172,7 +175,7 @@ export default function AddMediaPage() {
         </div>
 
         <div>
-          <label className="text-xs font-semibold text-[var(--color-ink-faint)]">Titre (optionnel)</label>
+          <label className="text-xs font-semibold text-[var(--color-ink-faint)]">{t("addMedia.optionalTitle")}</label>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -189,7 +192,7 @@ export default function AddMediaPage() {
           disabled={busy}
           className="rounded-full bg-[var(--color-accent)] py-3 text-sm font-bold text-white disabled:opacity-50"
         >
-          {busy ? "Envoi…" : "Publier"}
+          {busy ? t("addMedia.sending") : t("addMedia.publish")}
         </button>
       </form>
     </div>

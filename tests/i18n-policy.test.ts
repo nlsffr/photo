@@ -49,12 +49,14 @@ test("locale alternates are reciprocal and expose a neutral selector URL", async
 });
 
 test("the locale cookie wins, then Accept-Language quality values, then English", async () => {
-  const { chooseLocale } = await loadConfig();
+  const { chooseLocale, defaultShellLocale } = await loadConfig();
 
   assert.equal(chooseLocale("en", "fr-FR,fr;q=0.9,en;q=0.8"), "en");
   assert.equal(chooseLocale(null, "de;q=0.9,fr-FR;q=0.8,en;q=0.7"), "fr");
   assert.equal(chooseLocale(null, "fr;q=0.4,en-GB;q=0.9"), "en");
   assert.equal(chooseLocale("invalid", "es-MX,es;q=0.9"), "en");
+  assert.equal(defaultShellLocale("fr"), "fr");
+  assert.equal(defaultShellLocale("invalid"), "en");
 });
 
 test("framework, API, asset, bot and sitemap URLs never enter locale routing", async () => {

@@ -10,6 +10,8 @@ import { AiFilterTabs } from "@/components/AiFilterTabs";
 import { MediaImg } from "@/components/MediaImg";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { formatCount } from "@/lib/format";
+import type { Locale } from "@/lib/i18n/config";
+import { getDictionary } from "@/lib/i18n/dictionaries";
 
 export const metadata: Metadata = {
   title: "Search",
@@ -22,9 +24,13 @@ function first(v?: string | string[]): string | undefined {
 
 export default async function SearchPage({
   searchParams,
+  locale = "en",
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  locale?: Locale;
 }) {
+  const copy = getDictionary(locale).search;
+  const numberLocale = locale === "fr" ? "fr-FR" : "en-US";
   const sp = await searchParams;
   const q = first(sp.q);
   const tag = first(sp.tag);
@@ -49,7 +55,7 @@ export default async function SearchPage({
   return (
     <div className="px-3 py-5 sm:px-5">
       <h1 className="mb-4 text-2xl font-bold tracking-tight">
-        <span className="text-[var(--color-accent)]">Search</span>
+        <span className="text-[var(--color-accent)]">{copy.title}</span>
         {label && (
           <span className="text-[var(--color-ink-muted)]"> / {label}</span>
         )}
@@ -64,7 +70,7 @@ export default async function SearchPage({
       {creators.length > 0 && (
         <section className="mb-8">
           <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-[var(--color-ink-faint)]">
-            Creators
+            {copy.creators}
           </h2>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {creators.map((c, i) => (
@@ -93,7 +99,7 @@ export default async function SearchPage({
                   <p className="truncate text-sm text-[var(--color-ink-muted)]">
                     @{c.handle}
                     {c.followers
-                      ? ` · ${formatCount(c.followers)} followers`
+                      ? ` · ${formatCount(c.followers)} ${copy.followers}`
                       : ""}
                   </p>
                 </div>
@@ -106,8 +112,8 @@ export default async function SearchPage({
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-[var(--color-ink-muted)]">
           {hasQuery
-            ? `${page.total.toLocaleString("en-US")} result${page.total === 1 ? "" : "s"}`
-            : "Trending now"}
+            ? `${page.total.toLocaleString(numberLocale)} ${page.total === 1 ? copy.result : copy.results}`
+            : copy.trendingNow}
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <Suspense fallback={<div className="h-9 w-28" />}>

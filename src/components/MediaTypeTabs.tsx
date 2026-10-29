@@ -2,16 +2,20 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useLocale } from "@/components/LocaleProvider";
+import { localizedHref } from "@/lib/i18n/config";
 
-const TABS: { key: string | null; label: string }[] = [
-  { key: null, label: "Tout" },
-  { key: "photo", label: "Photos" },
-  { key: "video", label: "Vidéos" },
-  { key: "pack", label: "Packs" },
+const TABS: { key: string | null; labelKey: string }[] = [
+  { key: null, labelKey: "mediaTypes.all" },
+  { key: "photo", labelKey: "mediaTypes.photos" },
+  { key: "video", labelKey: "mediaTypes.videos" },
+  { key: "pack", labelKey: "mediaTypes.packs" },
 ];
 
 export function MediaTypeTabs({ basePath = "/" }: { basePath?: string }) {
   const searchParams = useSearchParams();
+  const { locale, t } = useLocale();
+  const effectiveBasePath = localizedHref(locale, basePath);
   const active = searchParams.get("type");
 
   function hrefFor(type: string | null) {
@@ -19,17 +23,17 @@ export function MediaTypeTabs({ basePath = "/" }: { basePath?: string }) {
     if (type) p.set("type", type);
     else p.delete("type");
     const qs = p.toString();
-    return qs ? `${basePath}?${qs}` : basePath;
+    return qs ? `${effectiveBasePath}?${qs}` : effectiveBasePath;
   }
 
   return (
     <div className="inline-flex items-center gap-1 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] p-1">
-      {TABS.map((t) => {
-        const isActive = (t.key ?? null) === (active ?? null);
+      {TABS.map((tab) => {
+        const isActive = (tab.key ?? null) === (active ?? null);
         return (
           <Link
-            key={t.label}
-            href={hrefFor(t.key)}
+            key={tab.key ?? "all"}
+            href={hrefFor(tab.key)}
             scroll={false}
             className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
               isActive
@@ -37,7 +41,7 @@ export function MediaTypeTabs({ basePath = "/" }: { basePath?: string }) {
                 : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
             }`}
           >
-            {t.label}
+            {t(tab.labelKey)}
           </Link>
         );
       })}

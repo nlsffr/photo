@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
+import { cookies } from "next/headers";
 import "../globals.css";
 import { SiteRootLayout } from "@/components/SiteRootLayout";
+import { defaultShellLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").replace(/\/$/, "");
@@ -68,13 +70,16 @@ export const viewport: Viewport = {
   themeColor: "#0a0a0b",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const cookieStore = await cookies();
+  const locale = defaultShellLocale(cookieStore.get(LOCALE_COOKIE)?.value);
+
   return (
-    <SiteRootLayout locale="en" dictionary={getDictionary("en")}>
+    <SiteRootLayout locale={locale} dictionary={getDictionary(locale)}>
       {children}
     </SiteRootLayout>
   );

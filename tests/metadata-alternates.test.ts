@@ -45,6 +45,10 @@ test("the two server dictionaries translate primary UI and indexable metadata", 
   assert.notEqual(en.home.filters.all, fr.home.filters.all);
   assert.notEqual(en.auth.loginTitle, fr.auth.loginTitle);
   assert.notEqual(en.premium.choosePlan, fr.premium.choosePlan);
+  assert.notEqual(en.search.title, fr.search.title);
+  assert.notEqual(en.searchForm.advanced, fr.searchForm.advanced);
+  assert.notEqual(en.addMedia.title, fr.addMedia.title);
+  assert.notEqual(en.addMedia.chooseFile, fr.addMedia.chooseFile);
   assert.notEqual(en.pages.models.meta.description, fr.pages.models.meta.description);
   assert.notEqual(en.pages.terms.meta.title, fr.pages.terms.meta.title);
 });

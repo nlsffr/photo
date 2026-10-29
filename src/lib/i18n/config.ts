@@ -143,6 +143,10 @@ export function chooseLocale(
   return DEFAULT_LOCALE;
 }
 
+export function defaultShellLocale(cookieValue?: string | null): Locale {
+  return isLocale(cookieValue) ? cookieValue : DEFAULT_LOCALE;
+}
+
 export function isSystemPath(pathname: string): boolean {
   const normalized = normalizePathname(pathname);
   if (SYSTEM_PATHS.has(normalized) || ASSET_EXTENSION.test(normalized)) return true;

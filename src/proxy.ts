@@ -226,7 +226,9 @@ function unavailable() {
 }
 
 export const config = {
+  // Exclude only exact machine namespaces. Prefix-like creator handles (for
+  // example /mediaqueen) must still reach removed-content enforcement.
   matcher: [
-    "/((?!api|_next/static|_next/image|media|sitemaps|favicon.ico|favicon.svg|robots.txt|sitemap.xml|icon|apple-icon).*)",
+    "/((?!api(?:/|$)|_next(?:/|$)|media(?:/|$)|sitemaps(?:/|$)|favicon\\.ico(?:/|$)|favicon\\.svg(?:/|$)|robots\\.txt(?:/|$)|sitemap\\.xml(?:/|$)|icon(?:/|$)|apple-icon(?:/|$)).*)",
   ],
 };

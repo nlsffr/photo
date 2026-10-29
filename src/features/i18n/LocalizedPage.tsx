@@ -161,7 +161,7 @@ export async function LocalizedPage({ locale, pathname, searchParams }: Localize
     case "/qu-est-ce-que-lumengallery":
       return locale === "fr" ? <FrenchWhatIsPage /> : <EnglishWhatIsPage />;
     case "/recherche":
-      return <SearchPage searchParams={searchParams} />;
+      return <SearchPage locale={locale} searchParams={searchParams} />;
     case "/feed":
       return <FeedPage searchParams={searchParams} />;
     case "/random/medias":

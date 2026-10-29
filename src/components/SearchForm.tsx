@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { useLocale } from "@/components/LocaleProvider";
+import { localePath } from "@/lib/i18n/config";
 import { creatorHref } from "@/lib/types";
 
 type Hit = {
@@ -16,6 +18,8 @@ type Hit = {
 export function SearchForm({ tags }: { tags: string[] }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { locale, t } = useLocale();
+  const searchPath = localePath(locale, "/recherche");
   const [value, setValue] = useState("");
   const [advanced, setAdvanced] = useState(false);
   const [hits, setHits] = useState<Hit[]>([]);
@@ -62,7 +66,7 @@ export function SearchForm({ tags }: { tags: string[] }) {
     e.preventDefault();
     const q = value.trim();
     setOpen(false);
-    router.push(q ? `/recherche?q=${encodeURIComponent(q)}` : "/recherche");
+    router.push(q ? `${searchPath}?q=${encodeURIComponent(q)}` : searchPath);
   }
 
   function tagHref(tag: string) {
@@ -71,7 +75,7 @@ export function SearchForm({ tags }: { tags: string[] }) {
     if (q) params.set("q", q);
     if (tag !== activeTag) params.set("tag", tag);
     const qs = params.toString();
-    return qs ? `/recherche?${qs}` : "/recherche";
+    return qs ? `${searchPath}?${qs}` : searchPath;
   }
 
   return (
@@ -90,8 +94,8 @@ export function SearchForm({ tags }: { tags: string[] }) {
           onChange={(e) => setValue(e.target.value)}
           onFocus={() => hits.length > 0 && setOpen(true)}
           autoFocus
-          placeholder="Search a model, tag, title…"
-          aria-label="Search"
+          placeholder={t("searchForm.placeholder")}
+          aria-label={t("searchForm.label")}
           autoComplete="off"
           className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] py-3 pl-12 pr-11 text-base text-[var(--color-ink)] outline-none transition focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent-soft)]"
         />
@@ -103,7 +107,7 @@ export function SearchForm({ tags }: { tags: string[] }) {
               setHits([]);
               setOpen(false);
             }}
-            aria-label="Clear"
+            aria-label={t("searchForm.clear")}
             className="absolute right-3 top-1/2 z-10 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink)]"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
@@ -141,7 +145,7 @@ export function SearchForm({ tags }: { tags: string[] }) {
                     <span className="block truncate text-xs text-[var(--color-ink-faint)]">
                       @{h.handle}
                       {typeof h.followers === "number" && h.followers > 0
-                        ? ` · ${h.followers.toLocaleString()} followers`
+                        ? ` · ${h.followers.toLocaleString(locale === "fr" ? "fr-FR" : "en-US")} ${t("search.followers")}`
                         : ""}
                     </span>
                   </span>
@@ -153,7 +157,7 @@ export function SearchForm({ tags }: { tags: string[] }) {
                 type="submit"
                 className="w-full px-3 py-2.5 text-left text-xs font-semibold text-[var(--color-accent)] hover:bg-[var(--color-surface-2)]"
               >
-                Search « {value.trim()} » →
+                {t("searchForm.searchFor")} « {value.trim()} » →
               </button>
             </li>
           </ul>
@@ -164,7 +168,7 @@ export function SearchForm({ tags }: { tags: string[] }) {
         type="submit"
         className="w-full rounded-xl bg-[var(--color-accent)] py-3 text-base font-semibold text-white transition-colors hover:bg-[var(--color-accent-600)]"
       >
-        Search
+        {t("searchForm.submit")}
       </button>
 
       <button
@@ -174,7 +178,7 @@ export function SearchForm({ tags }: { tags: string[] }) {
         aria-controls="recherche-avancee"
         className="inline-flex w-fit items-center gap-1.5 rounded-lg bg-[var(--color-surface-2)] px-3 py-1.5 text-sm font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
       >
-        Advanced
+        {t("searchForm.advanced")}
         <svg
           width="14"
           height="14"
@@ -196,7 +200,7 @@ export function SearchForm({ tags }: { tags: string[] }) {
           className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3"
         >
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-faint)]">
-            Filter by tag
+            {t("searchForm.filterByTag")}
           </p>
           <div className="flex flex-wrap gap-2">
             {tags.map((tag) => {
