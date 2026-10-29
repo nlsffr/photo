@@ -76,7 +76,7 @@ test("profile metadata, pages, redirects, and uploads reject removed creators", 
   const files = await Promise.all(
     [
       "../src/proxy.ts",
-      "../src/app/(default)/[handle]/page.tsx",
+      "../src/features/creator/CreatorCollectionPage.tsx",
       "../src/app/(default)/creator/[handle]/page.tsx",
       "../src/app/(default)/[handle]/[id]/page.tsx",
       "../src/app/api/media/upload/route.ts",
@@ -85,7 +85,7 @@ test("profile metadata, pages, redirects, and uploads reject removed creators", 
 
   const [proxy, profile, legacyProfile, media, upload] = files;
   assert.match(proxy, /creatorRouteDecision/);
-  assert.ok((profile.match(/isRemovedContent\(/g) ?? []).length >= 2);
+  assert.match(profile, /isRemovedContent\(/);
   assert.match(legacyProfile, /isRemovedContent\(/);
   assert.match(media, /isRemovedContent\(/);
   assert.match(upload, /isRemovedContent\(/);

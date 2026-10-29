@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getAllTags, getCreator, getPhotoById } from "@/lib/photos";
 import { creatorHref, mediaHref, parseVersionedSlug } from "@/lib/types";
+import { parseCreatorCollectionPath } from "@/lib/creator-collections";
 import {
   creatorRouteDecision,
   isRemovedContent,
@@ -148,6 +149,22 @@ export async function proxy(request: NextRequest) {
         return unavailable();
       }
       return missing();
+    }
+    // These static collection routes always win over a colliding media ID.
+    if (id === "photos" || id === "videos" || id === "popular") {
+      const collection = parseCreatorCollectionPath(pathname);
+      if (!collection) return missing();
+      const parsed = parseVersionedSlug(collection.handle);
+      if (RESERVED.has(parsed.base.toLowerCase())) return missing();
+      try {
+        const creator = await getCreator(parsed.base);
+        const decision = creatorRouteDecision(creator, parsed.version);
+        if (decision === "gone") return gone();
+        if (decision === "missing") return missing();
+      } catch {
+        return unavailable();
+      }
+      return NextResponse.next();
     }
     try {
       const photo = await getPhotoById(id);

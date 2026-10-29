@@ -201,3 +201,20 @@ export const isCurrentPublicVersion = isCurrentMediaVersion;
 export function canonicalForStaticPath(path: string): string | null {
   return (STATIC_SITEMAP_PATHS as readonly string[]).includes(path) ? path : null;
 }
+
+export type CreatorSearchParams = Record<string, string | string[] | undefined>;
+
+/** Only the three exact legacy queries identify an equivalent clean collection. */
+export function legacyCreatorCollection(search: CreatorSearchParams): "photos" | "videos" | "popular" | null {
+  const keys = Object.keys(search).filter((key) => search[key] !== undefined);
+  if (keys.length !== 1) return null;
+  if (search.type === "photo") return "photos";
+  if (search.type === "video") return "videos";
+  if (search.sort === "popular") return "popular";
+  return null;
+}
+
+/** Every extra filter is functional, but only numbered clean pages are indexable. */
+export function isCleanCreatorQuery(search: CreatorSearchParams): boolean {
+  return Object.keys(search).every((key) => key === "page" || search[key] === undefined);
+}
