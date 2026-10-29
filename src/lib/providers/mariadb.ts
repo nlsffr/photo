@@ -32,6 +32,7 @@ import {
   homeFeedSnapshotKey,
   homeFeedSnapshots,
 } from "../home-feed-snapshot";
+import { activeCreatorSql, activeMediaSql } from "./active-content-sql";
 
 type Params = Record<string, unknown>;
 
@@ -247,8 +248,7 @@ export class MariaDBProvider implements DataProvider {
          FROM photos p
          STRAIGHT_JOIN creators c ON c.id = p.creator_id
          WHERE p.id IN (${placeholders})
-           AND p.removed_from_index_at IS NULL
-           AND c.removed_from_index_at IS NULL`,
+           AND ${activeMediaSql("p", "c")}`,
         params,
       );
       const byId = new Map(
@@ -271,7 +271,10 @@ export class MariaDBProvider implements DataProvider {
 
   async getCreators(): Promise<Creator[]> {
     const rows = await this.q<RowDataPacket>(
-      "SELECT handle, name, avatar_url, cover_url, bio, location, followers_count, verified, COALESCE(url_version, 1) AS url_version, updated_at, removed_from_index_at FROM creators",
+      `SELECT handle, name, avatar_url, cover_url, bio, location, followers_count, verified,
+              COALESCE(url_version, 1) AS url_version, updated_at, removed_from_index_at
+       FROM creators c
+       WHERE ${activeCreatorSql("c")}`,
     );
     return rows.map((r) => creatorFromRow(r));
   }
@@ -299,9 +302,10 @@ export class MariaDBProvider implements DataProvider {
       `SELECT handle, name, avatar_url, cover_url, bio, location, followers_count, verified,
               COALESCE(url_version, 1) AS url_version, updated_at, removed_from_index_at
        FROM creators
-       WHERE handle LIKE :prefix OR name LIKE :prefix
+       WHERE ${activeCreatorSql("creators")}
+         AND (handle LIKE :prefix OR name LIKE :prefix
           OR handle LIKE :mid OR name LIKE :mid
-          OR handle LIKE :head OR name LIKE :head
+          OR handle LIKE :head OR name LIKE :head)
        LIMIT 80`,
       { prefix, mid, head: `${head}%` },
     );
@@ -398,10 +402,7 @@ export class MariaDBProvider implements DataProvider {
       },
     });
     const where: string[] = plan.extraWhere ? [plan.extraWhere] : [];
-    where.push(
-      "p.removed_from_index_at IS NULL",
-      "c.removed_from_index_at IS NULL",
-    );
+    where.push(activeMediaSql("p", "c"));
     const params: Record<string, unknown> = { ...plan.params };
     if (query.creator) {
       where.push("c.handle = :creator");
@@ -508,10 +509,14 @@ export class MariaDBProvider implements DataProvider {
       isNumeric
         ? `SELECT ${PHOTO_SELECT}
            ${PHOTO_FROM}
-           WHERE p.source_id = :sid LIMIT 1`
+           WHERE p.source_id = :sid
+             AND ${activeMediaSql("p", "c")}
+           LIMIT 1`
         : `SELECT ${PHOTO_SELECT}
            ${PHOTO_FROM}
-           WHERE p.id = :id LIMIT 1`,
+           WHERE p.id = :id
+             AND ${activeMediaSql("p", "c")}
+           LIMIT 1`,
       isNumeric ? { sid: String(id) } : { id },
     );
     const r = (rows as unknown as PhotoRow[])[0];
@@ -552,6 +557,7 @@ export class MariaDBProvider implements DataProvider {
        JOIN photos p ON p.id = matched.photo_id
        JOIN creators c ON c.id = p.creator_id
        WHERE p.id <> ?
+         AND ${activeMediaSql("p", "c")}
        ORDER BY p.views_count + p.likes_count * 3 DESC
        LIMIT ?`,
       [tags, ...legacyTags, photo.id, limit],
@@ -569,6 +575,7 @@ export class MariaDBProvider implements DataProvider {
        FROM creators c
        LEFT JOIN creator_media_stats stats ON stats.creator_id = c.id
        WHERE c.handle = :handle
+         AND ${activeCreatorSql("c")}
        LIMIT 1`,
       { handle },
     );
@@ -582,9 +589,12 @@ export class MariaDBProvider implements DataProvider {
 
   async getTags(): Promise<string[]> {
     const rows = await this.q<RowDataPacket>(
-      `SELECT tag, COUNT(*) AS n
-       FROM photo_tags
-       GROUP BY tag
+      `SELECT pt.tag, COUNT(*) AS n
+       FROM photo_tags pt
+       STRAIGHT_JOIN photos p ON p.id = pt.photo_id
+       STRAIGHT_JOIN creators c ON c.id = p.creator_id
+       WHERE ${activeMediaSql("p", "c")}
+       GROUP BY pt.tag
        HAVING n >= 3
        ORDER BY n DESC
        LIMIT 200`,
@@ -623,7 +633,7 @@ export class MariaDBProvider implements DataProvider {
               c.cover_url AS coverUrl
        FROM creators c
        JOIN creator_media_stats stats ON stats.creator_id = c.id
-       WHERE c.removed_from_index_at IS NULL
+       WHERE ${activeCreatorSql("c")}
          AND stats.photo_count > 0
        ORDER BY ${order}
        LIMIT ${safeLimit} OFFSET ${safeOffset}`,
@@ -691,7 +701,7 @@ export class MariaDBProvider implements DataProvider {
        SELECT COUNT(*) AS total
        FROM creators c
        JOIN creator_media_stats stats ON stats.creator_id = c.id
-       WHERE c.removed_from_index_at IS NULL
+       WHERE ${activeCreatorSql("c")}
          AND stats.photo_count > 0`,
     );
     return Math.max(0, Number(rows[0]?.total) || 0);
@@ -709,6 +719,8 @@ export class MariaDBProvider implements DataProvider {
                 + COALESCE(SUM(p.likes_count), 0) * 5) AS score
        FROM creators c
        LEFT JOIN photos p ON p.creator_id = c.id
+                         AND p.removed_from_index_at IS NULL
+       WHERE ${activeCreatorSql("c")}
        GROUP BY c.id
        HAVING COUNT(p.id) > 0 OR COALESCE(c.followers_count,0) > 0
        ORDER BY score DESC, c.followers_count DESC

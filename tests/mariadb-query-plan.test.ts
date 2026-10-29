@@ -120,8 +120,7 @@ test("discovery applies every active filter inside each bounded candidate arm", 
     new URL("../src/lib/providers/mariadb.ts", import.meta.url),
     "utf8",
   );
-  assert.match(provider, /"p\.removed_from_index_at IS NULL"/);
-  assert.match(provider, /"c\.removed_from_index_at IS NULL"/);
+  assert.match(provider, /activeMediaSql\("p", "c"\)/);
 });
 
 test("text search ranks a bounded candidate set including matching creators", async () => {

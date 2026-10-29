@@ -10,6 +10,7 @@ import {
 import { formatAge, formatCount } from "@/lib/format";
 import { creatorHref, mediaHref, parseVersionedSlug } from "@/lib/types";
 import { isCurrentMediaVersion } from "@/lib/seo-policy";
+import { isRemovedContent } from "@/lib/public-content-policy";
 import { PhotoCard } from "@/components/PhotoCard";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { FollowButton, PostActions } from "@/components/Interactions";
@@ -115,6 +116,7 @@ export default async function MediaByHandlePage({
   if (!isCurrentMediaVersion(raw.urlVersion, parsed.version)) notFound();
 
   const creator = await getCreator(raw.creatorHandle);
+  if (!creator || isRemovedContent(creator)) notFound();
   const photo = withCreator(raw, creator);
   const related = await getRelatedPhotos(raw, 36);
 
@@ -122,7 +124,7 @@ export default async function MediaByHandlePage({
   const kind =
     photo.type === "video" ? "video" : photo.type === "pack" ? "pack" : "photo";
   const h1 = `${photo.creatorHandle} ${kind} #${sid}`;
-  const creatorPath = creatorHref(photo.creatorHandle, creator?.urlVersion ?? photo.creator.urlVersion);
+  const creatorPath = creatorHref(photo.creatorHandle, creator.urlVersion);
   const mediaPath = mediaHref({ ...photo, sourceId: sid });
 
   const thumb = absUrl(photo.imageUrl);

@@ -87,7 +87,9 @@ test("recording a local view cannot change imported source engagement", async ()
   const connection = {
     async beginTransaction() {},
     async execute(sql: string, params: unknown[]) {
-      if (/UPDATE photos SET local_views_count = COALESCE\(local_views_count, 0\) \+ 1/.test(sql)) {
+      if (/UPDATE photos p[\s\S]*JOIN creators c[\s\S]*SET p\.local_views_count/.test(sql)) {
+        assert.match(sql, /p\.removed_from_index_at IS NULL/);
+        assert.match(sql, /c\.removed_from_index_at IS NULL/);
         state.localViews += 1;
         return [{ affectedRows: 1 }];
       }

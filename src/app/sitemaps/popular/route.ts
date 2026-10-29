@@ -2,7 +2,7 @@ import { getPopularSitemapMedia } from "@/lib/sitemap-data";
 import { mediaHref, toIso } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
-export const revalidate = 3600;
+export const revalidate = 300;
 
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").replace(
   /\/$/,
@@ -42,7 +42,7 @@ ${entries.join("\n")}
     return new Response(body, {
       headers: {
         "Content-Type": "application/xml; charset=utf-8",
-        "Cache-Control": "public, max-age=3600",
+        "Cache-Control": "public, max-age=300",
       },
     });
   } catch {

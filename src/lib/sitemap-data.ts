@@ -3,6 +3,7 @@ import "server-only";
 import type { RowDataPacket } from "mysql2";
 import { requireDbPool } from "./db-pool";
 import { toIso } from "./types";
+import { activeCreatorSql, activeMediaSql } from "./providers/active-content-sql";
 
 export type SitemapMedia = {
   id: string;
@@ -56,8 +57,9 @@ function mapSitemapMedia(row: SitemapMediaRow): SitemapMedia {
 export async function countIndexableMedia(): Promise<number> {
   const [rows] = await requireDbPool().query<RowDataPacket[]>(
     `SELECT COUNT(*) AS total
-     FROM photos
-     WHERE removed_from_index_at IS NULL`,
+     FROM photos p
+     STRAIGHT_JOIN creators c ON c.id = p.creator_id
+     WHERE ${activeMediaSql("p", "c")}`,
   );
   const total = Number(rows[0]?.total);
   return Number.isFinite(total) && total > 0 ? Math.floor(total) : 0;
@@ -73,10 +75,11 @@ export async function getSitemapMediaChunk(
     `SET STATEMENT max_statement_time=10 FOR
      SELECT ${SITEMAP_MEDIA_SELECT}
      FROM (
-       SELECT id
-       FROM photos FORCE INDEX (idx_photos_sitemap)
-       WHERE removed_from_index_at IS NULL
-       ORDER BY created_at DESC, id DESC
+       SELECT candidate.id
+       FROM photos candidate FORCE INDEX (idx_photos_sitemap)
+       STRAIGHT_JOIN creators owner ON owner.id = candidate.creator_id
+       WHERE ${activeMediaSql("candidate", "owner")}
+       ORDER BY candidate.created_at DESC, candidate.id DESC
        LIMIT ? OFFSET ?
      ) page
      JOIN photos p ON p.id = page.id
@@ -96,7 +99,7 @@ export async function getPopularSitemapMedia(
     `SELECT ${SITEMAP_MEDIA_SELECT}
      FROM photos p
      STRAIGHT_JOIN creators c ON c.id = p.creator_id
-     WHERE p.removed_from_index_at IS NULL
+     WHERE ${activeMediaSql("p", "c")}
      ORDER BY p.views_count DESC, p.likes_count DESC, p.id DESC
      LIMIT ?`,
     [safeLimit],
@@ -111,7 +114,7 @@ export async function getSitemapProfiles(): Promise<SitemapProfile[]> {
             COALESCE(c.url_version, 1) AS url_version,
             c.updated_at
      FROM creators c
-     WHERE c.removed_from_index_at IS NULL
+     WHERE ${activeCreatorSql("c")}
      ORDER BY c.id
      LIMIT 50000`,
   );

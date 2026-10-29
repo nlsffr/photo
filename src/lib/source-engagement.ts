@@ -84,7 +84,12 @@ export async function recordLocalPhotoView(
   try {
     await connection.beginTransaction();
     const updated = await connection.execute(
-      "UPDATE photos SET local_views_count = COALESCE(local_views_count, 0) + 1 WHERE id = ?",
+      `UPDATE photos p
+       JOIN creators c ON c.id = p.creator_id
+       SET p.local_views_count = COALESCE(p.local_views_count, 0) + 1
+       WHERE p.id = ?
+         AND p.removed_from_index_at IS NULL
+         AND c.removed_from_index_at IS NULL`,
       [photoId],
     );
     if (affectedRows(updated) !== 1) throw new Error("photo_not_found");

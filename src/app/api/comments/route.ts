@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { randomUUID } from "crypto";
+import type { ResultSetHeader, RowDataPacket } from "mysql2";
 import { getSessionUser } from "@/lib/auth-db";
 import { SESSION_COOKIE } from "@/lib/auth";
 import { getDbPool } from "@/lib/db-pool";
+import { activeMediaSql } from "@/lib/providers/active-content-sql";
 
 export const dynamic = "force-dynamic";
 
@@ -13,15 +15,22 @@ export async function GET(req: NextRequest) {
   const db = getDbPool();
   if (!db) return NextResponse.json({ items: [] });
   try {
-    const [rows] = await db.execute(
-      `SELECT c.id, c.body, c.created_at, u.username, u.email
-       FROM comments c
-       JOIN users u ON u.id = c.user_id
-       WHERE c.photo_id = ? AND c.is_hidden = 0
-       ORDER BY c.created_at DESC LIMIT 50`,
+    const [rows] = await db.execute<RowDataPacket[]>(
+      `SELECT cm.id, cm.body, cm.created_at, u.username, u.email
+       FROM photos p
+       JOIN creators owner ON owner.id = p.creator_id
+       LEFT JOIN comments cm
+         ON cm.photo_id = p.id AND cm.is_hidden = 0
+       LEFT JOIN users u ON u.id = cm.user_id
+       WHERE p.id = ?
+         AND ${activeMediaSql("p", "owner")}
+       ORDER BY cm.created_at DESC LIMIT 50`,
       [photoId],
     );
-    return NextResponse.json({ items: rows });
+    if (rows.length === 0) {
+      return NextResponse.json({ error: "photo_not_found" }, { status: 404 });
+    }
+    return NextResponse.json({ items: rows.filter((row) => row.id != null) });
   } catch {
     return NextResponse.json({ items: [] });
   }
@@ -48,10 +57,19 @@ export async function POST(req: NextRequest) {
     const db = getDbPool();
     if (!db) return NextResponse.json({ error: "no db" }, { status: 500 });
     const id = randomUUID();
-    await db.execute(
-      `INSERT INTO comments (id, photo_id, user_id, body) VALUES (?, ?, ?, ?)`,
-      [id, photoId, user.id, text],
+    const [inserted] = await db.execute<ResultSetHeader>(
+      `INSERT INTO comments (id, photo_id, user_id, body)
+       SELECT ?, p.id, ?, ?
+       FROM photos p
+       JOIN creators owner ON owner.id = p.creator_id
+       WHERE p.id = ?
+         AND ${activeMediaSql("p", "owner")}
+       LIMIT 1`,
+      [id, user.id, text, photoId],
     );
+    if (inserted.affectedRows !== 1) {
+      return NextResponse.json({ error: "photo_not_found" }, { status: 404 });
+    }
     return NextResponse.json({
       ok: true,
       id,

@@ -58,6 +58,9 @@ export async function POST(req: NextRequest) {
       { headers: { "X-RateLimit-Remaining": String(rate.remaining) } },
     );
   } catch (e) {
+    if (e instanceof Error && e.message === "photo_not_found") {
+      return NextResponse.json({ error: "photo_not_found" }, { status: 404 });
+    }
     console.error("[view]", e);
     return NextResponse.json({ ok: false }, { status: 500 });
   }

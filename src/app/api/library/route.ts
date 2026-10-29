@@ -4,6 +4,10 @@ import type { RowDataPacket } from "mysql2";
 import { getSessionUser } from "@/lib/auth-db";
 import { SESSION_COOKIE } from "@/lib/auth";
 import { getDbPool } from "@/lib/db-pool";
+import {
+  activeCreatorSql,
+  activeMediaSql,
+} from "@/lib/providers/active-content-sql";
 
 export const dynamic = "force-dynamic";
 
@@ -57,10 +61,14 @@ export async function GET(req: NextRequest) {
       const [rows] = await db.execute<RowDataPacket[]>(
         `SELECT c.id, c.handle, c.name, c.avatar_url, c.verified, c.followers_count,
                 COALESCE(c.url_version, 1) AS url_version,
-                (SELECT COUNT(*) FROM photos p WHERE p.creator_id = c.id) AS photo_count
+                (SELECT COUNT(*)
+                 FROM photos p
+                 WHERE p.creator_id = c.id
+                   AND ${activeMediaSql("p", "c")}) AS photo_count
          FROM follows f
          JOIN creators c ON c.id = f.creator_id
          WHERE f.follower_id = ?
+           AND ${activeCreatorSql("c")}
          ORDER BY f.created_at DESC
          LIMIT 200`,
         [user.id],
@@ -88,6 +96,7 @@ export async function GET(req: NextRequest) {
          JOIN photos p ON p.creator_id = f.creator_id
          JOIN creators c ON c.id = p.creator_id
          WHERE f.follower_id = ?
+           AND ${activeMediaSql("p", "c")}
          ORDER BY p.created_at DESC
          LIMIT 200`,
         [user.id],
@@ -106,6 +115,7 @@ export async function GET(req: NextRequest) {
        JOIN photos p ON p.id = x.photo_id
        JOIN creators c ON c.id = p.creator_id
        WHERE x.user_id = ?
+         AND ${activeMediaSql("p", "c")}
        ORDER BY x.created_at DESC
        LIMIT 500`,
       [user.id],

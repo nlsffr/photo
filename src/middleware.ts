@@ -3,9 +3,12 @@ import type { NextRequest } from "next/server";
 import { getAllTags, getCreator, getPhotoById } from "@/lib/photos";
 import { creatorHref, mediaHref, parseVersionedSlug } from "@/lib/types";
 import {
+  creatorRouteDecision,
+  isRemovedContent,
+} from "@/lib/public-content-policy";
+import {
   isAllowedReservedTwoSegmentPath,
   isCurrentMediaVersion,
-  isCurrentPublicVersion,
   isExistingTopLevelRoute,
   normalizeTagSlug,
   safeDecodePathSegment,
@@ -29,11 +32,7 @@ const RESERVED = new Set([
   "influenceuses-tendances", "qu-est-ce-que-lumengallery",
 ]);
 
-/**
- * 410 uniquement sur l'ancienne URL de profil /{handle}
- * quand creators.removed_from_index_at est non-null.
- * /{handle}-v{n} (version courante) n'est pas intercepté ici.
- */
+/** Removed profiles are gone at every URL version. */
 export async function middleware(request: NextRequest) {
   const forwardedHost =
     request.headers.get("x-forwarded-host") || request.headers.get("host") || "";
@@ -92,7 +91,8 @@ export async function middleware(request: NextRequest) {
       try {
         if (firstSegment === "creator") {
           const creator = await getCreator(id);
-          if (!creator || creator.removedFromIndexAt) return missing();
+          if (!creator) return missing();
+          if (isRemovedContent(creator)) return gone();
           return NextResponse.redirect(
             new URL(creatorHref(creator.handle, creator.urlVersion), CANONICAL_URL),
             308,
@@ -107,7 +107,7 @@ export async function middleware(request: NextRequest) {
           );
         }
       } catch {
-        return NextResponse.next();
+        return unavailable();
       }
       return missing();
     }
@@ -123,7 +123,7 @@ export async function middleware(request: NextRequest) {
         return missing();
       }
     } catch {
-      return NextResponse.next();
+      return unavailable();
     }
     return NextResponse.next();
   }
@@ -143,25 +143,25 @@ export async function middleware(request: NextRequest) {
 
   try {
     const creator = await getCreator(parsed.base);
-    if (!creator) return missing();
-    if (creator.removedFromIndexAt && parsed.version == null) {
-      return new NextResponse("Gone", {
-        status: 410,
-        headers: {
-          "Content-Type": "text/plain; charset=utf-8",
-          "X-Robots-Tag": "noindex",
-          "Cache-Control": "public, max-age=300",
-        },
-      });
-    }
-    if (!isCurrentPublicVersion(creator.urlVersion, parsed.version)) {
-      return missing();
-    }
+    const decision = creatorRouteDecision(creator, parsed.version);
+    if (decision === "gone") return gone();
+    if (decision === "missing") return missing();
   } catch {
-    return NextResponse.next();
+    return unavailable();
   }
 
   return NextResponse.next();
+}
+
+function gone() {
+  return new NextResponse("Gone", {
+    status: 410,
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "X-Robots-Tag": "noindex, noarchive",
+      "Cache-Control": "public, max-age=300",
+    },
+  });
 }
 
 function missing() {
@@ -171,6 +171,18 @@ function missing() {
       "Content-Type": "text/plain; charset=utf-8",
       "X-Robots-Tag": "noindex",
       "Cache-Control": "public, max-age=60",
+    },
+  });
+}
+
+function unavailable() {
+  return new NextResponse("Temporarily unavailable", {
+    status: 503,
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "X-Robots-Tag": "noindex, noarchive",
+      "Cache-Control": "no-store",
+      "Retry-After": "30",
     },
   });
 }

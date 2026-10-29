@@ -16,8 +16,8 @@ export interface Creator {
   /** ISO timestamp (creators.updated_at) — lastmod sitemap. */
   updatedAt?: string | null;
   /**
-   * Si non-null, l'ancienne URL /{handle} répond 410 Gone.
-   * L'URL versionnée courante reste 200. Colonne removed_from_index_at.
+   * Si non-null, toutes les URL publiques du créateur sont retirées.
+   * Colonne MariaDB creators.removed_from_index_at.
    */
   removedFromIndexAt?: string | null;
 }
@@ -53,7 +53,7 @@ export interface Photo {
   urlVersion?: number;
   /** ISO timestamp (photos.updated_at) — lastmod sitemap. */
   updatedAt?: string | null;
-  /** Si non-null, l'URL n'est pas émise dans le sitemap. */
+  /** Si non-null, le média est retiré de toutes les surfaces publiques. */
   removedFromIndexAt?: string | null;
 }
 

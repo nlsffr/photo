@@ -6,6 +6,7 @@ import { formatCount } from "@/lib/format";
 import type { MediaType, SortKey } from "@/lib/types";
 import { creatorHref, parseVersionedSlug } from "@/lib/types";
 import { isCurrentPublicVersion } from "@/lib/seo-policy";
+import { isRemovedContent } from "@/lib/public-content-policy";
 import { InfiniteGallery } from "@/components/InfiniteGallery";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { FollowButton } from "@/components/Interactions";
@@ -60,7 +61,7 @@ export async function generateMetadata({
     notFound();
   }
   const creator = await getCreator(parsed.base);
-  if (!creator) notFound();
+  if (!creator || isRemovedContent(creator)) notFound();
 
   const version = currentVersion(creator.urlVersion);
   if (!isCurrentPublicVersion(version, parsed.version)) notFound();
@@ -123,13 +124,10 @@ export default async function CreatorProfilePage({
 
   const sp = await searchParams;
   const creator = await getCreator(handle);
-  if (!creator) notFound();
+  if (!creator || isRemovedContent(creator)) notFound();
 
   const version = currentVersion(creator.urlVersion);
 
-  // Ancienne /{handle} : 410 seulement si removed_from_index_at est posé
-  // (le middleware pose le statut ; notFound est le filet si le middleware ne tourne pas).
-  if (creator.removedFromIndexAt && parsed.version == null) notFound();
   if (!isCurrentPublicVersion(version, parsed.version)) notFound();
 
   const typeRaw = first(sp.type);
