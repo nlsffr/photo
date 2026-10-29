@@ -21,6 +21,7 @@ import type {
 import { toIso } from "../types";
 import { legacyTagPrefix, normalizeTagSlug } from "../seo-policy";
 import type { DataProvider } from "../data-provider";
+import { buildPhotoListPlan } from "./photo-query-plan";
 
 type Params = Record<string, unknown>;
 
@@ -115,19 +116,6 @@ function creatorFromRow(r: RowDataPacket): Creator {
   };
 }
 
-const SORT_SQL: Record<SortKey, string> = {
-  recent: "p.created_at DESC, p.id DESC",
-  popular: "p.views_count DESC, p.id DESC",
-  liked: "p.likes_count DESC, p.id DESC",
-  trending: `
-    (p.views_count + p.likes_count * 12)
-    / POW(GREATEST(TIMESTAMPDIFF(HOUR, p.created_at, NOW()), 1) / 24.0 + 2, 1.4)
-    DESC, p.id DESC
-  `,
-  random: "RAND(:seed)",
-  longest: "COALESCE(p.duration_sec, 0) DESC, p.views_count DESC, p.id DESC",
-};
-
 function windowSql(window: TrendWindow | undefined): string {
   if (!window || window === "all") return "";
   if (window === "24h") return "p.created_at >= NOW() - INTERVAL 1 DAY";
@@ -149,10 +137,7 @@ const PHOTO_SELECT = `
   COALESCE(c.url_version, 1) AS creator_url_version
 `;
 
-const PHOTO_FROM = `
-  FROM photos p
-  JOIN creators c ON c.id = p.creator_id
-`;
+const PHOTO_FROM = "FROM photos p JOIN creators c ON c.id = p.creator_id";
 
 /** Normalize for fuzzy match: lowercase, strip non-alnum */
 function norm(s: string): string {
@@ -294,7 +279,10 @@ export class MariaDBProvider implements DataProvider {
     }
 
     scored.sort((a, b) => b._score - a._score || b.followers - a.followers);
-    return scored.slice(0, lim).map(({ _score, ...c }) => c);
+    return scored.slice(0, lim).map(({ _score, ...creator }) => {
+      void _score;
+      return creator;
+    });
   }
 
   async getPhotos(query: {
@@ -319,9 +307,12 @@ export class MariaDBProvider implements DataProvider {
           : Math.floor(Math.random() * 1_000_000)
         : undefined;
 
-    const where: string[] = [];
-    const params: Record<string, unknown> = {};
-    if (seed !== undefined) params.seed = seed;
+    const selectiveFilter = Boolean(
+      query.creator || query.tag || query.q || query.isAi === true,
+    );
+    const plan = buildPhotoListPlan({ sort, seed, selectiveFilter });
+    const where: string[] = plan.extraWhere ? [plan.extraWhere] : [];
+    const params: Record<string, unknown> = { ...plan.params };
     if (query.creator) {
       where.push("c.handle = :creator");
       params.creator = query.creator;
@@ -368,10 +359,11 @@ export class MariaDBProvider implements DataProvider {
     const off = Math.max(Number(cursor) || 0, 0);
 
     const rows = await this.q<RowDataPacket>(
-      `SELECT ${PHOTO_SELECT}
-       ${PHOTO_FROM}
+      `SET STATEMENT max_statement_time=3 FOR
+       SELECT ${PHOTO_SELECT}
+       ${plan.fromSql}
        ${whereSql}
-       ORDER BY ${SORT_SQL[sort]}
+       ORDER BY ${plan.orderBy}
        LIMIT ${lim + 1} OFFSET ${off}`,
       params,
     );
@@ -448,14 +440,16 @@ export class MariaDBProvider implements DataProvider {
 
   async getCreatorStats(handle: string) {
     const rows = await this.q<RowDataPacket>(
-      `SELECT COUNT(*) AS photoCount,
-              COALESCE(SUM(p.views_count),0) AS totalViews,
-              COALESCE(SUM(p.likes_count),0) AS totalLikes
-       FROM photos p JOIN creators c ON c.id = p.creator_id
-       WHERE c.handle = :handle`,
+      `SELECT COALESCE(stats.photo_count, 0) AS photoCount,
+              COALESCE(stats.total_views, 0) AS totalViews,
+              COALESCE(stats.total_likes, 0) AS totalLikes
+       FROM creators c
+       LEFT JOIN creator_media_stats stats ON stats.creator_id = c.id
+       WHERE c.handle = :handle
+       LIMIT 1`,
       { handle },
     );
-    const r = rows[0] as unknown as Record<string, number>;
+    const r = (rows[0] ?? {}) as unknown as Record<string, number>;
     return {
       photoCount: Number(r.photoCount),
       totalViews: Number(r.totalViews),
@@ -498,7 +492,7 @@ export class MariaDBProvider implements DataProvider {
         : "c.followers_count DESC, stats.total_views DESC, c.id ASC";
     const rows = await this.q<RowDataPacket>(
       `SET STATEMENT max_statement_time=10 FOR
-       SELECT c.handle, c.name, c.avatar_url, c.cover_url, c.bio, c.location, c.followers_count, c.verified,
+       SELECT c.id AS creatorId, c.handle, c.name, c.avatar_url, c.cover_url, c.bio, c.location, c.followers_count, c.verified,
               COALESCE(c.url_version, 1) AS url_version, c.updated_at, c.removed_from_index_at,
               stats.photo_count AS photoCount,
               stats.total_views AS totalViews,
@@ -511,6 +505,42 @@ export class MariaDBProvider implements DataProvider {
        ORDER BY ${order}
        LIMIT ${safeLimit} OFFSET ${safeOffset}`,
     );
+
+    const creatorIds = rows
+      .map((row) => String(row.creatorId || ""))
+      .filter(Boolean);
+    const mediaCovers = new Map<string, string>();
+    if (creatorIds.length > 0) {
+      try {
+        const [coverRows] = await this.pool.query<RowDataPacket[]>(
+          `SET STATEMENT max_statement_time=3 FOR
+           SELECT ranked.creator_id, ranked.image_url
+           FROM (
+             SELECT p.creator_id, p.image_url,
+                    ROW_NUMBER() OVER (
+                      PARTITION BY p.creator_id
+                      ORDER BY p.views_count DESC, p.id ASC
+                    ) AS row_number
+             FROM photos p FORCE INDEX (idx_photos_creator_views)
+             WHERE p.creator_id IN (?)
+               AND p.removed_from_index_at IS NULL
+               AND p.image_url <> ''
+           ) ranked
+           WHERE ranked.row_number = 1`,
+          [creatorIds],
+        );
+        for (const cover of coverRows) {
+          mediaCovers.set(
+            String(cover.creator_id),
+            String(cover.image_url || ""),
+          );
+        }
+      } catch {
+        // A model page remains usable with the creator cover if the optional
+        // media fallback hits its short statement-time budget.
+      }
+    }
+
     return rows.map((r) => ({
       handle: r.handle as string,
       name: r.name as string,
@@ -525,7 +555,10 @@ export class MariaDBProvider implements DataProvider {
       photoCount: Number(r.photoCount) || 0,
       totalViews: Number(r.totalViews) || 0,
       totalLikes: Number(r.totalLikes) || 0,
-      coverUrl: (r.coverUrl as string) || "",
+      coverUrl:
+        mediaCovers.get(String(r.creatorId)) ||
+        (r.coverUrl as string) ||
+        "",
     }));
   }
 

@@ -15,7 +15,6 @@ import type {
 import { parseVersionedSlug } from "./types";
 import { getDataProvider } from "./data-provider";
 import { ensureDataProvider } from "./bootstrap";
-import { cacheGet, cacheSet } from "./cache";
 import {
   createAsyncTtlCache,
   createAsyncTtlCacheMap,
@@ -44,10 +43,6 @@ const loadPhotoPage = createAsyncTtlCacheMap(async (serialized: string) => {
 }, 15_000, Date.now, 300);
 
 export async function getPhotos(query: PhotoQuery): Promise<PhotoPage> {
-  if (query.sort === "random") {
-    return (await getProvider()).getPhotos(query);
-  }
-
   const normalized: PhotoQuery = {
     sort: query.sort ?? "recent",
     ...(query.tag === undefined ? {} : { tag: query.tag }),
@@ -57,7 +52,11 @@ export async function getPhotos(query: PhotoQuery): Promise<PhotoPage> {
     ...(query.isAi === undefined ? {} : { isAi: query.isAi }),
     cursor: query.cursor ?? 0,
     limit: query.limit ?? 24,
-    ...(query.seed === undefined ? {} : { seed: query.seed }),
+    ...(query.sort === "random"
+      ? { seed: query.seed ?? Math.floor(Math.random() * 1_000_000) }
+      : query.seed === undefined
+        ? {}
+        : { seed: query.seed }),
   };
   return loadPhotoPage(JSON.stringify(normalized));
 }
@@ -165,13 +164,12 @@ export async function getRecommendedCreators(exclude?: string, limit = 6) {
   return models.filter((c) => c.handle !== exclude).slice(0, limit);
 }
 
+const loadAllTags = createAsyncTtlCache(async () => {
+  return (await getProvider()).getTags();
+}, 5 * 60_000);
+
 export async function getAllTags(): Promise<string[]> {
-  const ck = "tags:all";
-  const hit = cacheGet<string[]>(ck);
-  if (hit) return hit;
-  const tags = await (await getProvider()).getTags();
-  cacheSet(ck, tags, 60_000);
-  return tags;
+  return loadAllTags();
 }
 
 export async function getCreator(handle: string) {

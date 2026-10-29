@@ -66,8 +66,10 @@ export default async function Home({
     ? (sortRaw as SortKey)
     : "popular";
 
-  const page = await getPhotos({ sort, tag, type, limit: 24 });
-  const allTags = await getAllTags();
+  const [page, allTags] = await Promise.all([
+    getPhotos({ sort, tag, type, limit: 24 }),
+    getAllTags(),
+  ]);
   const queryKey = `${sort}|${tag ?? ""}|${type ?? ""}`;
 
   const filters: { label: string; href: string; active: boolean }[] = [
