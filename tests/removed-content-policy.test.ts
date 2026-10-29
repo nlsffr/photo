@@ -75,16 +75,16 @@ test("every public DB surface reuses the active-content SQL policy", async () =>
 test("profile metadata, pages, redirects, and uploads reject removed creators", async () => {
   const files = await Promise.all(
     [
-      "../src/middleware.ts",
-      "../src/app/[handle]/page.tsx",
-      "../src/app/creator/[handle]/page.tsx",
-      "../src/app/[handle]/[id]/page.tsx",
+      "../src/proxy.ts",
+      "../src/app/(default)/[handle]/page.tsx",
+      "../src/app/(default)/creator/[handle]/page.tsx",
+      "../src/app/(default)/[handle]/[id]/page.tsx",
       "../src/app/api/media/upload/route.ts",
     ].map((path) => readFile(new URL(path, import.meta.url), "utf8")),
   );
 
-  const [middleware, profile, legacyProfile, media, upload] = files;
-  assert.match(middleware, /creatorRouteDecision/);
+  const [proxy, profile, legacyProfile, media, upload] = files;
+  assert.match(proxy, /creatorRouteDecision/);
   assert.ok((profile.match(/isRemovedContent\(/g) ?? []).length >= 2);
   assert.match(legacyProfile, /isRemovedContent\(/);
   assert.match(media, /isRemovedContent\(/);
@@ -110,15 +110,15 @@ test("comments, views, and interaction writes reject removed media", async () =>
 });
 
 test("dynamic public routes fail closed when removal status cannot be checked", async () => {
-  const middleware = await readFile(
-    new URL("../src/middleware.ts", import.meta.url),
+  const proxy = await readFile(
+    new URL("../src/proxy.ts", import.meta.url),
     "utf8",
   );
 
-  assert.match(middleware, /function unavailable\(/);
-  assert.ok((middleware.match(/return unavailable\(\)/g) ?? []).length >= 3);
-  assert.match(middleware, /status: 503/);
-  assert.match(middleware, /"Cache-Control": "no-store"/);
+  assert.match(proxy, /function unavailable\(/);
+  assert.ok((proxy.match(/return unavailable\(\)/g) ?? []).length >= 3);
+  assert.match(proxy, /status: 503/);
+  assert.match(proxy, /"Cache-Control": "no-store"/);
 });
 
 test("removed sitemap entries cannot linger in a day-long stale cache", async () => {

@@ -24,11 +24,17 @@ test("legacy premium payment and activation routes are explicitly gone", async (
 });
 
 test("the premium UI advertises only benefits that are currently implemented", async () => {
-  const source = await readFile(
-    new URL("../src/app/premium/page.tsx", import.meta.url),
-    "utf8",
+  const [source, english, french] = await Promise.all(
+    [
+      "../src/app/(default)/premium/page.tsx",
+      "../src/lib/i18n/dictionaries/en.ts",
+      "../src/lib/i18n/dictionaries/fr.ts",
+    ].map((path) => readFile(new URL(path, import.meta.url), "utf8")),
   );
-  assert.doesNotMatch(source, /Qualité et vitesse prioritaires/);
+
+  assert.doesNotMatch(source, /premium\.priority/);
+  assert.doesNotMatch(english, /Priority quality and speed/);
+  assert.doesNotMatch(french, /Qualité et vitesse prioritaires/);
 });
 
 test("the payment ledger stores the entitlement interval needed for safe refunds", async () => {
