@@ -52,6 +52,8 @@ services:
       S3_FORCE_PATH_STYLE: "true"
       CDN_HOSTNAME: ${CDN_HOSTNAME:-}
       CDN_URL: ${CDN_URL:-}
+      SESSION_SECRET: ${SESSION_SECRET:-}
+      ANALYTICS_HASH_SECRET: ${ANALYTICS_HASH_SECRET:-}
     depends_on:
       mariadb:
         condition: service_healthy

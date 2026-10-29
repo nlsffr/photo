@@ -10,6 +10,7 @@ import { LocaleProvider } from "@/components/LocaleProvider";
 import { PremiumProvider } from "@/components/Premium";
 import { CookieBanner } from "@/components/CookieBanner";
 import { NavProgress } from "@/components/NavProgress";
+import { AnalyticsBeacon } from "@/components/AnalyticsBeacon";
 
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").replace(/\/$/, "");
 
@@ -95,6 +96,7 @@ export default function RootLayout({
                 <InteractionsProvider>
                   <Suspense fallback={null}>
                     <NavProgress />
+                    <AnalyticsBeacon />
                   </Suspense>
                   <AgeGate />
                   <AppShell>{children}</AppShell>

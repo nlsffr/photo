@@ -127,6 +127,32 @@ internal is ever reachable from the public internet. Only the edge is public.
 - Optional Grafana + Prometheus + Loki (VPN-only).
 - The app exposes `/api/healthz` (liveness) and `/api/readyz` (readiness).
 
+### First-party traffic and live presence
+
+Apply `migrations/016-analytics-presence.sql` and set a stable server-only
+`ANALYTICS_HASH_SECRET` (at least 16 characters; 32+ random bytes recommended).
+If it is temporarily omitted, the app falls back to the existing
+`SESSION_SECRET`; neither value is exposed to the browser.
+
+The measurements have deliberately separate meanings:
+
+- registered accounts are rows in `users`;
+- unexpired sessions are 30-day login credentials and are **not** people online;
+- daily visitors are random first-party visitor cookies aggregated by UTC day;
+- live presence is a heartbeat observed during the last five minutes.
+
+Run the operator-only report from the host or app environment:
+
+```bash
+DATABASE_URL="$DATABASE_URL" node scripts/analytics-report.mjs
+# Optional UTC day:
+DATABASE_URL="$DATABASE_URL" node scripts/analytics-report.mjs 2026-10-29
+```
+
+Before this migration, nginx logs and `media_views` can only provide estimates:
+proxy addresses, bots, cached responses, and missing anonymous identifiers make
+them unsuitable for an exact unique-visitor count.
+
 ## Local development
 
 ```bash
