@@ -15,5 +15,9 @@ test("the production image includes the operator analytics report", async () => 
     dockerfile,
     /mkdir -p \/ops-runtime[\s\S]*pnpm --dir \/ops-runtime add mysql2/,
   );
+  assert.doesNotMatch(
+    dockerfile,
+    /pnpm --dir \/ops-runtime add mysql2[^\n]*--offline/,
+  );
 });
 

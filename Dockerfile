@@ -16,7 +16,7 @@ RUN pnpm install --frozen-lockfile
 # files copied after the build.
 FROM deps AS ops-deps
 RUN mkdir -p /ops-runtime \
-  && pnpm --dir /ops-runtime add mysql2@3.23.1 --prod --offline \
+  && pnpm --dir /ops-runtime add mysql2@3.23.1 --prod \
   --config.auto-install-peers=false
 
 # ---------------------------------------------------------------------------
