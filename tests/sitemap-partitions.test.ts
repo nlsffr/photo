@@ -56,7 +56,7 @@ test("partition cursors are URL-safe and preserve the exact keyset boundary", as
 
   assert.match(
     partition.path,
-    /^\/sitemaps\/media\/2026-10-27\/[A-Za-z0-9_-]+$/,
+    /^\/sitemaps\/media\/stable\/2026-10-27\/[A-Za-z0-9_-]+$/,
   );
   assert.deepEqual(decodeSitemapCursor(partition.cursor), {
     createdAt: "2026-10-27T00:00:01.000Z",

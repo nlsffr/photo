@@ -98,6 +98,17 @@ class SearchConsoleReportTests(unittest.TestCase):
                 10,
             )
 
+    def test_zero_inspection_limit_returns_no_urls(self):
+        module = load_module()
+        self.assertEqual(
+            module.normalize_inspection_urls(
+                ["https://leakfanhub.com/alice/1"],
+                "https://leakfanhub.com",
+                0,
+            ),
+            [],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,4 +1,6 @@
-export const MEDIA_SITEMAP_CHUNK_SIZE = 10_000;
+// A 2,000-row partition remains below the 50 MiB protocol limit even when
+// every bounded title, description and media URL requires XML escaping.
+export const MEDIA_SITEMAP_CHUNK_SIZE = 2_000;
 const SITEMAP_PARTITION_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export function isSitemapPartitionDate(value: string): boolean {

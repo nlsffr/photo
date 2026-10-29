@@ -57,6 +57,8 @@ def normalize_inspection_urls(
 ) -> list[str]:
     site = _http_url(canonical_site)
     safe_limit = min(10, max(0, int(limit)))
+    if safe_limit == 0:
+        return []
     normalized: list[str] = []
     for raw in urls:
         parsed = _http_url(raw)

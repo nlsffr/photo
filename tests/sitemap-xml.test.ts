@@ -80,12 +80,44 @@ test("canonical sitemap index renders only valid HTTP sitemap URLs", async () =>
   const { renderSitemapIndex } = await loadXml();
   const xml = renderSitemapIndex([
     "https://leakfanhub.com/sitemaps/static",
-    "https://leakfanhub.com/sitemaps/media/2026-10-28/a_b-c",
+    "https://leakfanhub.com/sitemaps/media/stable/2026-10-28/a_b-c",
     "javascript:alert(1)",
   ]);
 
   assert.match(xml, /<sitemapindex xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9">/);
   assert.match(xml, /<loc>https:\/\/leakfanhub\.com\/sitemaps\/static<\/loc>/);
-  assert.match(xml, /<loc>https:\/\/leakfanhub\.com\/sitemaps\/media\/2026-10-28\/a_b-c<\/loc>/);
+  assert.match(xml, /<loc>https:\/\/leakfanhub\.com\/sitemaps\/media\/stable\/2026-10-28\/a_b-c<\/loc>/);
   assert.doesNotMatch(xml, /javascript/);
+});
+
+test("a full worst-case media partition stays below the 50 MiB XML limit", async () => {
+  const { MEDIA_SITEMAP_CHUNK_SIZE } = await import(
+    // @ts-expect-error Node's native type stripping requires the explicit suffix.
+    "../src/lib/seo-policy.ts"
+  );
+  const { renderMediaSitemap } = await loadXml();
+
+  assert.ok(
+    MEDIA_SITEMAP_CHUNK_SIZE <= 2_000,
+    "the bounded serializer budget supports at most 2,000 worst-case entries",
+  );
+  const ampUrl = `https://cdn.example/media?${"a=1&".repeat(115)}x=1`;
+  const entries = Array.from({ length: MEDIA_SITEMAP_CHUNK_SIZE }, (_, index) => ({
+    canonicalUrl: `https://leakfanhub.com/alice/${index}?${"a=1&".repeat(100)}x=1`,
+    lastmod: "2026-10-28T09:00:00.000Z",
+    type: "video" as const,
+    title: "&".repeat(160),
+    description: "&".repeat(2_048),
+    creatorHandle: "alice",
+    publicId: String(index),
+    imageUrl: ampUrl,
+    videoUrl: ampUrl,
+    createdAt: "2026-10-28T08:15:30.000Z",
+    durationSec: 28_800,
+    views: 999_999_999,
+    indexable: true,
+  }));
+  const xml = renderMediaSitemap(entries);
+
+  assert.ok(Buffer.byteLength(xml, "utf8") < 50 * 1024 * 1024);
 });

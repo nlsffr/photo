@@ -16,6 +16,12 @@ import {
   MEDIA_SITEMAP_CHUNK_SIZE,
   isSitemapPartitionDate,
 } from "./seo-policy";
+import {
+  SITEMAP_MEDIA_SELECT,
+  SITEMAP_NEXT_BOUNDARY_SQL,
+  SITEMAP_PARTITION_BOUNDARIES_SQL,
+  sitemapPartitionMediaSql,
+} from "./sitemap-query";
 
 export type SitemapMedia = {
   id: string;
@@ -66,22 +72,6 @@ type SitemapBoundaryRow = RowDataPacket & {
   created_at: Date | string;
   id: string;
 };
-
-const SITEMAP_MEDIA_SELECT = `
-  p.id,
-  p.source_id,
-  COALESCE(p.url_version, 1) AS url_version,
-  COALESCE(p.updated_at, p.created_at) AS updated_at,
-  p.created_at,
-  p.title,
-  p.description,
-  p.image_url,
-  p.video_url,
-  p.type,
-  p.duration_sec,
-  p.views_count,
-  c.handle AS creator_handle
-`;
 
 function mapSitemapMedia(row: SitemapMediaRow): SitemapMedia {
   return {
@@ -147,24 +137,12 @@ export async function getSitemapMediaChunk(
  */
 export async function getSitemapMediaPartitions(): Promise<SitemapPartition[]> {
   const [rows] = await requireDbPool().query<SitemapBoundaryRow[]>(
-    `WITH ranked AS (
-       SELECT DATE_FORMAT(p.created_at, '%Y-%m-%d') AS bucket_date,
-              p.created_at,
-              p.id,
-              ROW_NUMBER() OVER (
-                PARTITION BY DATE(p.created_at)
-                ORDER BY p.created_at ASC, p.id ASC
-              ) AS row_number
-       FROM photos p FORCE INDEX (idx_photos_sitemap_keyset)
-       STRAIGHT_JOIN creators c ON c.id = p.creator_id
-       WHERE ${activeMediaSql("p", "c")}
-     )
-     SELECT bucket_date, created_at, id
-     FROM ranked
-     WHERE MOD(row_number - 1, ?) = 0
-     ORDER BY bucket_date DESC, row_number ASC
-     LIMIT ?`,
-    [MEDIA_SITEMAP_CHUNK_SIZE, MAX_MEDIA_SITEMAP_FILES],
+    SITEMAP_PARTITION_BOUNDARIES_SQL,
+    [
+      MEDIA_SITEMAP_CHUNK_SIZE,
+      MEDIA_SITEMAP_CHUNK_SIZE,
+      MAX_MEDIA_SITEMAP_FILES,
+    ],
   );
   const boundaries: SitemapBoundary[] = [];
   for (const row of rows) {
@@ -198,30 +176,47 @@ export async function getSitemapMediaPartition(
     MEDIA_SITEMAP_CHUNK_SIZE,
     Math.max(1, Math.floor(limit)),
   );
-  const [rows] = await requireDbPool().query<SitemapMediaRow[]>(
-    `SET STATEMENT max_statement_time=10 FOR
-     SELECT ${SITEMAP_MEDIA_SELECT}
-     FROM photos p FORCE INDEX (idx_photos_sitemap_keyset)
-     STRAIGHT_JOIN creators c ON c.id = p.creator_id
-     WHERE ${activeMediaSql("p", "c")}
-       AND p.created_at >= ?
-       AND p.created_at < ?
-       AND (
-         p.created_at > ?
-         OR (p.created_at = ? AND p.id >= ?)
-       )
-     ORDER BY p.created_at ASC, p.id ASC
-     LIMIT ?`,
-    [
+  const connection = await requireDbPool().getConnection();
+  try {
+    await connection.query("START TRANSACTION READ ONLY");
+    const [upperRows] = await connection.query<SitemapBoundaryRow[]>(
+      SITEMAP_NEXT_BOUNDARY_SQL,
+      [
+        dayStart,
+        nextDay,
+        boundaryTimestamp,
+        boundaryTimestamp,
+        boundary.id,
+        MEDIA_SITEMAP_CHUNK_SIZE - 1,
+      ],
+    );
+    const upper = upperRows[0];
+    const parameters: Array<string | number> = [
       dayStart,
       nextDay,
       boundaryTimestamp,
       boundaryTimestamp,
       boundary.id,
-      safeLimit,
-    ],
-  );
-  return rows.map(mapSitemapMedia);
+    ];
+    if (upper) {
+      const upperTimestamp = toMariaDbUtcTimestamp(
+        toIso(upper.created_at) ?? "",
+      );
+      parameters.push(upperTimestamp, upperTimestamp, String(upper.id));
+    }
+    parameters.push(safeLimit);
+    const [rows] = await connection.query<SitemapMediaRow[]>(
+      sitemapPartitionMediaSql(Boolean(upper)),
+      parameters,
+    );
+    await connection.commit();
+    return rows.map(mapSitemapMedia);
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 }
 
 export async function getPopularSitemapMedia(

@@ -89,7 +89,7 @@ export function buildSitemapPartitions(
       return {
         ...boundary,
         cursor,
-        path: `/sitemaps/media/${boundary.date}/${cursor}`,
+        path: `/sitemaps/media/stable/${boundary.date}/${cursor}`,
       };
     });
 }

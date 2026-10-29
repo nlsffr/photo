@@ -169,13 +169,13 @@ test("distinguishes real top-level pages from route namespaces", async () => {
   }
 });
 
-test("uses 10k media chunks without truncating the catalog", async () => {
+test("uses conservative media chunks without truncating the catalog", async () => {
   const { mediaSitemapFileCount } = await loadPolicy();
 
   assert.equal(mediaSitemapFileCount(0), 0);
   assert.equal(mediaSitemapFileCount(1), 1);
-  assert.equal(mediaSitemapFileCount(80_001), 9);
-  assert.equal(mediaSitemapFileCount(226_676), 23);
+  assert.equal(mediaSitemapFileCount(80_001), 41);
+  assert.equal(mediaSitemapFileCount(226_676), 114);
 });
 
 test("accepts only the canonical database URL version for a media item", async () => {
