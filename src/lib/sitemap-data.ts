@@ -225,10 +225,10 @@ export async function getPopularSitemapMedia(
   const safeLimit = Math.min(2_000, Math.max(1, Math.floor(limit)));
   const [rows] = await requireDbPool().query<SitemapMediaRow[]>(
     `SELECT ${SITEMAP_MEDIA_SELECT}
-     FROM photos p
+     FROM photos p FORCE INDEX (idx_photos_views_id)
      STRAIGHT_JOIN creators c ON c.id = p.creator_id
      WHERE ${activeMediaSql("p", "c")}
-     ORDER BY p.views_count DESC, p.likes_count DESC, p.id DESC
+     ORDER BY p.views_count DESC, p.id ASC
      LIMIT ?`,
     [safeLimit],
   );

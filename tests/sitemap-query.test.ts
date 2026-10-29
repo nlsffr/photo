@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 async function loadQueries() {
@@ -36,4 +37,16 @@ test("partition reads use a physical-row upper boundary and an exclusive keyset"
   assert.doesNotMatch(nextBoundary, /removed_from_index_at/);
   assert.match(nextBoundary, /ORDER BY p\.created_at ASC, p\.id ASC/);
   assert.match(boundedRead, /p\.created_at < \? OR \(p\.created_at = \? AND p\.id < \?\)/);
+});
+
+test("popular sitemap follows the existing views index without a filesort", async () => {
+  const source = await readFile(
+    new URL("../src/lib/sitemap-data.ts", import.meta.url),
+    "utf8",
+  );
+  const popular = source.slice(source.indexOf("getPopularSitemapMedia"));
+
+  assert.match(popular, /FROM photos p FORCE INDEX \(idx_photos_views_id\)/);
+  assert.match(popular, /ORDER BY p\.views_count DESC, p\.id ASC/);
+  assert.doesNotMatch(popular, /p\.likes_count DESC/);
 });
