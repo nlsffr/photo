@@ -88,6 +88,12 @@ export async function getCreatorStats(handle: string) {
   return (await getProvider()).getCreatorStats(handle);
 }
 
+/** Shared by metadata and page during a render, never across requests. */
+export const getCreatorCollectionContext = cache(async (handle: string): Promise<{ creator: Creator; stats: CreatorCollectionStats } | undefined> => {
+  const { base } = parseVersionedSlug(handle);
+  return (await getProvider()).getCreatorCollectionContext(base);
+});
+
 /** Shared within a render request only, so removals are read again next request. */
 export const getCreatorCollectionStats = cache(async (handle: string): Promise<CreatorCollectionStats> => {
   const { base } = parseVersionedSlug(handle);

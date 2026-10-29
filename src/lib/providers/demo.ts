@@ -132,6 +132,11 @@ export class DemoProvider implements DataProvider {
   async getCreator(handle: string) {
     return BY_HANDLE.get(handle);
   }
+  async getCreatorCollectionContext(handle: string) {
+    const creator = BY_HANDLE.get(handle);
+    if (!creator || creator.removedFromIndexAt != null) return undefined;
+    return { creator, stats: await this.getCreatorCollectionStats(handle) };
+  }
   async searchCreators(q: string, limit = 12) {
     const term = q.toLowerCase();
     return CREATORS.filter(

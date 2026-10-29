@@ -53,6 +53,7 @@ function setup(
         totalLikes: 20,
       }),
       getCreatorCollectionStats: async () => options.stats ?? stats,
+      getCreatorCollectionContext: async () => ({ creator: options.creator ?? creator, stats: options.stats ?? stats }),
       getPhotos: async (query: Record<string, unknown>) => {
         queries.push(query);
         return {
@@ -258,4 +259,68 @@ test("legacy non-aligned offsets preserve a functional cursor link and remain no
     ).index,
     false,
   );
+});
+
+test("cold proxy plus metadata and page share one combined context and stay within four real SQL round trips including tags", async () => {
+  const { createRequire } = await import("node:module");
+  const { dirname, join } = await import("node:path");
+  const nativeRequire = createRequire(import.meta.url);
+  // Use React's real server cache; only provide the per-request dispatcher that
+  // the RSC renderer normally installs. No cache function is mocked.
+  const serverReact = nativeRequire(join(dirname(nativeRequire.resolve("react")), "cjs/react.react-server.development.js"));
+  const internals = serverReact.__SERVER_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;
+  const rawCreator = { handle: "aria-lune", name: "Aria Lune", avatar_url: "/avatar.jpg", cover_url: null, bio: "Public creator", location: "Paris", followers_count: 100, verified: 1, url_version: 3, updated_at: null, removed_from_index_at: null };
+  const rawStats = { mediaCount: "100", photoCount: "70", videoCount: "30", engagedCount: "10", totalViews: "800", totalLikes: "20" };
+  const mediaRow = { id: "asset-1", source_id: "1", title: "Asset", description: null, image_url: "/image.jpg", video_url: null, external_url: null, type: "photo", duration_sec: null, item_count: null, width: 100, height: 100, views_count: 20, likes_count: 2, source_views_count: 20, source_likes_count: 2, local_views_count: 0, is_ai: 0, created_at: "2026-10-29T00:00:00Z", updated_at: null, url_version: 1, removed_from_index_at: null, creator_handle: "aria-lune", creator_name: "Aria Lune", creator_avatar: "/avatar.jpg", creator_verified: 1, creator_url_version: 3 };
+  const calls: Array<{ operation: string; sql: string }> = [];
+  const pool = {
+    execute: async (sql: string) => {
+      calls.push({ operation: "execute", sql });
+      if (sql.includes("AS mediaCount")) return [[{ ...rawCreator, ...rawStats }], []];
+      if (sql.includes("FROM creators WHERE")) return [[rawCreator], []];
+      if (sql.includes("p.source_id AS source_id")) return [[mediaRow], []];
+      throw new Error(`Unexpected SQL: ${sql}`);
+    },
+    query: async (sql: string) => {
+      calls.push({ operation: "query", sql });
+      assert.match(sql, /SELECT photo_id, tag FROM photo_tags/);
+      return [[{ photo_id: "asset-1", tag: "portrait" }], []];
+    },
+  };
+  const { MariaDBProvider } = loadAppModule<{ MariaDBProvider: new () => unknown }>("src/lib/providers/mariadb.ts", { "../db-pool": { requireDbPool: () => pool } });
+  const provider = new MariaDBProvider();
+  const photos = loadAppModule<Record<string, (...args: unknown[]) => Promise<unknown>>>("src/lib/photos.ts", {
+    react: serverReact,
+    "./bootstrap": { ensureDataProvider: async () => undefined },
+    "./data-provider": { getDataProvider: () => provider },
+  });
+  const components: Record<string, unknown> = {};
+  for (const [file, component] of [["VerifiedBadge", "VerifiedBadge"], ["Interactions", "FollowButton"], ["MediaImg", "MediaImg"], ["BackLink", "BackLink"], ["FloatingBack", "FloatingBack"], ["JsonLd", "JsonLd"], ["InfiniteGallery", "InfiniteGallery"]]) components[`@/components/${file}`] = { [component]: () => null };
+  const route = loadAppModule<Route>("src/app/(default)/[handle]/page.tsx", { ...components, "@/lib/photos": photos });
+  const { proxy } = loadAppModule<{ proxy: (request: Request) => Promise<Response> }>("src/proxy.ts", { "@/lib/photos": photos });
+  const { NextRequest } = await import("next/server.js");
+  const props = { params: Promise.resolve({ handle: "aria-lune-v3" }), searchParams: Promise.resolve({ page: "2" }) };
+  const previous = internals.A;
+  const withinRequest = async (action: () => Promise<void>) => {
+    const entries = new Map<unknown, unknown>();
+    internals.A = { getCacheForType: (factory: () => unknown) => { if (!entries.has(factory)) entries.set(factory, factory()); return entries.get(factory); } };
+    try { await action(); } finally { internals.A = previous; }
+  };
+  await withinRequest(async () => {
+    assert.equal((await proxy(new NextRequest("https://leakfanhub.com/aria-lune-v3"))).status, 200);
+    const metadata = await route.generateMetadata(props);
+    assert.equal(metadata.alternates?.canonical, "/aria-lune-v3?page=2");
+    const tree = await route.default(props);
+    assert.ok(nodes(tree).some((node) => (node.props.initial as { items?: Array<{ tags: string[] }> } | undefined)?.items?.[0]?.tags.includes("portrait")));
+  });
+  assert.equal(calls.length, 4, "cold budget is proxy creator + shared context + media + tags");
+  assert.equal(calls.filter((call) => call.sql.includes("AS mediaCount")).length, 1);
+  assert.equal(calls.filter((call) => call.operation === "query").length, 1);
+  assert.equal(typeof photos.getCreatorCollectionContext, "function");
+  await withinRequest(async () => {
+    const context = await photos.getCreatorCollectionContext("aria-lune-v3") as { creator: { handle: string } };
+    assert.equal(context.creator.handle, "aria-lune");
+    await photos.getCreatorCollectionContext("aria-lune-v3");
+  });
+  assert.equal(calls.length, 5, "a new request rereads public context once; no persistent context cache");
 });

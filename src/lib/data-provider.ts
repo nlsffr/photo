@@ -16,6 +16,7 @@ import type {
 export interface DataProvider {
   getCreators(): Promise<Creator[]>;
   getCreator(handle: string): Promise<Creator | undefined>;
+  getCreatorCollectionContext(handle: string): Promise<{ creator: Creator; stats: CreatorCollectionStats } | undefined>;
   getPhotos(query: {
     sort?: SortKey;
     tag?: string;
@@ -59,6 +60,9 @@ export class EmptyDataProvider implements DataProvider {
     return [];
   }
   async getCreator(): Promise<undefined> {
+    return undefined;
+  }
+  async getCreatorCollectionContext(): Promise<undefined> {
     return undefined;
   }
   async getPhotos(): Promise<PhotoPage> {

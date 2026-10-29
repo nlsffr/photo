@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { getCreator, getCreatorCollectionStats, getPhotos } from "@/lib/photos";
+import { getCreatorCollectionContext, getPhotos } from "@/lib/photos";
 import { formatCount } from "@/lib/format";
 import type { CreatorCollection, MediaType, SortKey } from "@/lib/types";
 import { parseVersionedSlug } from "@/lib/types";
@@ -90,10 +90,10 @@ async function loadCollection({
     notFound();
   const parsed = parseVersionedSlug(handleParam);
   if (RESERVED.has(parsed.base.toLowerCase())) notFound();
-  const creator = await getCreator(parsed.base);
-  if (!creator || isRemovedContent(creator)) notFound();
+  const context = await getCreatorCollectionContext(parsed.base);
+  if (!context || isRemovedContent(context.creator)) notFound();
+  const { creator, stats } = context;
   if (!isCurrentPublicVersion(creator.urlVersion, parsed.version)) notFound();
-  const stats = await getCreatorCollectionStats(creator.handle);
   if (!collectionIsEligible(collection, stats)) notFound();
   const legacy =
     collection === "overview" ? legacyCreatorCollection(searchParams) : null;

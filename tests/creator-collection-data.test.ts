@@ -78,3 +78,24 @@ test("public aggregate wrapper uses React request cache and normalizes versioned
   assert.match(wrapper, /getCreatorCollectionStats\(base\)/);
   assert.doesNotMatch(wrapper, /createAsyncTtlCache|unstable_cache|new Map|use cache/);
 });
+
+test("demo combined context includes zero-public-media creators and excludes removed creators", async () => {
+  const provider = new (await demo).DemoProvider();
+  const creator = (await provider.getCreator("aria-lune"))!;
+  const items = (await provider.getAllPhotos()).filter((item: Photo) => item.creatorHandle === creator.handle);
+  const media = await Promise.all(items.map((item: Photo) => provider.getPhoto(item.id)));
+  assert.equal(typeof provider.getCreatorCollectionContext, "function", "combined context provider is required");
+  const context = await provider.getCreatorCollectionContext("aria-lune");
+  assert.equal(context?.creator.handle, "aria-lune");
+  assert.deepEqual(context?.stats, { mediaCount: 5, photoCount: 1, videoCount: 2, engagedCount: 5, totalViews: 1020272, totalLikes: 134414 });
+  try {
+    for (const item of media) item!.removedFromIndexAt = "2026-10-29";
+    assert.deepEqual((await provider.getCreatorCollectionContext("aria-lune"))?.stats, zero);
+    creator.removedFromIndexAt = "2026-10-29";
+    assert.equal(await provider.getCreatorCollectionContext("aria-lune"), undefined);
+    assert.equal(await provider.getCreatorCollectionContext("missing"), undefined);
+  } finally {
+    for (const item of media) delete item!.removedFromIndexAt;
+    delete creator.removedFromIndexAt;
+  }
+});

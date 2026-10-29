@@ -234,3 +234,40 @@ test("creator collection stats execute one bounded public aggregate and normaliz
     assert.deepEqual(await provider.getCreatorCollectionStats("empty-or-removed"), { mediaCount: 0, photoCount: 0, videoCount: 0, engagedCount: 0, totalViews: 0, totalLikes: 0 });
   } finally { hooks.deregister(); }
 });
+
+// @ts-expect-error Native Node requires explicit suffixes.
+import { loadAppModule } from "./helpers/load-app-module.ts";
+import type { Creator, CreatorCollectionStats } from "../src/lib/types";
+
+test("combined creator context crosses the real pool boundary once with active outer creator and left-joined public media", async () => {
+  const calls: Array<{ sql: string; params: unknown }> = [];
+  const rawCreator = { handle: "aria-lune", name: "Aria Lune", avatar_url: "/avatar.jpg", cover_url: null, bio: "Public creator", location: "Paris", followers_count: "123", verified: 1, url_version: 3, updated_at: null, removed_from_index_at: null };
+  let rows: Record<string, unknown>[] = [{ ...rawCreator, mediaCount: "24", photoCount: "12", videoCount: "4", engagedCount: "8", totalViews: "400", totalLikes: "30" }];
+  const pool = { execute: async (sql: string, params: unknown) => { calls.push({ sql, params }); return [rows, []]; } };
+  const { MariaDBProvider } = loadAppModule<{ MariaDBProvider: new () => { getCreatorCollectionContext: (handle: string) => Promise<{ creator: Creator; stats: CreatorCollectionStats } | undefined> } }>("src/lib/providers/mariadb.ts", { "../db-pool": { requireDbPool: () => pool } });
+  const provider = new MariaDBProvider();
+  assert.equal(typeof provider.getCreatorCollectionContext, "function", "combined SQL context is required");
+  const context = await provider.getCreatorCollectionContext("aria-lune");
+  assert.equal(calls.length, 1, "context must use one driver execution, including metadata and counters");
+  assert.equal(context?.creator.handle, "aria-lune");
+  assert.equal(context?.creator.followers, 123);
+  assert.equal(context?.creator.urlVersion, 3);
+  assert.deepEqual(context?.stats, { mediaCount: 24, photoCount: 12, videoCount: 4, engagedCount: 8, totalViews: 400, totalLikes: 30 });
+  const { sql, params } = calls[0];
+  assert.match(sql, /SET STATEMENT max_statement_time=5 FOR/);
+  assert.match(sql, /FROM creators c\s+LEFT JOIN photos p/);
+  assert.match(sql, /ON p.creator_id = c.id\s+AND p.removed_from_index_at IS NULL AND c.removed_from_index_at IS NULL/);
+  assert.match(sql, /WHERE c.handle = :handle\s+AND c.removed_from_index_at IS NULL/);
+  assert.match(sql, /COUNT\(p.id\) AS mediaCount/);
+  assert.match(sql, /p.type = 'photo'/);
+  assert.match(sql, /p.type = 'video'/);
+  assert.match(sql, /p.source_views_count[^\n]*> 0 OR[^\n]*p.source_likes_count[^\n]*> 0/);
+  assert.deepEqual(params, { handle: "aria-lune" });
+  rows = [{ ...rawCreator, mediaCount: "0", photoCount: null, videoCount: null, engagedCount: null, totalViews: null, totalLikes: null }];
+  const empty = await provider.getCreatorCollectionContext("aria-lune");
+  assert.equal(empty?.creator.handle, "aria-lune", "LEFT JOIN must retain an active creator with no public media");
+  assert.deepEqual(empty?.stats, { mediaCount: 0, photoCount: 0, videoCount: 0, engagedCount: 0, totalViews: 0, totalLikes: 0 });
+  rows = [];
+  assert.equal(await provider.getCreatorCollectionContext("removed"), undefined);
+  assert.equal(calls.length, 3);
+});

@@ -571,6 +571,37 @@ export class MariaDBProvider implements DataProvider {
     return photoRows.map((r) => rowToView(r, tagsMap.get(r.id) ?? []));
   }
 
+  async getCreatorCollectionContext(handle: string): Promise<{ creator: Creator; stats: CreatorCollectionStats } | undefined> {
+    const rows = await this.q<RowDataPacket>(
+      `SET STATEMENT max_statement_time=5 FOR
+       SELECT c.handle, c.name, c.avatar_url, c.cover_url, c.bio, c.location,
+              c.followers_count, c.verified, COALESCE(c.url_version, 1) AS url_version,
+              c.updated_at, c.removed_from_index_at,
+              COUNT(p.id) AS mediaCount,
+              COALESCE(SUM(p.type = 'photo'), 0) AS photoCount,
+              COALESCE(SUM(p.type = 'video'), 0) AS videoCount,
+              COALESCE(SUM(COALESCE(p.source_views_count, 0) > 0 OR COALESCE(p.source_likes_count, 0) > 0), 0) AS engagedCount,
+              COALESCE(SUM(COALESCE(p.source_views_count, p.views_count, 0) + COALESCE(p.local_views_count, 0)), 0) AS totalViews,
+              COALESCE(SUM(COALESCE(p.source_likes_count, p.likes_count, 0)), 0) AS totalLikes
+       FROM creators c
+       LEFT JOIN photos p ON p.creator_id = c.id AND ${activeMediaSql("p", "c")}
+       WHERE c.handle = :handle AND ${activeCreatorSql("c")}
+       GROUP BY c.id, c.handle, c.name, c.avatar_url, c.cover_url, c.bio, c.location,
+                c.followers_count, c.verified, c.url_version, c.updated_at, c.removed_from_index_at`,
+      { handle },
+    );
+    const row = rows[0];
+    if (!row) return undefined;
+    return { creator: creatorFromRow(row), stats: {
+      mediaCount: Number(row.mediaCount) || 0,
+      photoCount: Number(row.photoCount) || 0,
+      videoCount: Number(row.videoCount) || 0,
+      engagedCount: Number(row.engagedCount) || 0,
+      totalViews: Number(row.totalViews) || 0,
+      totalLikes: Number(row.totalLikes) || 0,
+    } };
+  }
+
   async getCreatorCollectionStats(handle: string): Promise<CreatorCollectionStats> {
     const rows = await this.q<RowDataPacket>(
       `SET STATEMENT max_statement_time=5 FOR
