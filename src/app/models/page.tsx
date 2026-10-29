@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getModelCount, getModels } from "@/lib/photos";
+import {
+  buildModelsPagePayload,
+  MODELS_PAGE_SIZE,
+} from "@/lib/models-pagination";
 import { creatorHref } from "@/lib/types";
-import { CreatorCard } from "@/components/CreatorCard";
+import { ModelsGrid } from "@/components/ModelsGrid";
 import { JsonLd } from "@/components/JsonLd";
 
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").replace(/\/$/, "");
-const PAGE_SIZE = 48;
 
 export const revalidate = 120;
 
@@ -36,13 +39,13 @@ export default async function ModelsPage({
   const sp = await searchParams;
   const sort = first(sp.sort) === "views" ? "views" : "followers";
   const pageNum = Math.max(1, parseInt(first(sp.page) || "1", 10) || 1);
-  const start = (pageNum - 1) * PAGE_SIZE;
+  const start = (pageNum - 1) * MODELS_PAGE_SIZE;
   const [pageModels, total] = await Promise.all([
-    getModels(sort, PAGE_SIZE + 1, start),
+    getModels(sort, MODELS_PAGE_SIZE + 1, start),
     getModelCount(),
   ]);
-  const hasMore = pageModels.length > PAGE_SIZE;
-  const models = pageModels.slice(0, PAGE_SIZE);
+  const page = buildModelsPagePayload(pageModels, start, MODELS_PAGE_SIZE);
+  const models = page.items;
 
   const toggle =
     "rounded-full px-4 py-1.5 text-sm font-semibold transition-colors";
@@ -63,8 +66,6 @@ export default async function ModelsPage({
       })),
     },
   };
-
-  const sortQs = sort === "views" ? "sort=views&" : "";
 
   return (
     <div className="px-3 py-6 sm:px-5">
@@ -100,22 +101,13 @@ export default async function ModelsPage({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
-        {models.map((c) => (
-          <CreatorCard key={c.handle} creator={c} />
-        ))}
-      </div>
-
-      {hasMore && (
-        <div className="mt-8 flex justify-center">
-          <Link
-            href={`/models?${sortQs}page=${pageNum + 1}`}
-            className="rounded-full bg-[var(--color-accent)] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[var(--color-accent-600)]"
-          >
-            Voir plus
-          </Link>
-        </div>
-      )}
+      <ModelsGrid
+        key={`${sort}:${start}`}
+        initialModels={models}
+        initialHasMore={page.hasMore}
+        initialNextOffset={page.nextOffset}
+        sort={sort}
+      />
     </div>
   );
 }
