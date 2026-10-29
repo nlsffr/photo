@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+import tempfile
 import unittest
 
 
@@ -42,6 +43,18 @@ CREATE INDEX IF NOT EXISTS idx_example ON photos (created_at);
         self.assertEqual(config["user"], "user")
         self.assertEqual(config["password"], "p@ss")
         self.assertEqual(config["database"], "leakfanhub")
+
+    def test_later_env_file_wins_without_shell_expansion(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            first = Path(directory, "first.env")
+            second = Path(directory, "second.env")
+            first.write_text("DATABASE_URL=mysql://old:p@db/old\n", "utf-8")
+            second.write_text(
+                "export DATABASE_URL='mysql://new:p%24word@db/current'\n", "utf-8"
+            )
+
+            value = MODULE.env_value([first, second], "DATABASE_URL")
+            self.assertEqual(value, "mysql://new:p%24word@db/current")
 
 
 if __name__ == "__main__":

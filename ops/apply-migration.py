@@ -14,6 +14,7 @@ from urllib.parse import unquote, urlsplit
 
 SAFE_DATABASE = re.compile(r"^[A-Za-z0-9_]{1,64}$")
 DELIMITER_DIRECTIVE = re.compile(r"^DELIMITER\s+(\S+)$", re.IGNORECASE)
+ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 def split_mysql_script(source: str) -> Iterator[str]:
@@ -68,6 +69,30 @@ def database_config(database_url: str, host: str) -> dict[str, object]:
         raise RuntimeError("DATABASE_URL is invalid") from error
 
 
+def env_value(paths: list[Path], name: str) -> str:
+    """Read one dotenv/systemd-style value; later files take precedence."""
+
+    if not ENV_NAME.fullmatch(name):
+        raise ValueError("invalid environment name")
+    result = ""
+    for path in paths:
+        if not path.exists():
+            continue
+        for raw_line in path.read_text("utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip().removeprefix("export ").strip()
+            if key != name:
+                continue
+            value = value.strip()
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+                value = value[1:-1]
+            result = value
+    return result
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("migration", type=Path)
@@ -75,6 +100,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--database-host",
         default=os.environ.get("MIGRATION_DATABASE_HOST", "127.0.0.1"),
     )
+    parser.add_argument("--env-file", action="append", type=Path, default=[])
     parser.add_argument("--check", action="store_true", help="parse only")
     return parser.parse_args(argv)
 
@@ -89,7 +115,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"parsed {len(statements)} statements")
         return 0
 
-    database_url = os.environ.get("DATABASE_URL", "")
+    database_url = os.environ.get("DATABASE_URL", "") or env_value(
+        args.env_file, "DATABASE_URL"
+    )
     if not database_url:
         raise RuntimeError("DATABASE_URL is required")
     try:
