@@ -50,7 +50,7 @@ const TRENDING_CANDIDATES_SQL = `FROM (
    ORDER BY pl.likes_count DESC, pl.id ASC
    LIMIT 500)
 ) candidates
-JOIN photos p ON p.id = candidates.id
+STRAIGHT_JOIN photos p ON p.id = candidates.id
 STRAIGHT_JOIN creators c ON c.id = p.creator_id`;
 
 const SEARCH_CANDIDATES_SQL = `FROM (
@@ -75,7 +75,7 @@ const SEARCH_CANDIDATES_SQL = `FROM (
    WHERE cs.name LIKE :q OR cs.handle LIKE :q
    LIMIT 500)
 ) candidates
-JOIN photos p ON p.id = candidates.id
+STRAIGHT_JOIN photos p ON p.id = candidates.id
 STRAIGHT_JOIN creators c ON c.id = p.creator_id`;
 
 function mix32(value: number): number {

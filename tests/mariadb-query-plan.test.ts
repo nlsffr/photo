@@ -68,6 +68,7 @@ test("global trending pages rank a bounded union of indexed candidates", async (
   assert.match(plan.fromSql, /idx_photos_created_id/);
   assert.match(plan.fromSql, /idx_photos_likes_id/);
   assert.match(plan.fromSql, /LIMIT 500/);
+  assert.match(plan.fromSql, /STRAIGHT_JOIN photos p ON p\.id = candidates\.id/);
   assert.match(plan.orderBy, /TIMESTAMPDIFF/);
 });
 
@@ -84,6 +85,7 @@ test("text search ranks a bounded candidate set including matching creators", as
   assert.match(plan.fromSql, /pt\.title LIKE :q/);
   assert.match(plan.fromSql, /cs\.handle LIKE :q/);
   assert.match(plan.fromSql, /LIMIT 500/);
+  assert.match(plan.fromSql, /STRAIGHT_JOIN photos p ON p\.id = candidates\.id/);
 });
 
 test("text search stays bounded even when random sorting is requested", async () => {
