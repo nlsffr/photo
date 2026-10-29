@@ -5,12 +5,14 @@
 import type {
   Creator,
   CreatorWithStats,
+  CreatorCollectionStats,
   MediaType,
   Photo,
   PhotoPage,
   PhotoView,
   SortKey,
 } from "../types";
+import { summarizeCreatorCollectionStats } from "../creator-collections";
 import type { DataProvider } from "../data-provider";
 import { rankHomeFeed, resolveHomeSeed } from "../home-feed";
 
@@ -203,6 +205,13 @@ export class DemoProvider implements DataProvider {
     )
       .slice(0, limit)
       .map(withCreator);
+  }
+  async getCreatorCollectionStats(handle: string): Promise<CreatorCollectionStats> {
+    const creator = BY_HANDLE.get(handle);
+    const media = creator && creator.removedFromIndexAt == null
+      ? PHOTOS.filter((photo) => photo.creatorHandle === handle && photo.removedFromIndexAt == null)
+      : [];
+    return summarizeCreatorCollectionStats(media);
   }
   async getCreatorStats(handle: string) {
     const list = PHOTOS.filter((p) => p.creatorHandle === handle);

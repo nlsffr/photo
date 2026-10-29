@@ -6,6 +6,7 @@
 import type {
   Creator,
   CreatorWithStats,
+  CreatorCollectionStats,
   Photo,
   PhotoPage,
   PhotoView,
@@ -86,6 +87,12 @@ export async function getRelatedPhotos(
 export async function getCreatorStats(handle: string) {
   return (await getProvider()).getCreatorStats(handle);
 }
+
+/** Shared within a render request only, so removals are read again next request. */
+export const getCreatorCollectionStats = cache(async (handle: string): Promise<CreatorCollectionStats> => {
+  const { base } = parseVersionedSlug(handle);
+  return (await getProvider()).getCreatorCollectionStats(base);
+});
 
 export async function searchCreators(q: string, limit = 12): Promise<Creator[]> {
   const provider = await getProvider();

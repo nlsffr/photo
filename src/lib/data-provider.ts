@@ -5,6 +5,7 @@
 import type {
   Creator,
   CreatorWithStats,
+  CreatorCollectionStats,
   MediaType,
   Photo,
   PhotoPage,
@@ -29,6 +30,7 @@ export interface DataProvider {
   getPhoto(id: string): Promise<Photo | undefined>;
   getAllPhotos(): Promise<PhotoView[]>;
   getRelatedPhotos(photo: Photo, limit?: number): Promise<PhotoView[]>;
+  getCreatorCollectionStats(handle: string): Promise<CreatorCollectionStats>;
   getCreatorStats(handle: string): Promise<{
     photoCount: number;
     totalViews: number;
@@ -70,6 +72,9 @@ export class EmptyDataProvider implements DataProvider {
   }
   async getRelatedPhotos(): Promise<PhotoView[]> {
     return [];
+  }
+  async getCreatorCollectionStats(): Promise<CreatorCollectionStats> {
+    return { mediaCount: 0, photoCount: 0, videoCount: 0, engagedCount: 0, totalViews: 0, totalLikes: 0 };
   }
   async getCreatorStats() {
     return { photoCount: 0, totalViews: 0, totalLikes: 0 };

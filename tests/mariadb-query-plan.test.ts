@@ -199,3 +199,38 @@ test("longest media pages use the duration index without a computed sort", async
   assert.match(plan.fromSql, /FORCE INDEX \(idx_photos_duration\)/);
   assert.doesNotMatch(plan.orderBy, /COALESCE/i);
 });
+
+test("creator collection stats execute one bounded public aggregate and normalize numeric counts", async () => {
+  // @ts-expect-error Runtime Node 24 exposes registerHooks; installed Node types predate it.
+  const { registerHooks } = await import("node:module");
+  const hooks = registerHooks({ resolve(specifier: string, context: unknown, nextResolve: (specifier: string, context: unknown) => { url: string }) {
+    if (specifier === "../db-pool") return { url: "data:text/javascript,export function requireDbPool(){throw new Error('Unexpected database connection')}", shortCircuit: true };
+    return nextResolve(specifier.startsWith(".") && !/\.[a-z]+$/.test(specifier) ? `${specifier}.ts` : specifier, context);
+  } });
+  try {
+    // @ts-expect-error Native Node requires explicit .ts suffixes.
+    const { MariaDBProvider } = await import("../src/lib/providers/mariadb.ts");
+    // @ts-expect-error Native Node requires explicit .ts suffixes.
+    const { activeMediaSql } = await import("../src/lib/providers/active-content-sql.ts");
+    const provider = Object.create(MariaDBProvider.prototype);
+    const calls: Array<{ sql: string; params: unknown }> = [];
+    let result = [{ mediaCount: "4", photoCount: "2", videoCount: "1", engagedCount: "2", totalViews: "60", totalLikes: "3" }];
+    provider.q = async (sql: string, params: unknown) => { calls.push({ sql, params }); return result; };
+    assert.deepEqual(await provider.getCreatorCollectionStats("aria-lune"), { mediaCount: 4, photoCount: 2, videoCount: 1, engagedCount: 2, totalViews: 60, totalLikes: 3 });
+    assert.equal(calls.length, 1);
+    const { sql, params } = calls[0];
+    assert.match(sql, /SET STATEMENT max_statement_time=5 FOR/);
+    assert.match(sql, /JOIN creators c ON c.id = p.creator_id/);
+    assert.ok(sql.includes(activeMediaSql("p", "c")));
+    assert.match(sql, /c.handle = :handle/);
+    assert.match(sql, /COUNT\(\*\) AS mediaCount/);
+    assert.match(sql, /p.type = 'photo'/);
+    assert.match(sql, /p.type = 'video'/);
+    assert.match(sql, /p.source_views_count[^\n]*> 0 OR[^\n]*p.source_likes_count[^\n]*> 0/);
+    assert.equal((sql.match(/\bSELECT\b/g) ?? []).length, 1);
+    assert.doesNotMatch(sql, /creator_media_stats|GROUP BY|LIMIT/);
+    assert.deepEqual(params, { handle: "aria-lune" });
+    result = [{ mediaCount: "0", photoCount: null, videoCount: null, engagedCount: null, totalViews: null, totalLikes: null }] as never;
+    assert.deepEqual(await provider.getCreatorCollectionStats("empty-or-removed"), { mediaCount: 0, photoCount: 0, videoCount: 0, engagedCount: 0, totalViews: 0, totalLikes: 0 });
+  } finally { hooks.deregister(); }
+});

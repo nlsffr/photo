@@ -11,6 +11,7 @@ import { requireDbPool } from "../db-pool";
 import type {
   Creator,
   CreatorWithStats,
+  CreatorCollectionStats,
   MediaType,
   Photo,
   PhotoPage,
@@ -568,6 +569,32 @@ export class MariaDBProvider implements DataProvider {
     const photoRows = rows as unknown as PhotoRow[];
     const tagsMap = await this.tagsFor(photoRows.map((r) => r.id));
     return photoRows.map((r) => rowToView(r, tagsMap.get(r.id) ?? []));
+  }
+
+  async getCreatorCollectionStats(handle: string): Promise<CreatorCollectionStats> {
+    const rows = await this.q<RowDataPacket>(
+      `SET STATEMENT max_statement_time=5 FOR
+       SELECT COUNT(*) AS mediaCount,
+              COALESCE(SUM(p.type = 'photo'), 0) AS photoCount,
+              COALESCE(SUM(p.type = 'video'), 0) AS videoCount,
+              COALESCE(SUM(COALESCE(p.source_views_count, 0) > 0 OR COALESCE(p.source_likes_count, 0) > 0), 0) AS engagedCount,
+              COALESCE(SUM(COALESCE(p.source_views_count, p.views_count, 0) + COALESCE(p.local_views_count, 0)), 0) AS totalViews,
+              COALESCE(SUM(COALESCE(p.source_likes_count, p.likes_count, 0)), 0) AS totalLikes
+       FROM photos p
+       JOIN creators c ON c.id = p.creator_id
+       WHERE c.handle = :handle
+         AND ${activeMediaSql("p", "c")}`,
+      { handle },
+    );
+    const row = rows[0];
+    return {
+      mediaCount: Number(row?.mediaCount) || 0,
+      photoCount: Number(row?.photoCount) || 0,
+      videoCount: Number(row?.videoCount) || 0,
+      engagedCount: Number(row?.engagedCount) || 0,
+      totalViews: Number(row?.totalViews) || 0,
+      totalLikes: Number(row?.totalLikes) || 0,
+    };
   }
 
   async getCreatorStats(handle: string) {

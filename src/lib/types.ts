@@ -1,3 +1,5 @@
+export type { CreatorCollection, CreatorCollectionStats } from "./creator-collections";
+
 export interface Creator {
   handle: string;
   name: string;
