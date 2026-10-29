@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default async function InfluenceusesTendancesPage() {
   // "Trending" = models whose content is getting the most views right now.
-  const models = await getModels("views");
+  const models = await getModels("views", 100);
   const trending = models.filter((m) => m.totalViews > 0);
 
   return (

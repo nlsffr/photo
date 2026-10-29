@@ -12,10 +12,22 @@ export type SitemapMedia = {
   updatedAt: string | null;
 };
 
+export type SitemapProfile = {
+  handle: string;
+  urlVersion: number;
+  updatedAt: string | null;
+};
+
 type SitemapMediaRow = RowDataPacket & {
   id: string;
   source_id: string | number | null;
   creator_handle: string;
+  url_version: number | null;
+  updated_at: Date | string | null;
+};
+
+type SitemapProfileRow = RowDataPacket & {
+  handle: string;
   url_version: number | null;
   updated_at: Date | string | null;
 };
@@ -56,14 +68,21 @@ export async function getSitemapMediaChunk(
   limit: number,
 ): Promise<SitemapMedia[]> {
   const safeOffset = Math.max(0, Math.floor(offset));
-  const safeLimit = Math.min(2_000, Math.max(1, Math.floor(limit)));
+  const safeLimit = Math.min(10_000, Math.max(1, Math.floor(limit)));
   const [rows] = await requireDbPool().query<SitemapMediaRow[]>(
-    `SELECT ${SITEMAP_MEDIA_SELECT}
-     FROM photos p
-     STRAIGHT_JOIN creators c ON c.id = p.creator_id
-     WHERE p.removed_from_index_at IS NULL
+    `SET STATEMENT max_statement_time=10 FOR
+     SELECT ${SITEMAP_MEDIA_SELECT}
+     FROM (
+       SELECT id
+       FROM photos FORCE INDEX (idx_photos_sitemap)
+       WHERE removed_from_index_at IS NULL
+       ORDER BY created_at DESC, id DESC
+       LIMIT ? OFFSET ?
+     ) page
+     JOIN photos p ON p.id = page.id
+     JOIN creators c ON c.id = p.creator_id
      ORDER BY p.created_at DESC, p.id DESC
-     LIMIT ? OFFSET ?`,
+    `,
     [safeLimit, safeOffset],
   );
   return rows.map(mapSitemapMedia);
@@ -83,4 +102,22 @@ export async function getPopularSitemapMedia(
     [safeLimit],
   );
   return rows.map(mapSitemapMedia);
+}
+
+export async function getSitemapProfiles(): Promise<SitemapProfile[]> {
+  const [rows] = await requireDbPool().query<SitemapProfileRow[]>(
+    `SET STATEMENT max_statement_time=10 FOR
+     SELECT c.handle,
+            COALESCE(c.url_version, 1) AS url_version,
+            c.updated_at
+     FROM creators c
+     WHERE c.removed_from_index_at IS NULL
+     ORDER BY c.id
+     LIMIT 50000`,
+  );
+  return rows.map((row) => ({
+    handle: row.handle,
+    urlVersion: Number(row.url_version) || 1,
+    updatedAt: toIso(row.updated_at),
+  }));
 }

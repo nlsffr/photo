@@ -6,6 +6,85 @@ async function loadPolicy() {
   return import("../src/lib/seo-policy.ts");
 }
 
+async function loadAsyncTtlCache() {
+  // @ts-expect-error Node's native type stripping requires the explicit .ts suffix.
+  return import("../src/lib/async-ttl-cache.ts");
+}
+
+test("coalesces concurrent sitemap loads and reuses the cached value", async () => {
+  const { createAsyncTtlCache } = await loadAsyncTtlCache();
+  let now = 1_000;
+  let calls = 0;
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const load = createAsyncTtlCache(
+    async () => {
+      calls += 1;
+      await gate;
+      return calls;
+    },
+    100,
+    () => now,
+  );
+
+  const first = load();
+  const second = load();
+  assert.equal(calls, 1, "parallel callers must share one database load");
+  release();
+  assert.deepEqual(await Promise.all([first, second]), [1, 1]);
+  assert.equal(await load(), 1, "the fresh value must be served from memory");
+  now = 1_101;
+  assert.equal(await load(), 2, "an expired value must be refreshed");
+});
+
+test("coalesces async cache loads independently for each key", async () => {
+  const { createAsyncTtlCacheMap } = await loadAsyncTtlCache();
+  let now = 1_000;
+  let calls = 0;
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const load = createAsyncTtlCacheMap(
+    async (key: string) => {
+      const invocation = ++calls;
+      await gate;
+      return `${key}:${invocation}`;
+    },
+    100,
+    () => now,
+  );
+
+  const firstA = load("a");
+  const secondA = load("a");
+  const firstB = load("b");
+  assert.equal(calls, 2, "same-key callers share one load; other keys do not");
+  release();
+  assert.deepEqual(await Promise.all([firstA, secondA, firstB]), [
+    "a:1",
+    "a:1",
+    "b:2",
+  ]);
+  assert.equal(await load("a"), "a:1");
+  now = 1_101;
+  assert.equal(await load("a"), "a:3");
+});
+
+test("retries a keyed async cache load after a rejection", async () => {
+  const { createAsyncTtlCacheMap } = await loadAsyncTtlCache();
+  let calls = 0;
+  const load = createAsyncTtlCacheMap(async () => {
+    calls += 1;
+    if (calls === 1) throw new Error("temporary failure");
+    return calls;
+  }, 1_000);
+
+  await assert.rejects(load("models"), /temporary failure/);
+  assert.equal(await load("models"), 2);
+});
+
 test("normalizes legacy Python-dict tags to one safe public slug", async () => {
   const { normalizeTagSlug } = await loadPolicy();
 
@@ -90,13 +169,13 @@ test("distinguishes real top-level pages from route namespaces", async () => {
   }
 });
 
-test("computes every media sitemap chunk without the old 40-file cap", async () => {
+test("uses 10k media chunks without truncating the catalog", async () => {
   const { mediaSitemapFileCount } = await loadPolicy();
 
   assert.equal(mediaSitemapFileCount(0), 0);
   assert.equal(mediaSitemapFileCount(1), 1);
-  assert.equal(mediaSitemapFileCount(80_001), 41);
-  assert.equal(mediaSitemapFileCount(226_676), 114);
+  assert.equal(mediaSitemapFileCount(80_001), 9);
+  assert.equal(mediaSitemapFileCount(226_676), 23);
 });
 
 test("accepts only the canonical database URL version for a media item", async () => {

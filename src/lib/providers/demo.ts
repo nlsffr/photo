@@ -198,7 +198,11 @@ export class DemoProvider implements DataProvider {
   async getTags() {
     return [...new Set(PHOTOS.flatMap((p) => p.tags))].slice(0, 40);
   }
-  async getModels(sort: "followers" | "views" = "followers"): Promise<CreatorWithStats[]> {
+  async getModels(
+    sort: "followers" | "views" = "followers",
+    limit?: number,
+    offset = 0,
+  ): Promise<CreatorWithStats[]> {
     const photos = PHOTOS;
     const withStats = CREATORS.map((c) => {
       const list = photos.filter((p) => p.creatorHandle === c.handle);
@@ -212,7 +216,14 @@ export class DemoProvider implements DataProvider {
     }).filter((c) => c.photoCount > 0);
     if (sort === "followers") withStats.sort((a, b) => b.followers - a.followers);
     else withStats.sort((a, b) => b.totalViews - a.totalViews);
-    return withStats;
+    const start = Math.max(0, Math.floor(offset));
+    const end = limit == null ? undefined : start + Math.max(1, Math.floor(limit));
+    return withStats.slice(start, end);
+  }
+  async getModelCount() {
+    return CREATORS.filter((creator) =>
+      PHOTOS.some((photo) => photo.creatorHandle === creator.handle),
+    ).length;
   }
   async getRankings(limit = 20) {
     const models = await this.getModels("views");

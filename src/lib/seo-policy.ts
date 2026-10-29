@@ -1,4 +1,4 @@
-export const MEDIA_SITEMAP_CHUNK_SIZE = 2_000;
+export const MEDIA_SITEMAP_CHUNK_SIZE = 10_000;
 
 /** A sitemap index may contain at most 50,000 child sitemap entries. */
 const MAX_SITEMAPS_PER_INDEX = 50_000;

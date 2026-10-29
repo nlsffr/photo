@@ -117,8 +117,8 @@ function creatorFromRow(r: RowDataPacket): Creator {
 
 const SORT_SQL: Record<SortKey, string> = {
   recent: "p.created_at DESC, p.id DESC",
-  popular: "p.views_count DESC, p.likes_count DESC, p.id DESC",
-  liked: "p.likes_count DESC, p.views_count DESC, p.id DESC",
+  popular: "p.views_count DESC, p.id DESC",
+  liked: "p.likes_count DESC, p.id DESC",
   trending: `
     (p.views_count + p.likes_count * 12)
     / POW(GREATEST(TIMESTAMPDIFF(HOUR, p.created_at, NOW()), 1) / 24.0 + 2, 1.4)
@@ -474,29 +474,35 @@ export class MariaDBProvider implements DataProvider {
     ];
   }
 
-  async getModels(sort: "followers" | "views" = "followers"): Promise<CreatorWithStats[]> {
+  async getModels(
+    sort: "followers" | "views" = "followers",
+    limit = 100,
+    offset = 0,
+  ): Promise<CreatorWithStats[]> {
+    const safeLimit = Number.isFinite(limit)
+      ? Math.min(Math.max(Math.floor(limit), 1), 500)
+      : 100;
+    const safeOffset = Number.isFinite(offset)
+      ? Math.min(Math.max(Math.floor(offset), 0), 1_000_000)
+      : 0;
     const order =
-      sort === "views" ? "totalViews DESC" : "c.followers_count DESC, totalViews DESC";
+      sort === "views"
+        ? "stats.total_views DESC, c.followers_count DESC, c.id ASC"
+        : "c.followers_count DESC, stats.total_views DESC, c.id ASC";
     const rows = await this.q<RowDataPacket>(
-      `SELECT c.handle, c.name, c.avatar_url, c.cover_url, c.bio, c.location, c.followers_count, c.verified,
+      `SET STATEMENT max_statement_time=10 FOR
+       SELECT c.handle, c.name, c.avatar_url, c.cover_url, c.bio, c.location, c.followers_count, c.verified,
               COALESCE(c.url_version, 1) AS url_version, c.updated_at, c.removed_from_index_at,
-              COUNT(p.id) AS photoCount,
-              COALESCE(SUM(p.views_count), 0) AS totalViews,
-              COALESCE(SUM(p.likes_count), 0) AS totalLikes,
-              COALESCE(
-                NULLIF(c.cover_url, ''),
-                (
-                  SELECT p2.image_url FROM photos p2
-                  WHERE p2.creator_id = c.id
-                  ORDER BY p2.views_count DESC
-                  LIMIT 1
-                )
-              ) AS coverUrl
+              stats.photo_count AS photoCount,
+              stats.total_views AS totalViews,
+              stats.total_likes AS totalLikes,
+              c.cover_url AS coverUrl
        FROM creators c
-       LEFT JOIN photos p ON p.creator_id = c.id
-       GROUP BY c.id
-       HAVING photoCount > 0
-       ORDER BY ${order}`,
+       JOIN creator_media_stats stats ON stats.creator_id = c.id
+       WHERE c.removed_from_index_at IS NULL
+         AND stats.photo_count > 0
+       ORDER BY ${order}
+       LIMIT ${safeLimit} OFFSET ${safeOffset}`,
     );
     return rows.map((r) => ({
       handle: r.handle as string,
@@ -514,6 +520,18 @@ export class MariaDBProvider implements DataProvider {
       totalLikes: Number(r.totalLikes) || 0,
       coverUrl: (r.coverUrl as string) || "",
     }));
+  }
+
+  async getModelCount(): Promise<number> {
+    const rows = await this.q<RowDataPacket>(
+      `SET STATEMENT max_statement_time=10 FOR
+       SELECT COUNT(*) AS total
+       FROM creators c
+       JOIN creator_media_stats stats ON stats.creator_id = c.id
+       WHERE c.removed_from_index_at IS NULL
+         AND stats.photo_count > 0`,
+    );
+    return Math.max(0, Number(rows[0]?.total) || 0);
   }
 
   async getRankings(limit = 20) {

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getModels } from "@/lib/photos";
+import { getModelCount, getModels } from "@/lib/photos";
 import { creatorHref } from "@/lib/types";
 import { CreatorCard } from "@/components/CreatorCard";
 import { JsonLd } from "@/components/JsonLd";
@@ -36,11 +36,13 @@ export default async function ModelsPage({
   const sp = await searchParams;
   const sort = first(sp.sort) === "views" ? "views" : "followers";
   const pageNum = Math.max(1, parseInt(first(sp.page) || "1", 10) || 1);
-  const all = await getModels(sort);
-  const total = all.length;
   const start = (pageNum - 1) * PAGE_SIZE;
-  const models = all.slice(start, start + PAGE_SIZE);
-  const hasMore = start + PAGE_SIZE < total;
+  const [pageModels, total] = await Promise.all([
+    getModels(sort, PAGE_SIZE + 1, start),
+    getModelCount(),
+  ]);
+  const hasMore = pageModels.length > PAGE_SIZE;
+  const models = pageModels.slice(0, PAGE_SIZE);
 
   const toggle =
     "rounded-full px-4 py-1.5 text-sm font-semibold transition-colors";
@@ -56,7 +58,7 @@ export default async function ModelsPage({
       itemListElement: models.slice(0, 50).map((m, i) => ({
         "@type": "ListItem",
         position: start + i + 1,
-        url: `${SITE}${creatorHref(m.handle)}`,
+        url: `${SITE}${creatorHref(m.handle, m.urlVersion)}`,
         name: m.name || m.handle,
       })),
     },
