@@ -108,7 +108,7 @@ export default async function Home({
             key={c.label}
             href={c.href}
             scroll={false}
-            prefetch={true}
+            prefetch={false}
             className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition ${
               c.active
                 ? "bg-[var(--color-accent)] text-white shadow-sm shadow-[var(--color-accent)]/30"
@@ -120,7 +120,7 @@ export default async function Home({
         ))}
         <Link
           href="/feed"
-          prefetch={true}
+          prefetch={false}
           className="ml-auto shrink-0 rounded-full border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-ink-muted)]"
         >
           Feed ↗

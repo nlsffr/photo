@@ -245,12 +245,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="ml-auto flex shrink-0 items-center gap-1 sm:ml-0 sm:gap-1.5">
           <Link
             href="/premium"
+            prefetch={false}
             className="hidden rounded-full bg-amber-400/15 px-3 py-1.5 text-xs font-bold text-amber-400 hover:bg-amber-400/25 sm:inline"
           >
             Premium
           </Link>
           <Link
             href="/add"
+            prefetch={false}
             aria-label="Add"
             className="hidden h-9 w-9 place-items-center rounded-lg bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-600)] sm:grid"
           >
@@ -260,6 +262,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
           <Link
             href="/recherche"
+            prefetch={false}
             aria-label="Search"
             className="grid h-9 w-9 place-items-center rounded-lg text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-2)] sm:hidden"
           >
@@ -324,12 +327,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               18+ only. Tolérance zéro : tout contenu impliquant des mineurs est interdit et doit être signalé immédiatement.
             </p>
             <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm text-[var(--color-ink-muted)]">
-              <Link href="/conditions" className="hover:text-[var(--color-ink)]">Conditions</Link>
-              <Link href="/confidentialite" className="hover:text-[var(--color-ink)]">Confidentialité</Link>
-              <Link href="/trust-and-safety" className="hover:text-[var(--color-ink)]">Trust & Safety</Link>
-              <Link href="/dmca" className="hover:text-[var(--color-ink)]">DMCA</Link>
-              <Link href="/contact" className="hover:text-[var(--color-ink)]">Contact</Link>
-              <Link href="/contact/signalement" className="font-semibold text-[var(--color-accent)] hover:underline">Signaler</Link>
+              <Link href="/conditions" prefetch={false} className="hover:text-[var(--color-ink)]">Conditions</Link>
+              <Link href="/confidentialite" prefetch={false} className="hover:text-[var(--color-ink)]">Confidentialité</Link>
+              <Link href="/trust-and-safety" prefetch={false} className="hover:text-[var(--color-ink)]">Trust & Safety</Link>
+              <Link href="/dmca" prefetch={false} className="hover:text-[var(--color-ink)]">DMCA</Link>
+              <Link href="/contact" prefetch={false} className="hover:text-[var(--color-ink)]">Contact</Link>
+              <Link href="/contact/signalement" prefetch={false} className="font-semibold text-[var(--color-accent)] hover:underline">Signaler</Link>
             </nav>
             <p className="text-xs text-[var(--color-ink-faint)]">© 2026 LeakFanHub · 18+ only</p>
           </div>

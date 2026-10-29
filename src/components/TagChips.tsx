@@ -15,13 +15,18 @@ export function TagChips({
 
   return (
     <div className="no-scrollbar -mx-3 mb-4 flex gap-2 overflow-x-auto px-3 sm:mx-0 sm:px-0">
-      <Link href="/" className={`${chip} ${!activeTag ? on : off}`}>
+      <Link
+        href="/"
+        prefetch={false}
+        className={`${chip} ${!activeTag ? on : off}`}
+      >
         Tout
       </Link>
       {tags.map((tag) => (
         <Link
           key={tag}
           href={`/?tag=${encodeURIComponent(tag)}`}
+          prefetch={false}
           className={`${chip} ${tag === activeTag ? on : off}`}
         >
           {tag}
