@@ -7,6 +7,7 @@ import { activeCreatorSql, activeMediaSql } from "./providers/active-content-sql
 import {
   buildSitemapPartitions,
   decodeSitemapCursor,
+  toMariaDbUtcTimestamp,
   type SitemapBoundary,
   type SitemapPartition,
 } from "./sitemap-partitions";
@@ -154,7 +155,7 @@ export async function getSitemapMediaPartitions(): Promise<SitemapPartition[]> {
                 PARTITION BY DATE(p.created_at)
                 ORDER BY p.created_at ASC, p.id ASC
               ) AS row_number
-       FROM photos p
+       FROM photos p FORCE INDEX (idx_photos_sitemap_keyset)
        STRAIGHT_JOIN creators c ON c.id = p.creator_id
        WHERE ${activeMediaSql("p", "c")}
      )
@@ -187,8 +188,12 @@ export async function getSitemapMediaPartition(
   if (!isSitemapPartitionDate(date)) return [];
   const boundary = decodeSitemapCursor(cursor);
   if (!boundary || boundary.createdAt.slice(0, 10) !== date) return [];
-  const dayStart = `${date}T00:00:00.000Z`;
-  const nextDay = new Date(Date.parse(dayStart) + 86_400_000).toISOString();
+  const dayStartIso = `${date}T00:00:00.000Z`;
+  const dayStart = toMariaDbUtcTimestamp(dayStartIso);
+  const nextDay = toMariaDbUtcTimestamp(
+    new Date(Date.parse(dayStartIso) + 86_400_000).toISOString(),
+  );
+  const boundaryTimestamp = toMariaDbUtcTimestamp(boundary.createdAt);
   const safeLimit = Math.min(
     MEDIA_SITEMAP_CHUNK_SIZE,
     Math.max(1, Math.floor(limit)),
@@ -196,7 +201,7 @@ export async function getSitemapMediaPartition(
   const [rows] = await requireDbPool().query<SitemapMediaRow[]>(
     `SET STATEMENT max_statement_time=10 FOR
      SELECT ${SITEMAP_MEDIA_SELECT}
-     FROM photos p FORCE INDEX (idx_photos_created_id)
+     FROM photos p FORCE INDEX (idx_photos_sitemap_keyset)
      STRAIGHT_JOIN creators c ON c.id = p.creator_id
      WHERE ${activeMediaSql("p", "c")}
        AND p.created_at >= ?
@@ -210,8 +215,8 @@ export async function getSitemapMediaPartition(
     [
       dayStart,
       nextDay,
-      boundary.createdAt,
-      boundary.createdAt,
+      boundaryTimestamp,
+      boundaryTimestamp,
       boundary.id,
       safeLimit,
     ],

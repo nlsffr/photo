@@ -1,8 +1,8 @@
 -- Stable media sitemap keysets. Safe to re-run on MariaDB 10.6+.
--- Existing deployments normally have this index from migration 008; this
--- migration makes the dependency explicit for deployments that skipped it.
+-- Ascending order matches the immutable oldest-first keyset scan. Keep a
+-- distinct name because migration 008 created a descending feed index.
 
 ALTER TABLE photos
-  ADD INDEX IF NOT EXISTS idx_photos_created_id (created_at DESC, id),
+  ADD INDEX IF NOT EXISTS idx_photos_sitemap_keyset (created_at ASC, id ASC),
   ALGORITHM=INPLACE,
   LOCK=NONE;

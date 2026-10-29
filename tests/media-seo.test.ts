@@ -96,6 +96,27 @@ test("unsafe asset URLs never become structured-data content URLs", async () => 
   assert.equal(seo.structuredData, undefined);
 });
 
+test("relative asset paths without a leading slash resolve against the site", async () => {
+  const { buildMediaSeo } = await loadMediaSeo();
+  const seo = buildMediaSeo(
+    {
+      ...baseMedia,
+      imageUrl: "media/creators/alice/poster.jpg",
+      videoUrl: "media/creators/alice/clip.mp4",
+    },
+    "https://leakfanhub.com",
+  );
+
+  assert.equal(
+    seo.thumbnailUrl,
+    "https://leakfanhub.com/media/creators/alice/poster.jpg",
+  );
+  assert.equal(
+    seo.contentUrl,
+    "https://leakfanhub.com/media/creators/alice/clip.mp4",
+  );
+});
+
 test("invalid publication dates do not fabricate the required upload date", async () => {
   const { buildMediaSeo } = await loadMediaSeo();
   const seo = buildMediaSeo(

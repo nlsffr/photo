@@ -73,3 +73,13 @@ test("malformed dates and cursors fail closed", async () => {
   );
   assert.equal(decodeSitemapCursor("not-a-real-cursor"), null);
 });
+
+test("UTC keysets are converted to unambiguous MariaDB timestamp literals", async () => {
+  const { toMariaDbUtcTimestamp } = await loadPartitions();
+
+  assert.equal(
+    toMariaDbUtcTimestamp("2026-10-27T14:12:04.123Z"),
+    "2026-10-27 14:12:04.123",
+  );
+  assert.throws(() => toMariaDbUtcTimestamp("not-a-date"), /timestamp/i);
+});

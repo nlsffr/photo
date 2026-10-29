@@ -131,7 +131,7 @@ export function absoluteHttpUrl(
   try {
     const base = new URL(site);
     if (base.protocol !== "http:" && base.protocol !== "https:") return undefined;
-    const resolved = value.startsWith("/") ? new URL(value, base) : new URL(value);
+    const resolved = new URL(value, base);
     if (resolved.protocol !== "http:" && resolved.protocol !== "https:") {
       return undefined;
     }

@@ -67,6 +67,12 @@ export function decodeSitemapCursor(
   }
 }
 
+export function toMariaDbUtcTimestamp(value: string): string {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) throw new Error("Invalid sitemap timestamp");
+  return new Date(timestamp).toISOString().replace("T", " ").replace("Z", "");
+}
+
 export function buildSitemapPartitions(
   boundaries: SitemapBoundary[],
 ): SitemapPartition[] {
