@@ -1,5 +1,7 @@
-import { redirect } from "next/navigation";
+import { permanentRedirect } from "next/navigation";
+
+export const dynamic = "force-dynamic";
 
 export default function TikTokAliasPage() {
-  redirect("/feed");
+  permanentRedirect("/feed");
 }

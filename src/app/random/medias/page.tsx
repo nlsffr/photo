@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Aléatoire",
   description: "Ordre purement aléatoire — différent à chaque rechargement",
+  robots: { index: false, follow: true },
 };
 
 export default async function RandomMediasPage() {

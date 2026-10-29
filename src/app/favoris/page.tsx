@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { SavedGallery } from "@/components/SavedGallery";
 
-export const metadata: Metadata = { title: "Enregistrés" };
+export const metadata: Metadata = {
+  title: "Enregistrés",
+  robots: { index: false, follow: true },
+};
 
 export default function FavorisPage() {
   return (

@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ContactForm } from "@/components/ContactForm";
 
-export const metadata: Metadata = { title: "DMCA — Retrait de contenu" };
+export const metadata: Metadata = {
+  title: "DMCA — Retrait de contenu",
+  alternates: { canonical: "/dmca" },
+};
 
 const STEPS = [
   "Identifie l’œuvre protégée dont tu es titulaire des droits.",

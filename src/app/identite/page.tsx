@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { IdentityManager } from "@/components/IdentityManager";
 
-export const metadata: Metadata = { title: "Identité anonyme" };
+export const metadata: Metadata = {
+  title: "Identité anonyme",
+  robots: { index: false, follow: true },
+};
 
 export default function IdentityPage() {
   return (

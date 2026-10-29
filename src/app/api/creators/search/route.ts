@@ -14,6 +14,7 @@ export async function GET(request: Request) {
         name: c.name,
         avatarUrl: c.avatarUrl,
         followers: c.followers,
+        urlVersion: c.urlVersion,
       })),
     });
   } catch {

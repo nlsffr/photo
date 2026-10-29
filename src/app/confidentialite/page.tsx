@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LegalPage } from "@/components/LegalPage";
 
-export const metadata: Metadata = { title: "Politique de confidentialité" };
+export const metadata: Metadata = {
+  title: "Politique de confidentialité",
+  alternates: { canonical: "/confidentialite" },
+};
 
 export default function ConfidentialitePage() {
   return (

@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import { getPhotos } from "@/lib/photos";
 import { ForYouGallery } from "@/components/ForYouGallery";
 
-export const metadata: Metadata = { title: "Pour toi" };
+export const metadata: Metadata = {
+  title: "Pour toi",
+  robots: { index: false, follow: true },
+};
 export const dynamic = "force-dynamic";
 
 export default async function PourToiPage() {

@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-export const metadata: Metadata = { title: "Qu’est-ce que LeakFanHub ?" };
+export const metadata: Metadata = {
+  title: "Qu’est-ce que LeakFanHub ?",
+  alternates: { canonical: "/qu-est-ce-que-lumengallery" },
+};
 
 const STEPS = [
   {

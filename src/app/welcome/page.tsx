@@ -4,6 +4,7 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "Bienvenue",
   description: "Découvre LeakFanHub — photos et vidéos",
+  robots: { index: false, follow: true },
 };
 
 export default function WelcomePage() {

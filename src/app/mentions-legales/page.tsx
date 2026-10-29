@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LegalPage } from "@/components/LegalPage";
 
-export const metadata: Metadata = { title: "Mentions légales" };
+export const metadata: Metadata = {
+  title: "Mentions légales",
+  alternates: { canonical: "/mentions-legales" },
+};
 
 export default function MentionsLegalesPage() {
   return (

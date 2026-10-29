@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ContactForm } from "@/components/ContactForm";
 
-export const metadata: Metadata = { title: "Signaler un contenu" };
+export const metadata: Metadata = {
+  title: "Signaler un contenu",
+  alternates: { canonical: "/contact/signalement" },
+};
 
 export default function SignalementPage() {
   return (

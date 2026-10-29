@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { FollowingFeed } from "@/components/FollowingFeed";
 
-export const metadata: Metadata = { title: "Abonnements" };
+export const metadata: Metadata = {
+  title: "Abonnements",
+  robots: { index: false, follow: true },
+};
 export const dynamic = "force-dynamic";
 
 export default function AbonnementsPage() {

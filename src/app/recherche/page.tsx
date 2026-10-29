@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { getPhotos, getAllTags, searchCreators } from "@/lib/photos";
-import type { MediaType } from "@/lib/types";
+import { creatorHref, type MediaType } from "@/lib/types";
 import { SearchForm } from "@/components/SearchForm";
 import { InfiniteGallery } from "@/components/InfiniteGallery";
 import { MediaTypeTabs } from "@/components/MediaTypeTabs";
@@ -11,7 +11,10 @@ import { MediaImg } from "@/components/MediaImg";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { formatCount } from "@/lib/format";
 
-export const metadata: Metadata = { title: "Search" };
+export const metadata: Metadata = {
+  title: "Search",
+  robots: { index: false, follow: true },
+};
 
 function first(v?: string | string[]): string | undefined {
   return Array.isArray(v) ? v[0] : v;
@@ -67,7 +70,7 @@ export default async function SearchPage({
             {creators.map((c, i) => (
               <Link
                 key={c.handle}
-                href={`/creator/${c.handle}`}
+                href={creatorHref(c.handle, c.urlVersion)}
                 className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 transition-colors hover:border-[var(--color-accent)]/50"
               >
                 <MediaImg

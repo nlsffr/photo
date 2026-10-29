@@ -6,7 +6,10 @@ import { creatorHref } from "@/lib/types";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { MediaImg } from "@/components/MediaImg";
 
-export const metadata: Metadata = { title: "Classements" };
+export const metadata: Metadata = {
+  title: "Classements",
+  alternates: { canonical: "/classements" },
+};
 
 export default async function RankingsPage() {
   const ranked = await getRankings(30);

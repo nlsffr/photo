@@ -11,15 +11,9 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        disallow: [
-          "/api/",
-          "/connexion",
-          "/inscription",
-          "/identite",
-          "/favoris",
-          "/premium",
-          "/abonnements",
-        ],
+        // HTML utility pages stay crawlable so their page-level noindex can
+        // actually be observed. Only machine endpoints are excluded here.
+        disallow: ["/api/"],
       },
     ],
     // Index découpé (rapide) — pas le monolithe /sitemap.xml

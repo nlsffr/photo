@@ -1,4 +1,4 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { getPhotoById } from "@/lib/photos";
 import { mediaHref } from "@/lib/types";
 
@@ -11,5 +11,5 @@ export default async function LegacyPhotoRedirect({
   const { id } = await params;
   const photo = await getPhotoById(id);
   if (!photo) notFound();
-  redirect(mediaHref(photo));
+  permanentRedirect(mediaHref(photo));
 }

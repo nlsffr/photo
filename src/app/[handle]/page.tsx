@@ -5,6 +5,7 @@ import { getCreator, getCreatorStats, getPhotos } from "@/lib/photos";
 import { formatCount } from "@/lib/format";
 import type { MediaType, SortKey } from "@/lib/types";
 import { creatorHref, parseVersionedSlug } from "@/lib/types";
+import { isCurrentPublicVersion } from "@/lib/seo-policy";
 import { InfiniteGallery } from "@/components/InfiniteGallery";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { FollowButton } from "@/components/Interactions";
@@ -56,20 +57,13 @@ export async function generateMetadata({
     RESERVED.has(handleParam.toLowerCase()) ||
     RESERVED.has(parsed.base.toLowerCase())
   ) {
-    return { title: "Not found", robots: { index: false, follow: true } };
+    notFound();
   }
   const creator = await getCreator(parsed.base);
-  if (!creator) return { title: "Profile not found", robots: { index: false, follow: true } };
+  if (!creator) notFound();
 
   const version = currentVersion(creator.urlVersion);
-  const isCurrent =
-    version <= 1
-      ? parsed.version == null || parsed.version === 1
-      : parsed.version === version;
-  const isLegacyBare = parsed.version == null && version > 1;
-  if (creator.removedFromIndexAt && (parsed.version == null || !isCurrent)) {
-    return { title: "Gone", robots: { index: false, follow: false } };
-  }
+  if (!isCurrentPublicVersion(version, parsed.version)) notFound();
 
   const title = `${creator.name} (@${creator.handle}) photos & videos — LeakFanHub`;
   const rawDesc =
@@ -92,7 +86,7 @@ export async function generateMetadata({
     ],
     alternates: { canonical: path },
     robots: {
-      index: isCurrent && !isLegacyBare,
+      index: true,
       follow: true,
       "max-image-preview": "large" as const,
     },
@@ -132,15 +126,11 @@ export default async function CreatorProfilePage({
   if (!creator) notFound();
 
   const version = currentVersion(creator.urlVersion);
-  const isCurrent =
-    version <= 1
-      ? parsed.version == null || parsed.version === 1
-      : parsed.version === version;
 
   // Ancienne /{handle} : 410 seulement si removed_from_index_at est posé
   // (le middleware pose le statut ; notFound est le filet si le middleware ne tourne pas).
   if (creator.removedFromIndexAt && parsed.version == null) notFound();
-  if (parsed.version != null && !isCurrent) notFound();
+  if (!isCurrentPublicVersion(version, parsed.version)) notFound();
 
   const typeRaw = first(sp.type);
   const type: MediaType | undefined =

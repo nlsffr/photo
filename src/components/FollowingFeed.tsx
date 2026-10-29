@@ -15,6 +15,7 @@ type CreatorRow = {
   verified: boolean;
   followers: number;
   photoCount: number;
+  urlVersion?: number;
 };
 
 export function FollowingFeed() {
@@ -102,7 +103,7 @@ export function FollowingFeed() {
         {creators.map((c) => (
           <Link
             key={c.handle}
-            href={creatorHref(c.handle)}
+            href={creatorHref(c.handle, c.urlVersion)}
             className="flex w-20 shrink-0 flex-col items-center gap-1.5"
           >
             <MediaImg

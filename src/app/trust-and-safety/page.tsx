@@ -5,6 +5,7 @@ export const metadata: Metadata = {
   title: "Trust & Safety",
   description:
     "Politique de modération LeakFanHub — tolérance zéro pour le contenu illégal et tout contenu impliquant des mineurs.",
+  alternates: { canonical: "/trust-and-safety" },
 };
 
 export default function TrustAndSafetyPage() {

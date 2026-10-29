@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ContactForm } from "@/components/ContactForm";
 
-export const metadata: Metadata = { title: "Support & aide" };
+export const metadata: Metadata = {
+  title: "Support & aide",
+  alternates: { canonical: "/contact/support" },
+};
 
 export default function SupportPage() {
   return (

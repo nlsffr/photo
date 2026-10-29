@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-export const metadata: Metadata = { title: "Contact" };
+export const metadata: Metadata = {
+  title: "Contact",
+  alternates: { canonical: "/contact" },
+};
 
 const CHANNELS = [
   {

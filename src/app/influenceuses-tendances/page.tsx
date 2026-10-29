@@ -3,7 +3,10 @@ import Link from "next/link";
 import { getModels } from "@/lib/photos";
 import { CreatorCard } from "@/components/CreatorCard";
 
-export const metadata: Metadata = { title: "Influenceuses tendances" };
+export const metadata: Metadata = {
+  title: "Influenceuses tendances",
+  alternates: { canonical: "/influenceuses-tendances" },
+};
 
 export default async function InfluenceusesTendancesPage() {
   // "Trending" = models whose content is getting the most views right now.

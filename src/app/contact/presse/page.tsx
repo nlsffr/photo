@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ContactForm } from "@/components/ContactForm";
 
-export const metadata: Metadata = { title: "Presse & médias" };
+export const metadata: Metadata = {
+  title: "Presse & médias",
+  alternates: { canonical: "/contact/presse" },
+};
 
 export default function PressePage() {
   return (

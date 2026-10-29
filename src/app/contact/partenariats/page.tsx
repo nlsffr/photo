@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ContactForm } from "@/components/ContactForm";
 
-export const metadata: Metadata = { title: "Partenariats & créateurs" };
+export const metadata: Metadata = {
+  title: "Partenariats & créateurs",
+  alternates: { canonical: "/contact/partenariats" },
+};
 
 export default function PartenariatsPage() {
   return (

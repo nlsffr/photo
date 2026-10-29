@@ -8,12 +8,8 @@ import {
   withCreator,
 } from "@/lib/photos";
 import { formatAge, formatCount } from "@/lib/format";
-import {
-  activeUrlVersion,
-  creatorHref,
-  mediaHref,
-  parseVersionedSlug,
-} from "@/lib/types";
+import { creatorHref, mediaHref, parseVersionedSlug } from "@/lib/types";
+import { isCurrentMediaVersion } from "@/lib/seo-policy";
 import { PhotoCard } from "@/components/PhotoCard";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { FollowButton, PostActions } from "@/components/Interactions";
@@ -62,23 +58,23 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { handle, id } = await params;
   if (RESERVED.has(handle.toLowerCase())) {
-    return { title: "Not found", robots: { index: false, follow: true } };
+    notFound();
   }
   // getPhotoById ignore le suffixe -v{N} pour la requête (source_id = base).
   const photo = await getPhotoById(id);
   if (!photo || photo.creatorHandle.toLowerCase() !== handle.toLowerCase()) {
-    return { title: "Not found", robots: { index: false, follow: true } };
+    notFound();
   }
 
   const parsed = parseVersionedSlug(id);
+  if (!isCurrentMediaVersion(photo.urlVersion, parsed.version)) notFound();
   const h = photo.creatorHandle;
   const kind =
     photo.type === "video" ? "video" : photo.type === "pack" ? "pack" : "photo";
   const sid = photo.sourceId || parsed.base;
-  const n = activeUrlVersion(photo.urlVersion, parsed.version);
   const title = `${h} ${kind} #${sid} — LeakFanHub`;
   const description = `Free ${h} ${kind} on LeakFanHub. ${formatCount(photo.views)} views · more from @${h}. Updated regularly. 18+ only.`;
-  const path = mediaHref({ ...photo, sourceId: sid, urlVersion: n });
+  const path = mediaHref({ ...photo, sourceId: sid });
   const url = `${SITE}${path}`;
   const ogImage = absUrl(photo.imageUrl);
 
@@ -116,18 +112,18 @@ export default async function MediaByHandlePage({
   const raw = await getPhotoById(id);
   if (!raw) notFound();
   if (raw.creatorHandle.toLowerCase() !== handle.toLowerCase()) notFound();
+  if (!isCurrentMediaVersion(raw.urlVersion, parsed.version)) notFound();
 
   const creator = await getCreator(raw.creatorHandle);
   const photo = withCreator(raw, creator);
   const related = await getRelatedPhotos(raw, 36);
 
   const sid = photo.sourceId || parsed.base;
-  const n = activeUrlVersion(photo.urlVersion, parsed.version);
   const kind =
     photo.type === "video" ? "video" : photo.type === "pack" ? "pack" : "photo";
   const h1 = `${photo.creatorHandle} ${kind} #${sid}`;
   const creatorPath = creatorHref(photo.creatorHandle, creator?.urlVersion ?? photo.creator.urlVersion);
-  const mediaPath = mediaHref({ ...photo, sourceId: sid, urlVersion: n });
+  const mediaPath = mediaHref({ ...photo, sourceId: sid });
 
   const thumb = absUrl(photo.imageUrl);
   const content = absUrl(photo.type === "video" ? photo.videoUrl : photo.imageUrl);

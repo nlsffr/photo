@@ -5,6 +5,7 @@ import { FeedViewer } from "@/components/FeedViewer";
 export const metadata: Metadata = {
   title: "Feed vertical",
   description: "Scroll vertical — vidéos en plein écran, ordre unique à chaque visite",
+  robots: { index: false, follow: true },
 };
 
 export const dynamic = "force-dynamic";

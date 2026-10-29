@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { creatorHref } from "@/lib/types";
 
 type Hit = {
   handle: string;
   name: string;
   avatarUrl: string;
   followers?: number;
+  urlVersion?: number;
 };
 
 export function SearchForm({ tags }: { tags: string[] }) {
@@ -115,7 +117,7 @@ export function SearchForm({ tags }: { tags: string[] }) {
             {hits.map((h, i) => (
               <li key={h.handle}>
                 <Link
-                  href={`/creator/${encodeURIComponent(h.handle)}`}
+                  href={creatorHref(h.handle, h.urlVersion)}
                   onClick={() => setOpen(false)}
                   className="flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-[var(--color-surface-2)]"
                 >
