@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 // @ts-expect-error Node's native type stripping requires the explicit .ts suffix.
@@ -103,4 +104,16 @@ test("stores a report and its notification without claiming it was delivered", a
   assert.deepEqual(result, { reportId: "report-id", outboxId: "outbox-id" });
   assert.match(db.calls[1].sql, /INSERT INTO reports/);
   assert.match(db.calls[2].sql, /report\.created/);
+});
+
+test("historical contact backfill is idempotent and bounded for Telegram", async () => {
+  const sql = await readFile(
+    new URL("../ops/backfill-contact-outbox.sql", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(sql, /INSERT IGNORE INTO notification_outbox/);
+  assert.match(sql, /existing\.event_type = 'contact\.created'/);
+  assert.match(sql, /existing\.aggregate_id = message\.id/);
+  assert.match(sql, /LEFT\([\s\S]*4000[\s\S]*\)/);
 });
