@@ -23,3 +23,15 @@ test("fresh migration order defines URL lifecycle columns before sitemap indexes
   );
   assert.match(sql, /idx_photos_url_version \(url_version\)/);
 });
+
+test("creator aggregates share the source identifier collation", async () => {
+  const sql = await readFile(
+    new URL("../migrations/013-creator-media-stats.sql", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(
+    sql,
+    /ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci/,
+  );
+});
