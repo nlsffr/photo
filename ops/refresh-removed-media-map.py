@@ -25,6 +25,7 @@ from urllib.parse import unquote, urlsplit
 SAFE_HANDLE = re.compile(r"^[A-Za-z0-9_.-]{1,100}$")
 SAFE_DATABASE = re.compile(r"^[A-Za-z0-9_]{1,64}$")
 CREATOR_QUERY = """
+SET STATEMENT max_statement_time=20 FOR
 SELECT 'creator', c.handle, COALESCE(c.avatar_url, ''),
        COALESCE(c.cover_url, '')
 FROM creators c
@@ -32,13 +33,16 @@ WHERE c.removed_from_index_at IS NOT NULL
 UNION ALL
 SELECT 'photo', '', COALESCE(p.image_url, ''),
        COALESCE(p.video_url, '')
-FROM photos p
-JOIN creators c ON c.id = p.creator_id
+FROM photos p FORCE INDEX (idx_photos_sitemap)
 WHERE p.removed_from_index_at IS NOT NULL
-   OR (
-     c.removed_from_index_at IS NOT NULL
-     AND c.handle NOT REGEXP '^[A-Za-z0-9_.-]{1,100}$'
-   )
+UNION ALL
+SELECT 'photo', '', COALESCE(p.image_url, ''),
+       COALESCE(p.video_url, '')
+FROM creators c
+STRAIGHT_JOIN photos p ON p.creator_id = c.id
+WHERE c.removed_from_index_at IS NOT NULL
+  AND c.handle NOT REGEXP '^[A-Za-z0-9_.-]{1,100}$'
+  AND p.removed_from_index_at IS NULL
 """.strip()
 
 

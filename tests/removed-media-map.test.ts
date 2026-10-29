@@ -140,7 +140,12 @@ import os
 
 class Cursor:
     def execute(self, query):
+        assert query.startswith("SET STATEMENT max_statement_time=20 FOR")
         assert "removed_from_index_at IS NOT NULL" in query
+        assert query.count("UNION ALL") == 2
+        assert "FROM photos p FORCE INDEX (idx_photos_sitemap)" in query
+        assert "FROM creators c\\nSTRAIGHT_JOIN photos p ON p.creator_id = c.id" in query
+        assert "p.removed_from_index_at IS NOT NULL\\n   OR" not in query
         assert "HEX(" not in query
     def fetchall(self):
         return [
