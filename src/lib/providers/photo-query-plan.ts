@@ -69,6 +69,8 @@ function discoveryArm(
   orderBy: string,
   filters: DiscoveryFilters,
 ): string {
+  const tagAlias = `${photo}t`;
+  const tagFiltered = Boolean(filters.tag && filters.legacyTag);
   const where = [
     `${photo}.removed_from_index_at IS NULL`,
     `${creator}.removed_from_index_at IS NULL`,
@@ -78,15 +80,17 @@ function discoveryArm(
   if (filters.isAi !== undefined) {
     where.push(`COALESCE(${photo}.is_ai, 0) = :isAi`);
   }
-  if (filters.tag && filters.legacyTag) {
+  if (tagFiltered) {
     where.push(
-      `EXISTS (SELECT 1 FROM photo_tags ${photo}t
-               WHERE ${photo}t.photo_id = ${photo}.id
-                 AND (${photo}t.tag = :tag OR ${photo}t.tag LIKE :legacyTag))`,
+      `(${tagAlias}.tag = :tag OR ${tagAlias}.tag LIKE :legacyTag)`,
     );
   }
+  const from = tagFiltered
+    ? `FROM photo_tags ${tagAlias} FORCE INDEX (idx_photo_tags_tag_id)
+   STRAIGHT_JOIN photos ${photo} ON ${photo}.id = ${tagAlias}.photo_id`
+    : `FROM photos ${photo} FORCE INDEX (${index})`;
   return `(SELECT ${photo}.id
-   FROM photos ${photo} FORCE INDEX (${index})
+   ${from}
    STRAIGHT_JOIN creators ${creator} ON ${creator}.id = ${photo}.creator_id
    WHERE ${where.join("\n     AND ")}
    ORDER BY ${orderBy}

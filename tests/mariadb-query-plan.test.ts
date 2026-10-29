@@ -106,7 +106,15 @@ test("discovery applies every active filter inside each bounded candidate arm", 
 
   assert.equal((plan.fromSql.match(/\.type = :type/g) ?? []).length, 3);
   assert.equal((plan.fromSql.match(/\.handle = :creator/g) ?? []).length, 3);
-  assert.equal((plan.fromSql.match(/EXISTS \(SELECT 1 FROM photo_tags/g) ?? []).length, 3);
+  assert.equal(
+    (plan.fromSql.match(/FROM photo_tags \w+t FORCE INDEX \(idx_photo_tags_tag_id\)/g) ?? []).length,
+    3,
+  );
+  assert.equal(
+    (plan.fromSql.match(/STRAIGHT_JOIN photos \w+ ON \w+\.id = \w+t\.photo_id/g) ?? []).length,
+    3,
+  );
+  assert.doesNotMatch(plan.fromSql, /EXISTS \(SELECT 1 FROM photo_tags/);
   assert.equal((plan.fromSql.match(/COALESCE\([^)]*\.is_ai, 0\) = :isAi/g) ?? []).length, 3);
   assert.deepEqual(plan.params, {
     creator: "creator-a",
