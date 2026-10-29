@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { getPhotos } from "@/lib/photos";
+import { notFound, permanentRedirect } from "next/navigation";
+import { getAllTags, getPhotos } from "@/lib/photos";
+import { normalizeTagSlug } from "@/lib/seo-policy";
 import type { MediaType, SortKey } from "@/lib/types";
 import { InfiniteGallery } from "@/components/InfiniteGallery";
 import { MediaTypeTabs } from "@/components/MediaTypeTabs";
@@ -23,17 +25,30 @@ function first(v?: string | string[]): string | undefined {
   return Array.isArray(v) ? v[0] : v;
 }
 
+async function resolveKnownTag(raw: string): Promise<string> {
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(raw);
+  } catch {
+    notFound();
+  }
+  const tag = normalizeTagSlug(decoded);
+  if (!tag || !(await getAllTags()).includes(tag)) notFound();
+  if (decoded !== tag) permanentRedirect(`/tag/${encodeURIComponent(tag)}`);
+  return tag;
+}
+
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ tag: string }>;
 }): Promise<Metadata> {
-  const { tag } = await params;
-  const decoded = decodeURIComponent(tag);
-  const path = `/tag/${encodeURIComponent(decoded)}`;
+  const { tag: rawTag } = await params;
+  const tag = await resolveKnownTag(rawTag);
+  const path = `/tag/${encodeURIComponent(tag)}`;
   return {
-    title: `#${decoded}`,
-    description: `Photos and videos tagged #${decoded} on LeakFanHub. Free gallery, updated daily. 18+.`,
+    title: `#${tag}`,
+    description: `Photos and videos tagged #${tag} on LeakFanHub. Free gallery, updated daily. 18+.`,
     alternates: { canonical: path },
     robots: { index: true, follow: true, "max-image-preview": "large" },
   };
@@ -47,7 +62,7 @@ export default async function TagPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const { tag: rawTag } = await params;
-  const tag = decodeURIComponent(rawTag);
+  const tag = await resolveKnownTag(rawTag);
   const sp = await searchParams;
 
   const typeRaw = first(sp.type);

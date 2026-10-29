@@ -1,4 +1,8 @@
-import { getPhotos } from "@/lib/photos";
+import { getSitemapMediaChunk } from "@/lib/sitemap-data";
+import {
+  MAX_MEDIA_SITEMAP_FILES,
+  MEDIA_SITEMAP_CHUNK_SIZE,
+} from "@/lib/seo-policy";
 import { mediaHref, toIso } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -9,75 +13,67 @@ const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").repl
   "",
 );
 
-const MEDIA_CHUNK = 2_000;
-const PAGE = 250;
-
 function xmlEscape(value: string): string {
   return value
-    .replace(/&/g, "&" + "amp;")
-    .replace(/</g, "&" + "lt;")
-    .replace(/>/g, "&" + "gt;")
-    .replace(/"/g, "&" + "quot;");
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
-/** Full catalog chunks — URLs de la version courante uniquement. */
+/** Full catalog chunks — one slim query, no tag hydration or N+1 paging. */
 export async function GET(
   _req: Request,
   ctx: { params: Promise<{ chunk: string }> | { chunk: string } },
 ) {
   const { chunk: chunkRaw } = await Promise.resolve(ctx.params);
-  const chunkIndex = Math.max(0, parseInt(chunkRaw, 10) || 0);
-  const offsetStart = chunkIndex * MEDIA_CHUNK;
-  const offsetEnd = offsetStart + MEDIA_CHUNK;
-  const now = new Date().toISOString();
+  if (!/^(0|[1-9]\d*)$/.test(chunkRaw)) {
+    return new Response("Not found\n", { status: 404 });
+  }
 
-  const entries: string[] = [];
-  const seen = new Set<string>();
-  let cursor = offsetStart;
+  const chunkIndex = Number(chunkRaw);
+  if (
+    !Number.isSafeInteger(chunkIndex) ||
+    chunkIndex >= MAX_MEDIA_SITEMAP_FILES
+  ) {
+    return new Response("Not found\n", { status: 404 });
+  }
 
   try {
-    while (cursor < offsetEnd) {
-      const limit = Math.min(PAGE, offsetEnd - cursor);
-      const page = await getPhotos({
-        sort: "recent",
-        limit,
-        cursor,
-      });
-      if (!page.items.length) break;
+    const items = await getSitemapMediaChunk(
+      chunkIndex * MEDIA_SITEMAP_CHUNK_SIZE,
+      MEDIA_SITEMAP_CHUNK_SIZE,
+    );
+    if (items.length === 0) return new Response("Not found\n", { status: 404 });
 
-      for (const p of page.items) {
-        if (p.removedFromIndexAt) continue;
-        const href = mediaHref(p);
-        if (seen.has(href)) continue;
-        seen.add(href);
-        const lastmod = toIso(p.updatedAt) ?? now;
-        entries.push(
-          `  <url>
+    const now = new Date().toISOString();
+    const entries = items.map((photo) => {
+      const href = mediaHref(photo);
+      const lastmod = toIso(photo.updatedAt) ?? now;
+      return `  <url>
     <loc>${xmlEscape(`${SITE}${href}`)}</loc>
     <lastmod>${lastmod}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
-  </url>`,
-        );
-      }
+  </url>`;
+    });
 
-      if (page.nextCursor == null) break;
-      cursor = page.nextCursor;
-    }
-  } catch {
-    // empty chunk is ok
-  }
-
-  const body = `<?xml version="1.0" encoding="UTF-8"?>
+    const body = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${entries.join("\n")}
 </urlset>
 `;
 
-  return new Response(body, {
-    headers: {
-      "Content-Type": "application/xml; charset=utf-8",
-      "Cache-Control": "public, max-age=3600",
-    },
-  });
+    return new Response(body, {
+      headers: {
+        "Content-Type": "application/xml; charset=utf-8",
+        "Cache-Control": "public, max-age=3600",
+      },
+    });
+  } catch {
+    return new Response("Sitemap temporarily unavailable\n", {
+      status: 503,
+      headers: { "Retry-After": "60", "Cache-Control": "no-store" },
+    });
+  }
 }

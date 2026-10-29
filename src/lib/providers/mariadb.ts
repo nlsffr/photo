@@ -19,6 +19,7 @@ import type {
   TrendWindow,
 } from "../types";
 import { toIso } from "../types";
+import { legacyTagPrefix, normalizeTagSlug } from "../seo-policy";
 import type { DataProvider } from "../data-provider";
 
 type Params = Record<string, unknown>;
@@ -204,8 +205,10 @@ export class MariaDBProvider implements DataProvider {
       [photoIds],
     );
     for (const r of rows as { photo_id: string; tag: string }[]) {
+      const slug = normalizeTagSlug(r.tag);
+      if (!slug) continue;
       const list = map.get(r.photo_id) ?? [];
-      list.push(r.tag);
+      if (!list.includes(slug)) list.push(slug);
       map.set(r.photo_id, list);
     }
     return map;
@@ -341,8 +344,16 @@ export class MariaDBProvider implements DataProvider {
       params.q2 = `${qq}%`;
     }
     if (query.tag) {
-      where.push("p.id IN (SELECT photo_id FROM photo_tags WHERE tag = :tag)");
-      params.tag = query.tag;
+      const tag = normalizeTagSlug(query.tag);
+      const legacyTag = tag ? legacyTagPrefix(tag) : null;
+      if (!tag || !legacyTag) {
+        return { items: [], nextCursor: null, total: 0, seed };
+      }
+      where.push(
+        "p.id IN (SELECT photo_id FROM photo_tags WHERE tag = :tag OR tag LIKE :legacyTag)",
+      );
+      params.tag = tag;
+      params.legacyTag = legacyTag;
     }
 
     if (sort === "trending") {
@@ -400,7 +411,8 @@ export class MariaDBProvider implements DataProvider {
   }
 
   async getRelatedPhotos(photo: Photo, limit = 12): Promise<PhotoView[]> {
-    if (photo.tags.length === 0) {
+    const tags = [...new Set(photo.tags.map(normalizeTagSlug).filter(Boolean))] as string[];
+    if (tags.length === 0) {
       const page = await this.getPhotos({
         creator: photo.creatorHandle,
         sort: "popular",
@@ -408,14 +420,19 @@ export class MariaDBProvider implements DataProvider {
       });
       return page.items.filter((p) => p.id !== photo.id).slice(0, limit);
     }
+    const legacyTags = tags
+      .map(legacyTagPrefix)
+      .filter((tag): tag is string => Boolean(tag));
+    const legacyPredicates = legacyTags.map(() => "t.tag LIKE ?");
+    const tagPredicates = ["t.tag IN (?)", ...legacyPredicates].join(" OR ");
     const [rows] = await this.pool.query<RowDataPacket[]>(
       `SELECT DISTINCT ${PHOTO_SELECT}
        ${PHOTO_FROM}
        JOIN photo_tags t ON t.photo_id = p.id
-       WHERE t.tag IN (?) AND p.id <> ?
+       WHERE (${tagPredicates}) AND p.id <> ?
        ORDER BY p.views_count + p.likes_count * 3 DESC
        LIMIT ?`,
-      [photo.tags, photo.id, limit],
+      [tags, ...legacyTags, photo.id, limit],
     );
     const photoRows = rows as unknown as PhotoRow[];
     const tagsMap = await this.tagsFor(photoRows.map((r) => r.id));
@@ -448,7 +465,13 @@ export class MariaDBProvider implements DataProvider {
        ORDER BY n DESC
        LIMIT 200`,
     );
-    return (rows as unknown as { tag: string }[]).map((r) => r.tag);
+    return [
+      ...new Set(
+        (rows as unknown as { tag: string }[])
+          .map((r) => normalizeTagSlug(r.tag))
+          .filter((tag): tag is string => Boolean(tag)),
+      ),
+    ];
   }
 
   async getModels(sort: "followers" | "views" = "followers"): Promise<CreatorWithStats[]> {

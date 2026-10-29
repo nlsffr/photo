@@ -28,7 +28,10 @@ export async function GET() {
   try {
     models = await getModels("followers");
   } catch {
-    models = [];
+    return new Response("Sitemap temporarily unavailable\n", {
+      status: 503,
+      headers: { "Retry-After": "60", "Cache-Control": "no-store" },
+    });
   }
 
   const urls = models
