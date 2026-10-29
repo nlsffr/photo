@@ -39,6 +39,8 @@ CREATE TABLE IF NOT EXISTS telegram_payments (
   provider_payment_charge_id VARCHAR(191) NULL,
   currency CHAR(3) NOT NULL,
   total_amount INT UNSIGNED NOT NULL,
+  entitlement_start DATETIME(3) NULL,
+  entitlement_end DATETIME(3) NULL,
   paid_at DATETIME(3) NOT NULL,
   refunded_at DATETIME(3) NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -50,10 +52,28 @@ CREATE TABLE IF NOT EXISTS telegram_payments (
   INDEX idx_tp_user_paid (telegram_user_id, paid_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Keep the migration re-runnable when the table was created by an earlier
+-- revision of migration 017.
+ALTER TABLE telegram_payments
+  ADD COLUMN IF NOT EXISTS entitlement_start DATETIME(3) NULL AFTER total_amount,
+  ADD COLUMN IF NOT EXISTS entitlement_end DATETIME(3) NULL AFTER entitlement_start;
+
 CREATE TABLE IF NOT EXISTS telegram_worker_state (
   worker_name VARCHAR(64) NOT NULL PRIMARY KEY,
   last_update_id BIGINT NOT NULL DEFAULT 0,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS telegram_failed_updates (
+  telegram_update_id BIGINT NOT NULL PRIMARY KEY,
+  update_kind VARCHAR(64) NOT NULL,
+  error_code VARCHAR(64) NOT NULL,
+  telegram_payment_charge_id VARCHAR(191) NULL,
+  failed_at DATETIME(3) NOT NULL,
+  last_seen_at DATETIME(3) NOT NULL,
+  attempts INT UNSIGNED NOT NULL DEFAULT 1,
+  INDEX idx_tfu_last_seen (last_seen_at),
+  INDEX idx_tfu_charge (telegram_payment_charge_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS notification_outbox (

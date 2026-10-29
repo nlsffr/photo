@@ -45,6 +45,18 @@ class TelegramApiTests(unittest.TestCase):
             },
         )
 
+    def test_precheckout_response_uses_a_bounded_transport_timeout(self):
+        calls = []
+
+        def transport(method, payload, timeout):
+            calls.append((method, payload, timeout))
+            return {"ok": True, "result": True}
+
+        api = TelegramApi("test-token", transport=transport)
+        api.answer_pre_checkout("query", True)
+
+        self.assertLessEqual(calls[0][2], 5)
+
 
 if __name__ == "__main__":
     unittest.main()

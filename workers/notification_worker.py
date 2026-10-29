@@ -22,8 +22,14 @@ def retry_delay_seconds(attempts: int) -> int:
 
 
 class MariaOutboxStore:
-    def __init__(self, database_url: str, connection_factory: Callable[..., Any] | None = None):
-        self._config = database_config(database_url)
+    def __init__(
+        self,
+        database_url: str,
+        connection_factory: Callable[..., Any] | None = None,
+        *,
+        host_override: str | None = None,
+    ):
+        self._config = database_config(database_url, host_override=host_override)
         self._connection_factory = connection_factory
 
     def _connect(self):
@@ -161,9 +167,8 @@ class NotificationWorker:
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
-    database_url = os.environ.get("TELEGRAM_WORKER_DATABASE_URL") or os.environ.get(
-        "DATABASE_URL", ""
-    )
+    database_url = os.environ.get("DATABASE_URL", "")
+    database_host = os.environ.get("TELEGRAM_WORKER_DATABASE_HOST") or None
     admin_chat_id = os.environ.get("TELEGRAM_ADMIN_CHAT_ID") or os.environ.get(
         "TELEGRAM_CHAT_ID", ""
     )
@@ -171,7 +176,7 @@ def main() -> None:
         raise SystemExit(
             "TELEGRAM_BOT_TOKEN, DATABASE_URL and TELEGRAM_ADMIN_CHAT_ID are required"
         )
-    store = MariaOutboxStore(database_url)
+    store = MariaOutboxStore(database_url, host_override=database_host)
     worker = NotificationWorker(
         store,
         TelegramApi(token),

@@ -99,7 +99,7 @@ class TelegramApi:
         payload: dict[str, Any] = {"pre_checkout_query_id": query_id, "ok": ok}
         if not ok:
             payload["error_message"] = error_message or "Paiement indisponible."
-        return bool(self.call("answerPreCheckoutQuery", payload, timeout=8))
+        return bool(self.call("answerPreCheckoutQuery", payload, timeout=4))
 
     def send_message(self, chat_id: int, text: str) -> dict[str, Any]:
         result = self.call(

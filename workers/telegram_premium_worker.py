@@ -52,30 +52,108 @@ def extension_window(
     return base, base + timedelta(days=days)
 
 
+def refund_adjusted_end(
+    now: datetime,
+    current_end: datetime,
+    base_entitlement_start: datetime,
+    active_grants: list[dict[str, Any]],
+    refunded_charge_id: str,
+) -> datetime:
+    """Remove one grant's remaining duration from a contiguous entitlement queue.
+
+    Earlier refunds shift later grants toward the present. Reconstructing the
+    queue from all still-active ledger grants prevents a later paid extension
+    from being shortened when an older charge is refunded.
+    """
+    current = aware_utc(current_end)
+    instant = aware_utc(now)
+    durations: list[tuple[str, timedelta]] = []
+    for grant in active_grants:
+        start = aware_utc(grant["entitlement_start"])
+        end = aware_utc(grant["entitlement_end"])
+        durations.append(
+            (
+                str(grant["telegram_payment_charge_id"]),
+                max(timedelta(0), end - start),
+            )
+        )
+    if not any(charge_id == refunded_charge_id for charge_id, _ in durations):
+        raise ValueError("refund_grant_not_active")
+
+    total_duration = sum((duration for _, duration in durations), timedelta(0))
+    queue_start = max(instant, aware_utc(base_entitlement_start))
+    queue_remaining = max(timedelta(0), current - queue_start)
+    consumed = max(timedelta(0), total_duration - queue_remaining)
+    target_remaining = timedelta(0)
+    for charge_id, duration in durations:
+        used = min(consumed, duration)
+        consumed -= used
+        if charge_id == refunded_charge_id:
+            target_remaining = duration - used
+            break
+    return max(instant, current - target_remaining)
+
+
 def invoice_order_id(payload: str) -> str | None:
     match = PAYLOAD_RE.fullmatch(payload)
     return match.group(1).lower() if match else None
 
 
-def database_config(database_url: str) -> dict[str, Any]:
+def update_failure_metadata(update: dict[str, Any]) -> tuple[str, str | None]:
+    query = update.get("pre_checkout_query")
+    if isinstance(query, dict):
+        return "pre_checkout_query", None
+    message = update.get("message")
+    if not isinstance(message, dict):
+        return "unknown", None
+    for key in ("successful_payment", "refunded_payment"):
+        payment = message.get(key)
+        if isinstance(payment, dict):
+            charge_id = str(payment.get("telegram_payment_charge_id") or "")
+            return key, charge_id or None
+    return "message", None
+
+
+def permanent_error_code(error: ValueError) -> str:
+    candidate = str(error)
+    if re.fullmatch(r"[a-z0-9_]{1,64}", candidate):
+        return candidate
+    return type(error).__name__
+
+
+def is_claimable_order_status(status: str) -> bool:
+    return status == "pending"
+
+
+def database_config(
+    database_url: str, *, host_override: str | None = None
+) -> dict[str, Any]:
     parsed = urlparse(database_url)
     if parsed.scheme not in {"mysql", "mariadb"} or not parsed.hostname or not parsed.path:
         raise ValueError("invalid_database_url")
     return {
         "user": unquote(parsed.username or ""),
         "password": unquote(parsed.password or ""),
-        "host": parsed.hostname,
+        "host": host_override or parsed.hostname,
         "port": parsed.port or 3306,
         "database": unquote(parsed.path.lstrip("/")),
         "autocommit": False,
         "charset": "utf8mb4",
-        "connection_timeout": 2,
+        "connection_timeout": 1,
+        "read_timeout": 2,
+        "write_timeout": 2,
     }
 
 
 class MariaPaymentStore:
-    def __init__(self, database_url: str, connection_factory: Callable[..., Any] | None = None):
-        self._config = database_config(database_url)
+    def __init__(
+        self,
+        database_url: str,
+        connection_factory: Callable[..., Any] | None = None,
+        *,
+        host_override: str | None = None,
+    ):
+        self._config = database_config(database_url, host_override=host_override)
         self._connection_factory = connection_factory
 
     def _connect(self):
@@ -116,6 +194,44 @@ class MariaPaymentStore:
         finally:
             connection.close()
 
+    def quarantine_update(
+        self,
+        update_id: int,
+        update_kind: str,
+        error_code: str,
+        charge_id: str | None,
+        now: datetime,
+    ) -> None:
+        connection = self._connect()
+        try:
+            cursor = connection.cursor()
+            cursor.execute(
+                """INSERT INTO telegram_failed_updates
+                   (telegram_update_id, update_kind, error_code,
+                    telegram_payment_charge_id, failed_at, last_seen_at, attempts)
+                   VALUES (%s, %s, %s, %s, %s, %s, 1)
+                   ON DUPLICATE KEY UPDATE
+                     update_kind=VALUES(update_kind),
+                     error_code=VALUES(error_code),
+                     telegram_payment_charge_id=VALUES(telegram_payment_charge_id),
+                     last_seen_at=VALUES(last_seen_at),
+                     attempts=attempts+1""",
+                (
+                    update_id,
+                    update_kind[:64],
+                    error_code[:64],
+                    charge_id[:191] if charge_id else None,
+                    db_time(now),
+                    db_time(now),
+                ),
+            )
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
     def claim_launch_token(
         self,
         token_hash: str,
@@ -147,7 +263,7 @@ class MariaPaymentStore:
                 )
                 connection.commit()
                 return None
-            if row["status"] in {"paid", "refunded", "failed", "expired"}:
+            if not is_claimable_order_status(str(row["status"])):
                 connection.commit()
                 return None
             bound_user = row.get("telegram_user_id")
@@ -192,7 +308,7 @@ class MariaPaymentStore:
             cursor.execute(
                 """UPDATE premium_orders
                    SET status='invoice_sent', invoice_sent_at=%s, failure_code=NULL
-                   WHERE id=%s AND status IN ('claimed','invoice_sent')""",
+                   WHERE id=%s AND status='claimed'""",
                 (db_time(now), order_id),
             )
             connection.commit()
@@ -340,8 +456,9 @@ class MariaPaymentStore:
                 """INSERT INTO telegram_payments
                    (order_id, telegram_update_id, telegram_user_id,
                     telegram_payment_charge_id, provider_payment_charge_id,
-                    currency, total_amount, paid_at)
-                   VALUES (%s, %s, %s, %s, %s, 'XTR', %s, %s)""",
+                    currency, total_amount, entitlement_start, entitlement_end,
+                    paid_at)
+                   VALUES (%s, %s, %s, %s, %s, 'XTR', %s, %s, %s, %s)""",
                 (
                     order_id,
                     update_id,
@@ -349,6 +466,8 @@ class MariaPaymentStore:
                     charge_id,
                     payment.get("provider_payment_charge_id") or None,
                     int(payment["total_amount"]),
+                    db_time(start),
+                    db_time(end),
                     db_time(now),
                 ),
             )
@@ -375,9 +494,12 @@ class MariaPaymentStore:
             connection.start_transaction()
             cursor = connection.cursor(dictionary=True)
             cursor.execute(
-                """SELECT order_id, telegram_user_id, refunded_at
-                   FROM telegram_payments
-                   WHERE telegram_payment_charge_id=%s LIMIT 1 FOR UPDATE""",
+                """SELECT tp.order_id, tp.telegram_user_id, tp.refunded_at,
+                          tp.entitlement_start, tp.entitlement_end, po.user_id
+                   FROM telegram_payments tp
+                   JOIN premium_orders po ON po.id=tp.order_id
+                   WHERE tp.telegram_payment_charge_id=%s
+                   LIMIT 1 FOR UPDATE""",
                 (charge_id,),
             )
             payment = cursor.fetchone()
@@ -388,6 +510,68 @@ class MariaPaymentStore:
             if payment.get("refunded_at"):
                 connection.commit()
                 return "duplicate"
+            if not payment.get("entitlement_start") or not payment.get("entitlement_end"):
+                raise ValueError("refund_entitlement_missing")
+
+            cursor.execute(
+                """SELECT tp.telegram_payment_charge_id, tp.entitlement_start,
+                          tp.entitlement_end, tp.refunded_at
+                   FROM telegram_payments tp
+                   JOIN premium_orders po ON po.id=tp.order_id
+                   WHERE po.user_id=%s
+                     AND tp.entitlement_start IS NOT NULL
+                     AND tp.entitlement_end IS NOT NULL
+                   ORDER BY tp.entitlement_start, tp.paid_at, tp.id
+                   FOR UPDATE""",
+                (payment["user_id"],),
+            )
+            grants = cursor.fetchall()
+            base_entitlement_start = min(
+                aware_utc(grant["entitlement_start"]) for grant in grants
+            )
+            active_grants = [grant for grant in grants if not grant.get("refunded_at")]
+
+            cursor.execute(
+                """SELECT id, current_period_end FROM subscriptions
+                   WHERE user_id=%s AND status='active'
+                   ORDER BY current_period_end DESC LIMIT 1 FOR UPDATE""",
+                (payment["user_id"],),
+            )
+            active = cursor.fetchone()
+            if active and active.get("current_period_end"):
+                adjusted_end = refund_adjusted_end(
+                    now,
+                    active["current_period_end"],
+                    base_entitlement_start,
+                    active_grants,
+                    charge_id,
+                )
+                if adjusted_end > aware_utc(now):
+                    cursor.execute(
+                        "UPDATE subscriptions SET current_period_end=%s WHERE id=%s",
+                        (db_time(adjusted_end), active["id"]),
+                    )
+                else:
+                    cursor.execute(
+                        "UPDATE subscriptions SET status='canceled', current_period_end=%s WHERE id=%s",
+                        (db_time(now), active["id"]),
+                    )
+            cursor.execute(
+                """UPDATE subscriptions SET status='canceled'
+                   WHERE user_id=%s AND status='active' AND current_period_end <= %s""",
+                (payment["user_id"], db_time(now)),
+            )
+            cursor.execute(
+                """SELECT id FROM subscriptions
+                   WHERE user_id=%s AND status='active' AND current_period_end > %s
+                   LIMIT 1""",
+                (payment["user_id"], db_time(now)),
+            )
+            still_premium = cursor.fetchone() is not None
+            cursor.execute(
+                "UPDATE users SET is_premium=%s WHERE id=%s",
+                (1 if still_premium else 0, payment["user_id"]),
+            )
             cursor.execute(
                 "UPDATE telegram_payments SET refunded_at=%s WHERE telegram_payment_charge_id=%s",
                 (db_time(now), charge_id),
@@ -479,7 +663,16 @@ class PaymentWorker:
 
         self.api.answer_pre_checkout(query["id"], error is None, error)
         if error is None:
-            self.store.mark_precheckout_approved(order["id"], self.now())
+            try:
+                self.store.mark_precheckout_approved(order["id"], self.now())
+            except Exception as exc:
+                # Telegram has already received the time-critical answer. This
+                # timestamp is audit-only and must not make the update poison
+                # the queue or cause a duplicate answer on retry.
+                log_event(
+                    "telegram_precheckout_audit_failed",
+                    error=type(exc).__name__,
+                )
 
     def _handle_message(self, update_id: int, message: dict[str, Any]) -> None:
         chat_id = int(message["chat"]["id"])
@@ -526,9 +719,49 @@ class PaymentWorker:
             self._handle_message(update_id, message)
 
     def process_batch(self, updates: list[dict[str, Any]]) -> None:
-        for update in sorted(updates, key=lambda item: int(item["update_id"])):
-            self.handle_update(update)
-            self.store.save_offset(int(update["update_id"]))
+        ordered = sorted(updates, key=lambda item: int(item["update_id"]))
+        preprocessed: set[int] = set()
+
+        # Telegram invalidates unanswered pre-checkout queries after ten
+        # seconds. Answer all of them before slower messages in the same poll.
+        for update in ordered:
+            if not isinstance(update.get("pre_checkout_query"), dict):
+                continue
+            update_id = int(update["update_id"])
+            try:
+                self.handle_update(update)
+            except ValueError as exc:
+                kind, charge_id = update_failure_metadata(update)
+                code = permanent_error_code(exc)
+                self.store.quarantine_update(
+                    update_id, kind, code, charge_id, self.now()
+                )
+                log_event(
+                    "telegram_update_quarantined",
+                    update_id=update_id,
+                    update_kind=kind,
+                    error_code=code,
+                )
+            preprocessed.add(update_id)
+
+        for update in ordered:
+            update_id = int(update["update_id"])
+            if update_id not in preprocessed:
+                try:
+                    self.handle_update(update)
+                except ValueError as exc:
+                    kind, charge_id = update_failure_metadata(update)
+                    code = permanent_error_code(exc)
+                    self.store.quarantine_update(
+                        update_id, kind, code, charge_id, self.now()
+                    )
+                    log_event(
+                        "telegram_update_quarantined",
+                        update_id=update_id,
+                        update_kind=kind,
+                        error_code=code,
+                    )
+            self.store.save_offset(update_id)
 
 
 def log_event(event: str, **fields: Any) -> None:
@@ -538,12 +771,11 @@ def log_event(event: str, **fields: Any) -> None:
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
-    database_url = os.environ.get("TELEGRAM_WORKER_DATABASE_URL") or os.environ.get(
-        "DATABASE_URL", ""
-    )
+    database_url = os.environ.get("DATABASE_URL", "")
+    database_host = os.environ.get("TELEGRAM_WORKER_DATABASE_HOST") or None
     if not token or not database_url:
         raise SystemExit("TELEGRAM_BOT_TOKEN and DATABASE_URL are required")
-    store = MariaPaymentStore(database_url)
+    store = MariaPaymentStore(database_url, host_override=database_host)
     api = TelegramApi(token)
     worker = PaymentWorker(
         store,

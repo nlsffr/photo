@@ -234,7 +234,6 @@ export default function PremiumPage() {
 
       <ul className="mt-8 space-y-2 text-sm text-[var(--color-ink-muted)]">
         <li>✓ Sans publicité</li>
-        <li>✓ Qualité et vitesse prioritaires</li>
         <li>✓ Premium lié à ton compte sur tous tes appareils</li>
       </ul>
       <p className="mt-6 text-xs text-[var(--color-ink-faint)]">

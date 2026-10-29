@@ -165,14 +165,15 @@ The implementation follows Telegram's official digital-goods flow:
 - Premium activates only after `successful_payment`, whose Telegram charge ID
   is persisted for idempotency/refunds:
   https://core.telegram.org/bots/api#successfulpayment
-- the update offset is saved only after successful processing, following
-  `getUpdates`: https://core.telegram.org/bots/api#getupdates
+- the update offset is saved only after successful processing or durable
+  quarantine of a permanent validation failure, following `getUpdates`:
+  https://core.telegram.org/bots/api#getupdates
 
 No bot token or database password is added to the repository. Reuse the
-existing values in `/opt/photo/.env`; do not rotate them for this rollout. If
-the existing `DATABASE_URL` uses the Docker hostname `mariadb`, add
-`TELEGRAM_WORKER_DATABASE_URL` with the same current username/password and
-host `127.0.0.1` because MariaDB is already bound to host loopback.
+existing values in `/opt/photo/.env`; do not rotate them for this rollout. The
+systemd units set `TELEGRAM_WORKER_DATABASE_HOST=127.0.0.1`, so a shared
+`DATABASE_URL` that names the Docker host `mariadb` works from the VPS host
+without copying its username or password into a second variable.
 
 ```bash
 cd /opt/photo-seo-fix

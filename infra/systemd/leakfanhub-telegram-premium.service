@@ -10,6 +10,7 @@ EnvironmentFile=-/opt/photo/.env
 EnvironmentFile=-/opt/photo/.env.prod
 Environment=PYTHONUNBUFFERED=1
 Environment=TZ=UTC
+Environment=TELEGRAM_WORKER_DATABASE_HOST=127.0.0.1
 ExecStart=/usr/bin/python3 /opt/photo-seo-fix/workers/telegram_premium_worker.py
 Restart=always
 RestartSec=3
