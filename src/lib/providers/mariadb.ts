@@ -310,7 +310,12 @@ export class MariaDBProvider implements DataProvider {
     const selectiveFilter = Boolean(
       query.creator || query.tag || query.q || query.isAi === true,
     );
-    const plan = buildPhotoListPlan({ sort, seed, selectiveFilter });
+    const plan = buildPhotoListPlan({
+      sort,
+      seed,
+      selectiveFilter,
+      textSearch: Boolean(query.q),
+    });
     const where: string[] = plan.extraWhere ? [plan.extraWhere] : [];
     const params: Record<string, unknown> = { ...plan.params };
     if (query.creator) {
@@ -359,7 +364,7 @@ export class MariaDBProvider implements DataProvider {
     const off = Math.max(Number(cursor) || 0, 0);
 
     const rows = await this.q<RowDataPacket>(
-      `SET STATEMENT max_statement_time=3 FOR
+      `SET STATEMENT max_statement_time=5 FOR
        SELECT ${PHOTO_SELECT}
        ${plan.fromSql}
        ${whereSql}

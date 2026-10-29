@@ -47,11 +47,57 @@ test("random media pages use a stable seed-derived UUID pivot instead of RAND", 
   assert.notEqual(first.params.randomPivot, other.params.randomPivot);
   assert.match(
     String(first.params.randomPivot),
-    /^[0-7][0-9a-f]{7}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
   );
-  assert.equal(first.extraWhere, "p.id >= :randomPivot");
-  assert.equal(first.orderBy, "p.id ASC");
   assert.doesNotMatch(first.orderBy, /RAND/i);
+
+  const plans = Array.from({ length: 64 }, (_, seed) =>
+    buildPhotoListPlan({ sort: "random", seed }),
+  );
+  const ascending = plans.find((plan) => plan.orderBy === "p.id ASC");
+  const descending = plans.find((plan) => plan.orderBy === "p.id DESC");
+  assert.equal(ascending?.extraWhere, "p.id >= :randomPivot");
+  assert.equal(descending?.extraWhere, "p.id <= :randomPivot");
+});
+
+test("global trending pages rank a bounded union of indexed candidates", async () => {
+  const { buildPhotoListPlan } = await loadQueryPlan();
+  const plan = buildPhotoListPlan({ sort: "trending" });
+
+  assert.match(plan.fromSql, /idx_photos_views_id/);
+  assert.match(plan.fromSql, /idx_photos_created_id/);
+  assert.match(plan.fromSql, /idx_photos_likes_id/);
+  assert.match(plan.fromSql, /LIMIT 500/);
+  assert.match(plan.orderBy, /TIMESTAMPDIFF/);
+});
+
+test("text search ranks a bounded candidate set including matching creators", async () => {
+  const { buildPhotoListPlan } = await loadQueryPlan();
+  const plan = buildPhotoListPlan({
+    sort: "popular",
+    selectiveFilter: true,
+    textSearch: true,
+  });
+
+  assert.match(plan.fromSql, /idx_photos_views_id/);
+  assert.match(plan.fromSql, /idx_photos_created_id/);
+  assert.match(plan.fromSql, /pt\.title LIKE :q/);
+  assert.match(plan.fromSql, /cs\.handle LIKE :q/);
+  assert.match(plan.fromSql, /LIMIT 500/);
+});
+
+test("text search stays bounded even when random sorting is requested", async () => {
+  const { buildPhotoListPlan } = await loadQueryPlan();
+  const plan = buildPhotoListPlan({
+    sort: "random",
+    seed: 42,
+    selectiveFilter: true,
+    textSearch: true,
+  });
+
+  assert.match(plan.fromSql, /pt\.title LIKE :q/);
+  assert.equal(plan.extraWhere, null);
+  assert.equal(plan.params.randomPivot, undefined);
 });
 
 test("filtered searches keep the optimizer free to choose their selective index", async () => {
