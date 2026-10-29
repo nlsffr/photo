@@ -1,6 +1,11 @@
 import { getPhotos } from "@/lib/photos";
 import type { MediaType, SortKey } from "@/lib/types";
-import { anonKey, rateLimit, sweep } from "@/lib/ratelimit";
+import {
+  anonKey,
+  rateLimit,
+  requestRateLimitKey,
+  sweep,
+} from "@/lib/ratelimit";
 import { cacheGet, cacheSet, cacheKey } from "@/lib/cache";
 
 const SORTS: SortKey[] = [
@@ -15,21 +20,9 @@ const SORTS: SortKey[] = [
 /** Cache only first pages of common feeds (high traffic). */
 const CACHE_TTL_MS = 20_000;
 
-function clientKey(request: Request): string {
-  const explicit = request.headers.get("x-ratelimit-bucket");
-  if (explicit) return explicit;
-  const fwd =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
-    request.headers.get("cf-connecting-ip") ||
-    "";
-  if (fwd) return fwd;
-  return `ua:${request.headers.get("user-agent")?.slice(0, 80) ?? "unknown"}`;
-}
-
 export async function GET(request: Request) {
   sweep();
-  const coarse = clientKey(request);
+  const coarse = requestRateLimitKey(request);
   const { allowed, remaining, resetAt } = rateLimit(anonKey(coarse), 300, 60_000);
   if (!allowed) {
     return Response.json(

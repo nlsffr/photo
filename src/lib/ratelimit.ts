@@ -29,6 +29,21 @@ export function anonKey(raw: string): string {
   return createHash("sha256").update(SALT).update(raw).digest("hex").slice(0, 24);
 }
 
+/** Coarse per-request key. Callers hash it with anonKey before storage. */
+export function requestRateLimitKey(request: Request): string {
+  // Production Nginx overwrites X-Real-IP with the actual peer address.
+  // X-Forwarded-For and arbitrary custom headers can be supplied by clients,
+  // so only use them as fallbacks for local/non-Nginx deployments.
+  const forwarded =
+    request.headers.get("x-real-ip") ||
+    request.headers.get("cf-connecting-ip") ||
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    "";
+  if (forwarded) return forwarded;
+
+  return `ua:${request.headers.get("user-agent")?.slice(0, 80) ?? "unknown"}`;
+}
+
 /**
  * Returns true if the request is allowed, false if rate-limited.
  * @param key   already-anonymised key (use anonKey()).
