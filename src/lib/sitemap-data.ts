@@ -4,6 +4,17 @@ import type { RowDataPacket } from "mysql2";
 import { requireDbPool } from "./db-pool";
 import { toIso } from "./types";
 import { activeCreatorSql, activeMediaSql } from "./providers/active-content-sql";
+import {
+  buildSitemapPartitions,
+  decodeSitemapCursor,
+  type SitemapBoundary,
+  type SitemapPartition,
+} from "./sitemap-partitions";
+import {
+  MAX_MEDIA_SITEMAP_FILES,
+  MEDIA_SITEMAP_CHUNK_SIZE,
+  isSitemapPartitionDate,
+} from "./seo-policy";
 
 export type SitemapMedia = {
   id: string;
@@ -31,6 +42,12 @@ type SitemapProfileRow = RowDataPacket & {
   handle: string;
   url_version: number | null;
   updated_at: Date | string | null;
+};
+
+type SitemapBoundaryRow = RowDataPacket & {
+  bucket_date: string;
+  created_at: Date | string;
+  id: string;
 };
 
 const SITEMAP_MEDIA_SELECT = `
@@ -87,6 +104,85 @@ export async function getSitemapMediaChunk(
      ORDER BY p.created_at DESC, p.id DESC
     `,
     [safeLimit, safeOffset],
+  );
+  return rows.map(mapSitemapMedia);
+}
+
+/**
+ * Return immutable keyset boundaries. Rows are ordered oldest-first inside a
+ * UTC day, so normal newer inserts append without renaming existing parts.
+ */
+export async function getSitemapMediaPartitions(): Promise<SitemapPartition[]> {
+  const [rows] = await requireDbPool().query<SitemapBoundaryRow[]>(
+    `WITH ranked AS (
+       SELECT DATE_FORMAT(p.created_at, '%Y-%m-%d') AS bucket_date,
+              p.created_at,
+              p.id,
+              ROW_NUMBER() OVER (
+                PARTITION BY DATE(p.created_at)
+                ORDER BY p.created_at ASC, p.id ASC
+              ) AS row_number
+       FROM photos p
+       STRAIGHT_JOIN creators c ON c.id = p.creator_id
+       WHERE ${activeMediaSql("p", "c")}
+     )
+     SELECT bucket_date, created_at, id
+     FROM ranked
+     WHERE MOD(row_number - 1, ?) = 0
+     ORDER BY bucket_date DESC, row_number ASC
+     LIMIT ?`,
+    [MEDIA_SITEMAP_CHUNK_SIZE, MAX_MEDIA_SITEMAP_FILES],
+  );
+  const boundaries: SitemapBoundary[] = [];
+  for (const row of rows) {
+    const createdAt = toIso(row.created_at);
+    if (!createdAt) continue;
+    boundaries.push({
+      date: row.bucket_date,
+      createdAt,
+      id: String(row.id),
+    });
+  }
+  return buildSitemapPartitions(boundaries);
+}
+
+/** Fetch one bounded partition using its immutable (created_at,id) cursor. */
+export async function getSitemapMediaPartition(
+  date: string,
+  cursor: string,
+  limit = MEDIA_SITEMAP_CHUNK_SIZE,
+): Promise<SitemapMedia[]> {
+  if (!isSitemapPartitionDate(date)) return [];
+  const boundary = decodeSitemapCursor(cursor);
+  if (!boundary || boundary.createdAt.slice(0, 10) !== date) return [];
+  const dayStart = `${date}T00:00:00.000Z`;
+  const nextDay = new Date(Date.parse(dayStart) + 86_400_000).toISOString();
+  const safeLimit = Math.min(
+    MEDIA_SITEMAP_CHUNK_SIZE,
+    Math.max(1, Math.floor(limit)),
+  );
+  const [rows] = await requireDbPool().query<SitemapMediaRow[]>(
+    `SET STATEMENT max_statement_time=10 FOR
+     SELECT ${SITEMAP_MEDIA_SELECT}
+     FROM photos p FORCE INDEX (idx_photos_created_id)
+     STRAIGHT_JOIN creators c ON c.id = p.creator_id
+     WHERE ${activeMediaSql("p", "c")}
+       AND p.created_at >= ?
+       AND p.created_at < ?
+       AND (
+         p.created_at > ?
+         OR (p.created_at = ? AND p.id >= ?)
+       )
+     ORDER BY p.created_at ASC, p.id ASC
+     LIMIT ?`,
+    [
+      dayStart,
+      nextDay,
+      boundary.createdAt,
+      boundary.createdAt,
+      boundary.id,
+      safeLimit,
+    ],
   );
   return rows.map(mapSitemapMedia);
 }

@@ -1,4 +1,14 @@
 export const MEDIA_SITEMAP_CHUNK_SIZE = 10_000;
+const SITEMAP_PARTITION_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+export function isSitemapPartitionDate(value: string): boolean {
+  if (!SITEMAP_PARTITION_DATE_RE.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return (
+    Number.isFinite(parsed.getTime()) &&
+    parsed.toISOString().slice(0, 10) === value
+  );
+}
 
 /** A sitemap index may contain at most 50,000 child sitemap entries. */
 const MAX_SITEMAPS_PER_INDEX = 50_000;
