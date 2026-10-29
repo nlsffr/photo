@@ -206,6 +206,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isFeed = pathname.startsWith("/feed") || pathname.startsWith("/tiktok");
 
   useEffect(() => {
+    if (openPath === null || openPath === pathname) return;
+    const frame = window.requestAnimationFrame(() => setOpenPath(null));
+    return () => window.cancelAnimationFrame(frame);
+  }, [openPath, pathname]);
+
+  useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
