@@ -42,6 +42,7 @@ type PhotoRow = {
   id: string;
   source_id: number | string | null;
   title: string;
+  description: string | null;
   image_url: string;
   video_url: string | null;
   external_url: string | null;
@@ -56,7 +57,7 @@ type PhotoRow = {
   source_likes_count?: number | string | null;
   local_views_count?: number | string | null;
   is_ai: number | null;
-  created_at: Date;
+  created_at: Date | string;
   url_version: number | null;
   updated_at: Date | string | null;
   removed_from_index_at: Date | string | null;
@@ -92,6 +93,7 @@ function rowToView(row: PhotoRow, tags: string[]): PhotoView {
     id: row.id,
     sourceId: sid,
     title: row.title,
+    description: row.description ?? undefined,
     imageUrl: row.image_url,
     videoUrl: row.video_url ?? undefined,
     externalUrl: row.external_url ?? undefined,
@@ -110,6 +112,7 @@ function rowToView(row: PhotoRow, tags: string[]): PhotoView {
     isAi: Boolean(row.is_ai),
     urlVersion: Number(row.url_version) || 1,
     updatedAt: toIso(row.updated_at),
+    createdAt: toIso(row.created_at),
     removedFromIndexAt: toIso(row.removed_from_index_at),
     creatorHandle: row.creator_handle,
     tags,
@@ -149,7 +152,7 @@ function windowSql(window: TrendWindow | undefined): string {
 
 const PHOTO_SELECT = `
   p.id, p.source_id AS source_id,
-  p.title, p.image_url, p.video_url, p.external_url, p.type, p.duration_sec, p.item_count,
+  p.title, p.description, p.image_url, p.video_url, p.external_url, p.type, p.duration_sec, p.item_count,
   p.width, p.height, p.views_count, p.likes_count,
   p.source_views_count, p.source_likes_count, p.local_views_count, p.created_at,
   COALESCE(p.is_ai, 0) AS is_ai,

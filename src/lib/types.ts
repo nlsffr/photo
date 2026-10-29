@@ -28,6 +28,8 @@ export interface Photo {
   id: string;
   sourceId?: string;
   title: string;
+  /** Source-authored description used for page and rich-result metadata. */
+  description?: string;
   imageUrl: string;
   width: number;
   height: number;
@@ -53,6 +55,8 @@ export interface Photo {
   urlVersion?: number;
   /** ISO timestamp (photos.updated_at) — lastmod sitemap. */
   updatedAt?: string | null;
+  /** ISO timestamp (photos.created_at) — immutable publication date. */
+  createdAt?: string | null;
   /** Si non-null, le média est retiré de toutes les surfaces publiques. */
   removedFromIndexAt?: string | null;
 }
