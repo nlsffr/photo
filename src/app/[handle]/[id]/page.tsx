@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   getCreator,
-  getPhotoById,
+  getPhotoByIdForPage,
   getRelatedPhotos,
   withCreator,
 } from "@/lib/photos";
@@ -21,6 +21,7 @@ import { JsonLd } from "@/components/JsonLd";
 import { BackLink } from "@/components/BackLink";
 import { FloatingBack } from "@/components/FloatingBack";
 import { RecordView } from "@/components/RecordView";
+import { buildMediaPagePresentation } from "@/lib/media-seo";
 
 export const revalidate = 300;
 
@@ -35,23 +36,6 @@ const RESERVED = new Set([
   "connexion", "inscription", "favoris", "abonnements",
 ]);
 
-function absUrl(path?: string | null): string | undefined {
-  if (!path) return undefined;
-  if (/^https?:\/\//i.test(path)) return path;
-  return `${SITE}${path.startsWith("/") ? path : `/${path}`}`;
-}
-
-function durationIso(sec?: number): string | undefined {
-  if (sec == null || sec <= 0 || !Number.isFinite(sec)) return undefined;
-  const s = Math.round(sec);
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const r = s % 60;
-  if (h > 0) return `PT${h}H${m}M${r}S`;
-  if (m > 0) return `PT${m}M${r}S`;
-  return `PT${r}S`;
-}
-
 export async function generateMetadata({
   params,
 }: {
@@ -62,43 +46,20 @@ export async function generateMetadata({
     notFound();
   }
   // getPhotoById ignore le suffixe -v{N} pour la requête (source_id = base).
-  const photo = await getPhotoById(id);
+  const photo = await getPhotoByIdForPage(id);
   if (!photo || photo.creatorHandle.toLowerCase() !== handle.toLowerCase()) {
     notFound();
   }
 
   const parsed = parseVersionedSlug(id);
   if (!isCurrentMediaVersion(photo.urlVersion, parsed.version)) notFound();
-  const h = photo.creatorHandle;
-  const kind =
-    photo.type === "video" ? "video" : photo.type === "pack" ? "pack" : "photo";
   const sid = photo.sourceId || parsed.base;
-  const title = `${h} ${kind} #${sid} — LeakFanHub`;
-  const description = `Free ${h} ${kind} on LeakFanHub. ${formatCount(photo.views)} views · more from @${h}. Updated regularly. 18+ only.`;
   const path = mediaHref({ ...photo, sourceId: sid });
-  const url = `${SITE}${path}`;
-  const ogImage = absUrl(photo.imageUrl);
-
-  return {
-    title: { absolute: title },
-    description,
-    alternates: { canonical: path },
-    robots: { index: true, follow: true, "max-image-preview": "large" as const },
-    openGraph: {
-      type: photo.type === "video" ? "video.other" : "article",
-      title,
-      description,
-      url,
-      siteName: "LeakFanHub",
-      images: ogImage ? [{ url: ogImage }] : [],
-    },
-    twitter: {
-      card: "summary_large_image",
-      title,
-      description,
-      images: ogImage ? [ogImage] : undefined,
-    },
-  };
+  return buildMediaPagePresentation(photo, {
+    site: SITE,
+    canonicalPath: path,
+    creatorName: photo.creatorHandle,
+  }).metadata;
 }
 
 export default async function MediaByHandlePage({
@@ -110,7 +71,7 @@ export default async function MediaByHandlePage({
   if (RESERVED.has(handle.toLowerCase())) notFound();
 
   const parsed = parseVersionedSlug(id);
-  const raw = await getPhotoById(id);
+  const raw = await getPhotoByIdForPage(id);
   if (!raw) notFound();
   if (raw.creatorHandle.toLowerCase() !== handle.toLowerCase()) notFound();
   if (!isCurrentMediaVersion(raw.urlVersion, parsed.version)) notFound();
@@ -121,60 +82,16 @@ export default async function MediaByHandlePage({
   const related = await getRelatedPhotos(raw, 36);
 
   const sid = photo.sourceId || parsed.base;
-  const kind =
-    photo.type === "video" ? "video" : photo.type === "pack" ? "pack" : "photo";
-  const h1 = `${photo.creatorHandle} ${kind} #${sid}`;
   const creatorPath = creatorHref(photo.creatorHandle, creator.urlVersion);
   const mediaPath = mediaHref({ ...photo, sourceId: sid });
-
-  const thumb = absUrl(photo.imageUrl);
-  const content = absUrl(photo.type === "video" ? photo.videoUrl : photo.imageUrl);
-
-  const personLd = {
-    "@type": "Person",
-    name: photo.creator.name || photo.creatorHandle,
-    alternateName: photo.creatorHandle,
-    url: `${SITE}${creatorPath}`,
-    image: absUrl(photo.creator.avatarUrl) || thumb,
-  };
-
-  const mediaLd =
-    photo.type === "video" && photo.videoUrl
-      ? {
-          "@context": "https://schema.org",
-          "@type": "VideoObject",
-          name: h1,
-          description: `${photo.creatorHandle} video on LeakFanHub — ${formatCount(photo.views)} views`,
-          thumbnailUrl: thumb,
-          contentUrl: content,
-          embedUrl: `${SITE}${mediaPath}`,
-          duration: durationIso(photo.durationSec),
-          author: personLd,
-          publisher: {
-            "@type": "Organization",
-            name: "LeakFanHub",
-            url: SITE,
-          },
-          interactionStatistic: {
-            "@type": "InteractionCounter",
-            interactionType: "https://schema.org/WatchAction",
-            userInteractionCount: photo.views,
-          },
-        }
-      : {
-          "@context": "https://schema.org",
-          "@type": "ImageObject",
-          name: h1,
-          description: `${photo.creatorHandle} photo on LeakFanHub — ${formatCount(photo.views)} views`,
-          contentUrl: content || thumb,
-          thumbnailUrl: thumb,
-          author: personLd,
-          publisher: {
-            "@type": "Organization",
-            name: "LeakFanHub",
-            url: SITE,
-          },
-        };
+  const presentation = buildMediaPagePresentation(photo, {
+    site: SITE,
+    canonicalPath: mediaPath,
+    creatorName: photo.creator.name,
+    creatorPath,
+    creatorAvatarUrl: photo.creator.avatarUrl,
+  });
+  const h1 = presentation.h1;
 
   const breadcrumbLd = {
     "@context": "https://schema.org",
@@ -198,7 +115,7 @@ export default async function MediaByHandlePage({
 
   return (
     <div className="mx-auto max-w-[1600px] px-3 pb-8 pt-3 sm:px-6 sm:py-6">
-      <JsonLd data={[mediaLd, breadcrumbLd]} />
+      <JsonLd data={presentation.mediaLd ? [presentation.mediaLd, breadcrumbLd] : [breadcrumbLd]} />
       <RecordView photoId={photo.id} />
       {/* History back — never force profile (caused video ↔ profile loop) */}
       <FloatingBack fallback="/" label="Retour" />

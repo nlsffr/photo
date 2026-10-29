@@ -106,3 +106,30 @@ test("invalid publication dates do not fabricate the required upload date", asyn
   assert.equal(seo.uploadDate, undefined);
   assert.equal(seo.structuredData, undefined);
 });
+
+test("media page presentation keeps the real title consistent across metadata and JSON-LD", async () => {
+  const { buildMediaPagePresentation } = await loadMediaSeo();
+  const presentation = buildMediaPagePresentation(baseMedia, {
+    site: "https://leakfanhub.com",
+    canonicalPath: "/alice/98123",
+    creatorName: "Alice Example",
+    creatorPath: "/alice",
+    creatorAvatarUrl: "/media/creators/alice/avatar.jpg",
+  });
+
+  assert.deepEqual(presentation.metadata.title, {
+    absolute: "A real launch title — LeakFanHub",
+  });
+  assert.equal(presentation.metadata.openGraph.title, "A real launch title — LeakFanHub");
+  assert.equal(presentation.metadata.alternates.canonical, "/alice/98123");
+  assert.equal(presentation.h1, "A real launch title");
+  assert.deepEqual(presentation.mediaLd?.author, {
+    "@type": "Person",
+    name: "Alice Example",
+    alternateName: "alice",
+    url: "https://leakfanhub.com/alice",
+    image: "https://leakfanhub.com/media/creators/alice/avatar.jpg",
+  });
+  assert.equal(presentation.mediaLd?.uploadDate, "2026-10-28T08:15:30.000Z");
+  assert.equal("embedUrl" in (presentation.mediaLd ?? {}), false);
+});

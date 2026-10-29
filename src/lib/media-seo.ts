@@ -32,6 +32,18 @@ export type MediaStructuredData = {
     interactionType: { "@type": "WatchAction" };
     userInteractionCount: number;
   };
+  author?: {
+    "@type": "Person";
+    name: string;
+    alternateName: string;
+    url?: string;
+    image?: string;
+  };
+  publisher?: {
+    "@type": "Organization";
+    name: "LeakFanHub";
+    url: string;
+  };
 };
 
 export type MediaSeo = {
@@ -43,6 +55,45 @@ export type MediaSeo = {
   thumbnailUrl?: string;
   contentUrl?: string;
   structuredData?: MediaStructuredData;
+};
+
+export type MediaPageContext = {
+  site: string;
+  canonicalPath: string;
+  creatorName?: string | null;
+  creatorPath?: string | null;
+  creatorAvatarUrl?: string | null;
+};
+
+export type MediaPageMetadata = {
+  title: { absolute: string };
+  description: string;
+  alternates: { canonical: string };
+  robots: {
+    index: true;
+    follow: true;
+    "max-image-preview": "large";
+    "max-video-preview": -1;
+  };
+  openGraph: {
+    type: "video.other" | "article";
+    title: string;
+    description: string;
+    url: string;
+    siteName: "LeakFanHub";
+    images: Array<{ url: string }>;
+  };
+  twitter: {
+    card: "summary_large_image";
+    title: string;
+    description: string;
+    images?: string[];
+  };
+};
+
+export type MediaPagePresentation = MediaSeo & {
+  metadata: MediaPageMetadata;
+  mediaLd?: MediaStructuredData;
 };
 
 function plainText(value: string | null | undefined): string {
@@ -165,5 +216,65 @@ export function buildMediaSeo(media: MediaSeoInput, site: string): MediaSeo {
     thumbnailUrl,
     contentUrl,
     structuredData,
+  };
+}
+
+export function buildMediaPagePresentation(
+  media: MediaSeoInput,
+  context: MediaPageContext,
+): MediaPagePresentation {
+  const seo = buildMediaSeo(media, context.site);
+  const canonicalUrl = absoluteHttpUrl(context.canonicalPath, context.site);
+  if (!canonicalUrl) {
+    throw new Error("A media page requires an HTTP(S) canonical URL");
+  }
+  const creatorUrl = absoluteHttpUrl(context.creatorPath, context.site);
+  const creatorImage = absoluteHttpUrl(context.creatorAvatarUrl, context.site);
+  const mediaLd = seo.structuredData
+    ? {
+        ...seo.structuredData,
+        author: {
+          "@type": "Person" as const,
+          name: plainText(context.creatorName) || media.creatorHandle,
+          alternateName: media.creatorHandle,
+          ...(creatorUrl ? { url: creatorUrl } : {}),
+          ...(creatorImage ? { image: creatorImage } : {}),
+        },
+        publisher: {
+          "@type": "Organization" as const,
+          name: "LeakFanHub" as const,
+          url: new URL(context.site).origin,
+        },
+      }
+    : undefined;
+
+  return {
+    ...seo,
+    mediaLd,
+    metadata: {
+      title: { absolute: seo.pageTitle },
+      description: seo.description,
+      alternates: { canonical: context.canonicalPath },
+      robots: {
+        index: true,
+        follow: true,
+        "max-image-preview": "large",
+        "max-video-preview": -1,
+      },
+      openGraph: {
+        type: media.type === "video" ? "video.other" : "article",
+        title: seo.pageTitle,
+        description: seo.description,
+        url: canonicalUrl,
+        siteName: "LeakFanHub",
+        images: seo.thumbnailUrl ? [{ url: seo.thumbnailUrl }] : [],
+      },
+      twitter: {
+        card: "summary_large_image",
+        title: seo.pageTitle,
+        description: seo.description,
+        ...(seo.thumbnailUrl ? { images: [seo.thumbnailUrl] } : {}),
+      },
+    },
   };
 }

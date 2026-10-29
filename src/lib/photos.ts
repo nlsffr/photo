@@ -16,6 +16,7 @@ import { parseVersionedSlug } from "./types";
 import { resolveHomeSeed } from "./home-feed";
 import { getDataProvider } from "./data-provider";
 import { ensureDataProvider } from "./bootstrap";
+import { cache } from "react";
 import {
   createAsyncTtlCache,
   createAsyncTtlCacheMap,
@@ -67,6 +68,9 @@ export async function getPhotoById(id: string): Promise<Photo | undefined> {
   const { base } = parseVersionedSlug(id);
   return (await getProvider()).getPhoto(base);
 }
+
+/** Request-scoped memoization shared by page rendering and generateMetadata. */
+export const getPhotoByIdForPage = cache(getPhotoById);
 
 export async function getAllPhotoViews(): Promise<PhotoView[]> {
   return (await getProvider()).getAllPhotos();
