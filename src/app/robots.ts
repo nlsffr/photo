@@ -16,8 +16,7 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ["/api/"],
       },
     ],
-    // Index découpé (rapide) — pas le monolithe /sitemap.xml
-    sitemap: `${SITE}/sitemaps`,
+    sitemap: `${SITE}/sitemap.xml`,
     host: SITE.replace(/^https?:\/\//, ""),
   };
 }

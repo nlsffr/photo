@@ -3,7 +3,8 @@ import {
   MAX_MEDIA_SITEMAP_FILES,
   MEDIA_SITEMAP_CHUNK_SIZE,
 } from "@/lib/seo-policy";
-import { mediaHref, toIso } from "@/lib/types";
+import { toMediaSitemapEntry } from "@/lib/sitemap-route";
+import { renderMediaSitemap } from "@/lib/sitemap-xml";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 300;
@@ -12,14 +13,6 @@ const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").repl
   /\/$/,
   "",
 );
-
-function xmlEscape(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
 
 /** Full catalog chunks — one slim query, no tag hydration or N+1 paging. */
 export async function GET(
@@ -46,23 +39,9 @@ export async function GET(
     );
     if (items.length === 0) return new Response("Not found\n", { status: 404 });
 
-    const now = new Date().toISOString();
-    const entries = items.map((photo) => {
-      const href = mediaHref(photo);
-      const lastmod = toIso(photo.updatedAt) ?? now;
-      return `  <url>
-    <loc>${xmlEscape(`${SITE}${href}`)}</loc>
-    <lastmod>${lastmod}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.6</priority>
-  </url>`;
-    });
-
-    const body = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${entries.join("\n")}
-</urlset>
-`;
+    const body = renderMediaSitemap(
+      items.map((photo) => toMediaSitemapEntry(photo, SITE)),
+    );
 
     return new Response(body, {
       headers: {

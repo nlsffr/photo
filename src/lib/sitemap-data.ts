@@ -2,7 +2,7 @@ import "server-only";
 
 import type { RowDataPacket } from "mysql2";
 import { requireDbPool } from "./db-pool";
-import { toIso } from "./types";
+import { toIso, type MediaType } from "./types";
 import { activeCreatorSql, activeMediaSql } from "./providers/active-content-sql";
 import {
   buildSitemapPartitions,
@@ -22,6 +22,14 @@ export type SitemapMedia = {
   creatorHandle: string;
   urlVersion: number;
   updatedAt: string | null;
+  createdAt: string | null;
+  title: string;
+  description?: string;
+  imageUrl: string;
+  videoUrl?: string;
+  type: MediaType;
+  durationSec?: number;
+  views: number;
 };
 
 export type SitemapProfile = {
@@ -36,6 +44,14 @@ type SitemapMediaRow = RowDataPacket & {
   creator_handle: string;
   url_version: number | null;
   updated_at: Date | string | null;
+  created_at: Date | string | null;
+  title: string;
+  description: string | null;
+  image_url: string;
+  video_url: string | null;
+  type: MediaType;
+  duration_sec: number | null;
+  views_count: number | string | null;
 };
 
 type SitemapProfileRow = RowDataPacket & {
@@ -55,6 +71,14 @@ const SITEMAP_MEDIA_SELECT = `
   p.source_id,
   COALESCE(p.url_version, 1) AS url_version,
   COALESCE(p.updated_at, p.created_at) AS updated_at,
+  p.created_at,
+  p.title,
+  p.description,
+  p.image_url,
+  p.video_url,
+  p.type,
+  p.duration_sec,
+  p.views_count,
   c.handle AS creator_handle
 `;
 
@@ -68,6 +92,14 @@ function mapSitemapMedia(row: SitemapMediaRow): SitemapMedia {
     creatorHandle: row.creator_handle,
     urlVersion: Number(row.url_version) || 1,
     updatedAt: toIso(row.updated_at),
+    createdAt: toIso(row.created_at),
+    title: row.title,
+    description: row.description ?? undefined,
+    imageUrl: row.image_url,
+    videoUrl: row.video_url ?? undefined,
+    type: row.type,
+    durationSec: row.duration_sec ?? undefined,
+    views: Math.max(0, Number(row.views_count) || 0),
   };
 }
 
