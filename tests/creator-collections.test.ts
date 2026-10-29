@@ -19,6 +19,11 @@ test("collection eligibility follows the public-content thresholds", async () =>
 test("parses collection routes safely, including localized and versioned handles", async () => {
   const { parseCreatorCollectionPath } = await policyPromise;
   for (const path of ["/alice/photos", "/en/alice/photos", "/fr/alice-v3/videos"]) assert.ok(parseCreatorCollectionPath(path));
+  assert.deepEqual(parseCreatorCollectionPath("/alice"), { handle: "alice", collection: "overview" });
+  assert.deepEqual(parseCreatorCollectionPath("/en/alice"), { handle: "alice", collection: "overview" });
+  assert.deepEqual(parseCreatorCollectionPath("/fr/alice-v3"), { handle: "alice-v3", collection: "overview" });
+  assert.equal(parseCreatorCollectionPath("/contact"), null);
+  assert.equal(parseCreatorCollectionPath("/en/contact"), null);
   for (const path of ["/photos/videos", "/alice/unknown", "/%E0%A4%A/photos", "/photos/photos", "/alice-v0/popular"]) assert.equal(parseCreatorCollectionPath(path), null);
 });
 
@@ -27,6 +32,10 @@ test("parses safe page numbers and builds localized versioned canonical paths", 
   for (const raw of [undefined, "", "1"]) assert.deepEqual(parseCreatorPage(raw), { page: 1, valid: true });
   for (const raw of ["0", "-1", "1.2", "10001", "abc"]) assert.equal(parseCreatorPage(raw).valid, false);
   assert.equal(creatorCollectionPath("alice", 1, "photos"), "/alice/photos");
+  assert.equal(creatorCollectionPath("alice", 1, "overview"), "/alice");
+  assert.equal(creatorCollectionPath("alice", 1, "overview", "en"), "/en/alice");
+  assert.equal(creatorCollectionPath("alice", 1, "overview", "fr"), "/fr/alice");
+  assert.equal(creatorCollectionPath("alice", 3, "overview", "fr", 2), "/fr/alice-v3?page=2");
   assert.equal(creatorCollectionPath("alice", 3, "photos", "fr", 1), "/fr/alice-v3/photos");
   assert.equal(creatorCollectionPath("alice", 3, "photos", "en", 2), "/en/alice-v3/photos?page=2");
 });

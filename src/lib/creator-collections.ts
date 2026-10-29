@@ -1,4 +1,6 @@
 import type { Photo } from "./types";
+// @ts-expect-error Node’s native type stripping requires the explicit .ts suffix.
+import { isExistingTopLevelRoute } from "./seo-policy.ts";
 
 export type CreatorCollection = "overview" | "photos" | "videos" | "popular";
 export interface CreatorCollectionStats {
@@ -39,13 +41,18 @@ export function summarizeCreatorCollectionStats(media: readonly Pick<Photo, "typ
 export function parseCreatorCollectionPath(pathname: string): { handle: string; collection: CreatorCollection } | null {
   if (typeof pathname !== "string" || pathname.includes("?")) return null;
   const rawSegments = pathname.split("/").filter(Boolean);
-  if (rawSegments.length === 3 && (rawSegments[0] === "en" || rawSegments[0] === "fr")) rawSegments.shift();
-  if (rawSegments.length !== 2) return null;
+  let locale: string | null = null;
+  if (rawSegments[0] === "en" || rawSegments[0] === "fr") locale = rawSegments.shift() ?? null;
+  if (rawSegments.length !== 1 && rawSegments.length !== 2) return null;
   let handle: string;
   let segment: string;
-  try { handle = decodeURIComponent(rawSegments[0]); segment = decodeURIComponent(rawSegments[1]); } catch { return null; }
+  try {
+    handle = decodeURIComponent(rawSegments[0]);
+    segment = rawSegments.length === 2 ? decodeURIComponent(rawSegments[1]) : "overview";
+  } catch { return null; }
   if (!HANDLE.test(handle) || RESERVED.has(handle.toLowerCase()) || /-v0$/i.test(handle)) return null;
-  if (!COLLECTIONS.has(segment as CreatorCollection) || segment === "overview") return null;
+  if (isExistingTopLevelRoute(handle)) return null;
+  if (!COLLECTIONS.has(segment as CreatorCollection)) return null;
   return { handle, collection: segment as CreatorCollection };
 }
 
@@ -60,12 +67,13 @@ export function parseCreatorPage(raw: string | string[] | null | undefined): { p
 export function creatorCollectionPath(handle: string, urlVersion: number, collection: CreatorCollection, locale?: "en" | "fr", page?: number): string {
   const safeHandle = handle.trim();
   if (!HANDLE.test(safeHandle) || RESERVED.has(safeHandle.toLowerCase())) throw new TypeError("Invalid creator handle");
-  if (!COLLECTIONS.has(collection) || collection === "overview") throw new TypeError("Invalid collection");
+  if (!COLLECTIONS.has(collection)) throw new TypeError("Invalid collection");
   const version = Number.isInteger(urlVersion) && urlVersion > 1 ? urlVersion : 1;
   const versionedHandle = version > 1 ? `${safeHandle}-v${version}` : safeHandle;
   const prefix = locale === "en" || locale === "fr" ? `/${locale}` : "";
   const suffix = Number.isInteger(page) && (page as number) >= 2 ? `?page=${page}` : "";
-  return `${prefix}/${versionedHandle}/${collection}${suffix}`;
+  const collectionPath = collection === "overview" ? `/${versionedHandle}` : `/${versionedHandle}/${collection}`;
+  return `${prefix}${collectionPath}${suffix}`;
 }
 
 const COPY = {
