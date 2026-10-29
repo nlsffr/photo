@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chmod, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -122,14 +122,98 @@ exit 0
   assert.equal((afterFailure.match(/nginx -s reload/g) ?? []).length, 1);
 });
 
+test("the database URL is decoded but its host is overridden without leaking credentials", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "removed-media-db-"));
+  const modules = join(dir, "modules");
+  const mysqlPackage = join(modules, "mysql");
+  const output = join(dir, "removed-media-maps.conf");
+  const lock = join(dir, "refresh.lock");
+  const docker = join(dir, "docker");
+  const mysqlLog = join(dir, "mysql.json");
+
+  await mkdir(mysqlPackage, { recursive: true });
+  await writeFile(join(mysqlPackage, "__init__.py"), "", "utf8");
+  await writeFile(
+    join(mysqlPackage, "connector.py"),
+    `import json
+import os
+
+class Cursor:
+    def execute(self, query):
+        assert "removed_from_index_at IS NOT NULL" in query
+        assert "HEX(" not in query
+    def fetchall(self):
+        return [
+            ("creator", "pinkchyu", "/media/creators/pinkchyu/avatar.webp", None),
+            ("photo", "", "/media/removed-from-db.webp", None),
+        ]
+    def close(self):
+        pass
+
+class Connection:
+    def cursor(self):
+        return Cursor()
+    def close(self):
+        pass
+
+def connect(**kwargs):
+    assert kwargs["host"] == "127.0.0.1"
+    assert kwargs["port"] == 3307
+    assert kwargs["user"] == "db-user"
+    assert kwargs["password"] == "p@ss"
+    assert kwargs["database"] == "leakfanhub"
+    with open(os.environ["FAKE_MYSQL_LOG"], "w", encoding="utf-8") as stream:
+        json.dump({
+            "host": kwargs["host"],
+            "port": kwargs["port"],
+            "user": kwargs["user"],
+            "database": kwargs["database"],
+            "passwordPresent": bool(kwargs["password"]),
+        }, stream)
+    return Connection()
+`,
+    "utf8",
+  );
+  await writeFile(docker, "#!/bin/sh\nexit 0\n", "utf8");
+  await chmod(docker, 0o755);
+
+  const result = refresh(
+    [
+      "--output", output,
+      "--lock-file", lock,
+      "--docker-bin", docker,
+      "--database-host", "127.0.0.1",
+      "--database-port", "3307",
+    ],
+    {
+      PYTHONPATH: modules,
+      DATABASE_URL: "mysql://db%2Duser:p%40ss@db-internal:3306/leakfanhub?charset=utf8mb4",
+      FAKE_MYSQL_LOG: mysqlLog,
+    },
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(await readFile(output, "utf8"), /"pinkchyu" 1;/);
+  assert.match(await readFile(output, "utf8"), /"\/media\/removed-from-db\.webp" 1;/);
+  assert.deepEqual(JSON.parse(await readFile(mysqlLog, "utf8")), {
+    host: "127.0.0.1",
+    port: 3307,
+    user: "db-user",
+    database: "leakfanhub",
+    passwordPresent: true,
+  });
+  assert.doesNotMatch(`${result.stdout}\n${result.stderr}`, /p%40ss|p@ss|db-internal|db-user/);
+});
+
 test("nginx, systemd, and the runbook wire the generated guard without touching bots", async () => {
-  const [nginx, service, timer, runbook, baseline] = await Promise.all(
+  const [nginx, service, timer, runbook, baseline, requirements] = await Promise.all(
     [
       "../infra/nginx/nginx.conf",
       "../infra/systemd/leakfanhub-media-tombstones.service",
       "../infra/systemd/leakfanhub-media-tombstones.timer",
       "../docs/REMOVED-MEDIA-GUARD.md",
       "../infra/nginx/generated/removed-media-maps.conf",
+      "../ops/requirements-media-tombstones.txt",
     ].map((path) => readFile(new URL(path, import.meta.url), "utf8")),
   );
 
@@ -139,6 +223,11 @@ test("nginx, systemd, and the runbook wire the generated guard without touching 
   assert.ok((nginx.match(/\$media_cache_control always/g) ?? []).length >= 2);
   assert.match(service, /refresh-removed-media-map\.py/);
   assert.match(service, /\/opt\/photo\/infra\/nginx\/generated/);
+  assert.match(service, /EnvironmentFile=-\/opt\/photo\/\.env/);
+  assert.match(service, /EnvironmentFile=-\/opt\/photo\/\.env\.prod/);
+  assert.match(service, /--database-host 127\.0\.0\.1/);
+  assert.match(service, /RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6/);
+  assert.doesNotMatch(service, /database-container|MARIADB_ROOT_PASSWORD/);
   assert.match(timer, /OnUnitActiveSec=1min/);
   assert.match(runbook, /photo-edge-1/);
   assert.match(runbook, /docker inspect/);
@@ -148,4 +237,5 @@ test("nginx, systemd, and the runbook wire the generated guard without touching 
   assert.match(runbook, /API de purge/i);
   assert.doesNotMatch(service + timer + runbook, /megabot.*(stop|disable|delete)/i);
   assert.match(baseline, /default 0;/);
+  assert.match(requirements, /mysql-connector-python/);
 });

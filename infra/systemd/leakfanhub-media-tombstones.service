@@ -5,7 +5,9 @@ Requires=docker.service
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/python3 /opt/photo/ops/refresh-removed-media-map.py --output /opt/photo/infra/nginx/generated/removed-media-maps.conf --docker-bin /usr/bin/docker --edge-container photo-edge-1 --database-container photo-mariadb-1
+EnvironmentFile=-/opt/photo/.env
+EnvironmentFile=-/opt/photo/.env.prod
+ExecStart=/usr/bin/python3 /opt/photo/ops/refresh-removed-media-map.py --output /opt/photo/infra/nginx/generated/removed-media-maps.conf --docker-bin /usr/bin/docker --edge-container photo-edge-1 --database-host 127.0.0.1
 TimeoutStartSec=90s
 UMask=0027
 NoNewPrivileges=true
@@ -17,7 +19,7 @@ ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
 RestrictSUIDSGID=true
-RestrictAddressFamilies=AF_UNIX
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 
 [Install]
 WantedBy=multi-user.target

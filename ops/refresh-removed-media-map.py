@@ -25,13 +25,13 @@ from urllib.parse import unquote, urlsplit
 SAFE_HANDLE = re.compile(r"^[A-Za-z0-9_.-]{1,100}$")
 SAFE_DATABASE = re.compile(r"^[A-Za-z0-9_]{1,64}$")
 CREATOR_QUERY = """
-SELECT 'creator', HEX(c.handle), IFNULL(HEX(c.avatar_url), ''),
-       IFNULL(HEX(c.cover_url), '')
+SELECT 'creator', c.handle, COALESCE(c.avatar_url, ''),
+       COALESCE(c.cover_url, '')
 FROM creators c
 WHERE c.removed_from_index_at IS NOT NULL
 UNION ALL
-SELECT 'photo', '', IFNULL(HEX(p.image_url), ''),
-       IFNULL(HEX(p.video_url), '')
+SELECT 'photo', '', COALESCE(p.image_url, ''),
+       COALESCE(p.video_url, '')
 FROM photos p
 JOIN creators c ON c.id = p.creator_id
 WHERE p.removed_from_index_at IS NOT NULL
@@ -40,12 +40,6 @@ WHERE p.removed_from_index_at IS NOT NULL
      AND c.handle NOT REGEXP '^[A-Za-z0-9_.-]{1,100}$'
    )
 """.strip()
-
-
-def _decode_hex(raw: str) -> str:
-    if not raw:
-        return ""
-    return bytes.fromhex(raw).decode("utf-8")
 
 
 def _media_paths(value: Any, allowed_hosts: set[str]) -> set[str]:
@@ -105,56 +99,76 @@ def _fixture_tombstones(
 
 
 def _database_tombstones(
-    docker_bin: str,
-    edge_database_container: str,
-    database: str,
+    database_url: str,
+    database_host: str,
+    database_port: int | None,
     allowed_hosts: set[str],
 ) -> tuple[set[str], set[str]]:
-    if not SAFE_DATABASE.fullmatch(database):
-        raise ValueError("invalid MEDIA_TOMBSTONE_DATABASE identifier")
+    try:
+        import mysql.connector  # type: ignore[import-untyped]
+    except ImportError as error:
+        raise RuntimeError("mysql-connector-python is required") from error
 
-    client = (
-        'test -n "$MARIADB_ROOT_PASSWORD" || exit 70; '
-        'exec mariadb --protocol=socket --user=root '
-        '--password="$MARIADB_ROOT_PASSWORD" --batch --skip-column-names '
-        '"$MEDIA_TOMBSTONE_DATABASE" --execute="$MEDIA_TOMBSTONE_QUERY"'
-    )
-    command = [
-        docker_bin,
-        "exec",
-        "-e",
-        f"MEDIA_TOMBSTONE_DATABASE={database}",
-        "-e",
-        f"MEDIA_TOMBSTONE_QUERY={CREATOR_QUERY}",
-        edge_database_container,
-        "sh",
-        "-c",
-        client,
-    ]
-    result = subprocess.run(
-        command,
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=45,
-    )
-    if result.returncode != 0:
-        detail = result.stderr.strip().splitlines()[-1:] or ["database query failed"]
-        raise RuntimeError(detail[0])
+    try:
+        parsed = urlsplit(database_url)
+        if parsed.scheme.lower() not in {"mysql", "mariadb"}:
+            raise ValueError
+        if parsed.username is None or parsed.password is None:
+            raise ValueError
+        database = unquote(parsed.path.lstrip("/"))
+        if not SAFE_DATABASE.fullmatch(database):
+            raise ValueError
+        port = database_port if database_port is not None else (parsed.port or 3306)
+        if not database_host or not 1 <= port <= 65535:
+            raise ValueError
+        config = {
+            "host": database_host,
+            "port": port,
+            "user": unquote(parsed.username),
+            "password": unquote(parsed.password),
+            "database": database,
+            "connection_timeout": 15,
+        }
+    except (TypeError, ValueError) as error:
+        raise RuntimeError("DATABASE_URL is invalid") from error
+
+    connection = None
+    cursor = None
+    try:
+        connection = mysql.connector.connect(**config)
+        cursor = connection.cursor()
+        cursor.execute(CREATOR_QUERY)
+        rows = cursor.fetchall()
+    except Exception:
+        # Connector exceptions may contain endpoint/user details. Keep the
+        # service log deliberately generic and never echo DATABASE_URL.
+        raise RuntimeError("database connection or query failed") from None
+    finally:
+        if cursor is not None:
+            try:
+                cursor.close()
+            except Exception:
+                pass
+        if connection is not None:
+            try:
+                connection.close()
+            except Exception:
+                pass
 
     handles: set[str] = set()
     paths: set[str] = set()
-    for line in result.stdout.splitlines():
-        columns = line.split("\t")
-        if len(columns) != 4:
+    for row in rows:
+        if len(row) != 4:
             raise RuntimeError("unexpected database response shape")
-        kind, handle_hex, first_hex, second_hex = columns
         try:
-            handle = _decode_hex(handle_hex)
-            first = _decode_hex(first_hex)
-            second = _decode_hex(second_hex)
-        except (UnicodeDecodeError, ValueError) as error:
-            raise RuntimeError("invalid encoded database response") from error
+            kind, handle, first, second = (
+                value.decode("utf-8") if isinstance(value, bytes) else value or ""
+                for value in row
+            )
+        except UnicodeDecodeError as error:
+            raise RuntimeError("invalid database response encoding") from error
+        if not all(isinstance(value, str) for value in (kind, handle, first, second)):
+            raise RuntimeError("unexpected database response type")
         if kind == "creator" and SAFE_HANDLE.fullmatch(handle):
             handles.add(handle.lower())
         paths.update(_media_paths(first, allowed_hosts))
@@ -281,10 +295,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument("--docker-bin", default="/usr/bin/docker")
     parser.add_argument("--edge-container", default="photo-edge-1")
-    parser.add_argument("--database-container", default="photo-mariadb-1")
     parser.add_argument(
-        "--database", default=os.environ.get("MEDIA_TOMBSTONE_DATABASE", "leakfanhub")
+        "--database-host",
+        default=os.environ.get("MEDIA_TOMBSTONE_DB_HOST", "127.0.0.1"),
     )
+    parser.add_argument("--database-port", type=int)
     parser.add_argument("--allowed-host", action="append", default=[])
     return parser.parse_args(argv)
 
@@ -310,10 +325,19 @@ def main(argv: list[str] | None = None) -> int:
             payload = json.loads(args.fixture.read_text("utf-8"))
             handles, paths = _fixture_tombstones(payload, allowed_hosts)
         else:
+            database_url = os.environ.get("DATABASE_URL", "")
+            if not database_url:
+                raise RuntimeError("DATABASE_URL is required")
+            database_port = args.database_port
+            if database_port is None and os.environ.get("MEDIA_TOMBSTONE_DB_PORT"):
+                try:
+                    database_port = int(os.environ["MEDIA_TOMBSTONE_DB_PORT"])
+                except ValueError as error:
+                    raise RuntimeError("MEDIA_TOMBSTONE_DB_PORT is invalid") from error
             handles, paths = _database_tombstones(
-                args.docker_bin,
-                args.database_container,
-                args.database,
+                database_url,
+                args.database_host,
+                database_port,
                 allowed_hosts,
             )
 

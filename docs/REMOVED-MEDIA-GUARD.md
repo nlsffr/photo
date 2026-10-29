@@ -23,6 +23,8 @@ docker inspect --format '{{json .HostConfig}}' photo-edge-1
 docker inspect --format '{{json .Config}}' photo-edge-1
 cp -a /tmp/nginx-edge.conf /opt/photo/infra/nginx/default.conf
 install -m 0750 ops/refresh-removed-media-map.py /opt/photo/ops/refresh-removed-media-map.py
+install -m 0644 ops/requirements-media-tombstones.txt \
+  /opt/photo/ops/requirements-media-tombstones.txt
 install -m 0640 infra/nginx/generated/removed-media-maps.conf \
   /opt/photo/infra/nginx/generated/removed-media-maps.conf
 ```
@@ -75,7 +77,18 @@ The generator validates the candidate inside the real edge container and only
 then reloads it. A failed database query, `nginx -t`, or reload restores the
 previous file atomically.
 
+It reads `DATABASE_URL` from `/opt/photo/.env` and then
+`/opt/photo/.env.prod` (the latter wins when both define it). Credentials and
+the database name are parsed from that URL, but its hostname is deliberately
+ignored: the service forces `127.0.0.1`, which is the working host-side
+MariaDB endpoint. `MEDIA_TOMBSTONE_DB_HOST` can override the script default,
+and `MEDIA_TOMBSTONE_DB_PORT` or the URL port selects the TCP port. Neither the
+URL nor connector errors containing account details are written to logs.
+
 ```bash
+python3 -c 'import mysql.connector'
+# Only when the import above is missing:
+python3 -m pip install --requirement /opt/photo/ops/requirements-media-tombstones.txt
 install -m 0644 infra/systemd/leakfanhub-media-tombstones.service /etc/systemd/system/
 install -m 0644 infra/systemd/leakfanhub-media-tombstones.timer /etc/systemd/system/
 systemctl daemon-reload
@@ -85,10 +98,9 @@ systemctl status leakfanhub-media-tombstones.service --no-pager
 systemctl list-timers leakfanhub-media-tombstones.timer --no-pager
 ```
 
-The default database is `leakfanhub`. Override it with
-`MEDIA_TOMBSTONE_DATABASE` in a systemd drop-in if production uses another
-schema name. The root password stays inside the MariaDB container; it is never
-copied to the map, command output, or repository.
+The systemd unit permits Unix sockets for Docker plus IPv4/IPv6 for the direct
+MariaDB connection. No database password is copied to the map, process
+arguments, command output, or repository.
 
 ## DDoS-Guard cache limitation
 
