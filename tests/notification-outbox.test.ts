@@ -114,6 +114,9 @@ test("historical contact backfill is idempotent and bounded for Telegram", async
 
   assert.match(sql, /INSERT IGNORE INTO notification_outbox/);
   assert.match(sql, /existing\.event_type = 'contact\.created'/);
-  assert.match(sql, /existing\.aggregate_id = message\.id/);
+  assert.match(
+    sql,
+    /BINARY existing\.aggregate_id = BINARY message\.id/,
+  );
   assert.match(sql, /LEFT\([\s\S]*4000[\s\S]*\)/);
 });

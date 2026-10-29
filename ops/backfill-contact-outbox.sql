@@ -37,6 +37,6 @@ SELECT
 FROM contact_messages message
 LEFT JOIN notification_outbox existing
   ON existing.event_type = 'contact.created'
- AND existing.aggregate_id = message.id
+ AND BINARY existing.aggregate_id = BINARY message.id
  AND existing.destination = 'telegram_admin'
 WHERE existing.id IS NULL;
