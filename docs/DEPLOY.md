@@ -204,6 +204,32 @@ Rollback is reversible: stop and disable both units, then roll back the app
 image. Migration 017 is additive and may remain in place; pending orders expire
 after 30 minutes and no existing credentials are changed.
 
+### Search Console report and canonical sitemap
+
+Reuse the existing service-account file; this rollout does not create, replace,
+print, or rotate a Google credential. The script requests only a Search Console
+OAuth scope: read-only for reports, or read/write only when `--submit-sitemap`
+is explicitly supplied.
+
+```bash
+python3 -m pip install -r scripts/requirements-search-console.txt
+python3 scripts/search-console-report.py \
+  --key-file /opt/photo/dmca/gsc_key.json \
+  --inspect-url https://leakfanhub.com/ \
+  --inspect-url https://leakfanhub.com/models
+
+# After the public /sitemap.xml smoke check succeeds:
+python3 scripts/search-console-report.py \
+  --key-file /opt/photo/dmca/gsc_key.json \
+  --sitemap https://leakfanhub.com/sitemap.xml \
+  --submit-sitemap
+```
+
+Output is a bounded summary of properties, Search Analytics totals, and URL
+Inspection verdicts. It never emits the OAuth token, private key, or raw API
+responses. Search Console accepts a full sitemap URL through `sitemaps.submit`:
+https://developers.google.com/webmaster-tools/v1/sitemaps/submit
+
 ## Local development
 
 ```bash
