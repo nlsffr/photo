@@ -713,19 +713,18 @@ export class MariaDBProvider implements DataProvider {
   async getRankings(limit = 20) {
     const lim = Math.min(Math.max(Number(limit) || 20, 1), 100);
     const rows = await this.q<RowDataPacket>(
-      `SELECT c.handle, c.name, c.avatar_url, c.bio, c.location, c.followers_count, c.verified,
+      `SET STATEMENT max_statement_time=5 FOR
+       SELECT c.handle, c.name, c.avatar_url, c.bio, c.location, c.followers_count, c.verified,
               COALESCE(c.url_version, 1) AS url_version, c.updated_at, c.removed_from_index_at,
-              COALESCE(SUM(p.views_count), 0) AS views,
-              COALESCE(SUM(p.likes_count), 0) AS likes,
-              (COALESCE(c.followers_count,0) * 10
-                + COALESCE(SUM(p.views_count), 0)
-                + COALESCE(SUM(p.likes_count), 0) * 5) AS score
+              COALESCE(stats.total_views, 0) AS views,
+              COALESCE(stats.total_likes, 0) AS likes,
+              (COALESCE(c.followers_count, 0) * 10
+                + COALESCE(stats.total_views, 0)
+                + COALESCE(stats.total_likes, 0) * 5) AS score
        FROM creators c
-       LEFT JOIN photos p ON p.creator_id = c.id
-                         AND p.removed_from_index_at IS NULL
+       LEFT JOIN creator_media_stats stats ON stats.creator_id = c.id
        WHERE ${activeCreatorSql("c")}
-       GROUP BY c.id
-       HAVING COUNT(p.id) > 0 OR COALESCE(c.followers_count,0) > 0
+         AND (COALESCE(stats.photo_count, 0) > 0 OR COALESCE(c.followers_count, 0) > 0)
        ORDER BY score DESC, c.followers_count DESC
        LIMIT ${lim}`,
     );
