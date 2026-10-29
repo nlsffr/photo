@@ -98,12 +98,16 @@ function discoveryArm(
 }
 
 function discoveryCandidatesSql(filters: DiscoveryFilters): string {
+  const sparseType = filters.type === "pack";
+  const viewsIndex = sparseType ? "idx_type" : "idx_photos_source_views_id";
+  const likesIndex = sparseType ? "idx_type" : "idx_photos_source_likes_id";
+  const recentIndex = sparseType ? "idx_type" : "idx_photos_created_id";
   return `FROM (
-  ${discoveryArm("pv", "cv", "idx_photos_source_views_id", "pv.source_views_count DESC, pv.id ASC", filters)}
+  ${discoveryArm("pv", "cv", viewsIndex, "pv.source_views_count DESC, pv.id ASC", filters)}
   UNION DISTINCT
-  ${discoveryArm("pl", "cl", "idx_photos_source_likes_id", "pl.source_likes_count DESC, pl.id ASC", filters)}
+  ${discoveryArm("pl", "cl", likesIndex, "pl.source_likes_count DESC, pl.id ASC", filters)}
   UNION DISTINCT
-  ${discoveryArm("pr", "cr", "idx_photos_created_id", "pr.created_at DESC, pr.id ASC", filters)}
+  ${discoveryArm("pr", "cr", recentIndex, "pr.created_at DESC, pr.id ASC", filters)}
 ) candidates
 STRAIGHT_JOIN photos p ON p.id = candidates.id
 STRAIGHT_JOIN creators c ON c.id = p.creator_id`;

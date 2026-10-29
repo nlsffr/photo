@@ -131,6 +131,23 @@ test("discovery applies every active filter inside each bounded candidate arm", 
   assert.match(provider, /activeMediaSql\("p", "c"\)/);
 });
 
+test("empty or sparse pack discovery starts from the type index", async () => {
+  const { buildPhotoListPlan } = await loadQueryPlan();
+  const plan = buildPhotoListPlan({
+    sort: "discover",
+    discoveryFilters: { type: "pack" },
+  });
+
+  assert.equal(
+    (plan.fromSql.match(/FORCE INDEX \(idx_type\)/g) ?? []).length,
+    3,
+  );
+  assert.doesNotMatch(plan.fromSql, /idx_photos_source_(views|likes)_id/);
+  assert.doesNotMatch(plan.fromSql, /idx_photos_created_id/);
+  assert.equal((plan.fromSql.match(/\.type = :type/g) ?? []).length, 3);
+  assert.equal(plan.params.type, "pack");
+});
+
 test("text search ranks a bounded candidate set including matching creators", async () => {
   const { buildPhotoListPlan } = await loadQueryPlan();
   const plan = buildPhotoListPlan({
