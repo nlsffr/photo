@@ -1,4 +1,46 @@
 export const enDictionary = {
+  creator: {
+    collections: {
+      overview: {
+        title: "Photos and videos by {name}",
+        description: "Browse public photos and videos by {name}."
+      },
+      photos: {
+        title: "Photos by {name}",
+        description: "Browse public photos shared by {name}."
+      },
+      videos: {
+        title: "Videos by {name}",
+        description: "Browse public videos shared by {name}."
+      },
+      popular: {
+        title: "Popular media by {name}",
+        description: "Browse popular public media shared by {name}."
+      }
+    },
+    tabs: {
+      overview: "All",
+      photos: "Photos",
+      videos: "Videos",
+      popular: "Popular"
+    },
+    home: "Home",
+    models: "Models",
+    back: "Back",
+    followers: "followers",
+    media: "media",
+    views: "views",
+    previousPage: "Previous page",
+    nextPage: "Next page",
+    page: "Page",
+    collectionsLabel: "Collections",
+    paginationLabel: "Pagination",
+    verified: "Verified",
+    follow: {
+      follow: "Follow",
+      following: "Following"
+    }
+  },
   shell: {
     language: "Language",
     menu: "Menu",

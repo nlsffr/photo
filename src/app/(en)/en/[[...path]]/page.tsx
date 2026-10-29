@@ -9,9 +9,9 @@ function pathnameFrom(parts?: string[]): string {
   return parts?.length ? `/${parts.join("/")}` : "/";
 }
 
-export async function generateMetadata({ params }: Props) {
+export async function generateMetadata({ params, searchParams }: Props) {
   const { path } = await params;
-  return localizedPageMetadata("en", pathnameFrom(path));
+  return localizedPageMetadata("en", pathnameFrom(path), searchParams);
 }
 
 export default async function EnglishPage({ params, searchParams }: Props) {

@@ -1,3 +1,6 @@
+// @ts-expect-error Node’s native type stripping requires the explicit .ts suffix.
+import { parseCreatorCollectionPath } from "../creator-collections.ts";
+
 export const LOCALES = ["en", "fr"] as const;
 export type Locale = (typeof LOCALES)[number];
 
@@ -6,8 +9,8 @@ export const LOCALE_COOKIE = "lfh_locale";
 
 /**
  * Routes whose shell and primary content are available in both languages.
- * Creator, media and tag pages intentionally stay unprefixed until their
- * primary database content can be localized without creating thin duplicates.
+ * Exact static routes only; creator collections are dispatched separately.
+ * Media and tag pages stay unprefixed.
  */
 export const LOCALIZED_ROUTE_PATHS = [
   "/",
@@ -41,6 +44,17 @@ export const LOCALIZED_ROUTE_PATHS = [
 ] as const;
 
 const LOCALIZED_ROUTES = new Set<string>(LOCALIZED_ROUTE_PATHS);
+/** Static routes always win, and localized media details are never dispatched. */
+export function resolveLocalizedPage(locale: Locale, pathname: string) {
+  if (!isLocale(locale)) return null;
+  if (LOCALIZED_ROUTES.has(pathname)) return { kind: "static" as const, pathname };
+  if (!/^\/[^/]+(?:\/(?:photos|videos|popular))?$/.test(pathname)) return null;
+  // This input is already unprefixed; prevent a second locale from being parsed.
+  if (/^\/(?:en|fr)(?:\/|$)/.test(pathname)) return null;
+  const creator = parseCreatorCollectionPath(pathname);
+  return creator ? { kind: "creator" as const, ...creator } : null;
+}
+
 const SYSTEM_PREFIXES = [
   "/api",
   "/_next",

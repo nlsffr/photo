@@ -1,5 +1,7 @@
 import type { Photo } from "./types";
 // @ts-expect-error Node’s native type stripping requires the explicit .ts suffix.
+import { getDictionary } from "./i18n/dictionaries.ts";
+// @ts-expect-error Node’s native type stripping requires the explicit .ts suffix.
 import { isExistingTopLevelRoute } from "./seo-policy.ts";
 
 export type CreatorCollection = "overview" | "photos" | "videos" | "popular";
@@ -76,23 +78,9 @@ export function creatorCollectionPath(handle: string, urlVersion: number, collec
   return `${prefix}${collectionPath}${suffix}`;
 }
 
-const COPY = {
-  en: {
-    overview: { title: "Photos and videos by {name}", description: "Browse public photos and videos by {name}." },
-    photos: { title: "Photos by {name}", description: "Browse public photos shared by {name}." },
-    videos: { title: "Videos by {name}", description: "Browse public videos shared by {name}." },
-    popular: { title: "Popular media by {name}", description: "Browse popular public media shared by {name}." },
-  },
-  fr: {
-    overview: { title: "Photos et vidéos de {name}", description: "Parcourez les photos et vidéos publiques de {name}." },
-    photos: { title: "Photos de {name}", description: "Parcourez les photos publiques partagées par {name}." },
-    videos: { title: "Vidéos de {name}", description: "Parcourez les vidéos publiques partagées par {name}." },
-    popular: { title: "Médias populaires de {name}", description: "Parcourez les médias publics populaires partagés par {name}." },
-  },
-} as const;
 export function creatorCollectionCopy(locale: "en" | "fr", collection: CreatorCollection, name: string) {
-  const copy = COPY[locale][collection];
-  return { title: copy.title.replace("{name}", name), description: copy.description.replace("{name}", name) };
+  const copy = getDictionary(locale).creator.collections[collection];
+  return { title: copy.title.replace("{name}", () => name), description: copy.description.replace("{name}", () => name) };
 }
 export function creatorCollectionMetadata(handle: string, collection: CreatorCollection, locale: "en" | "fr" = "en") {
   const copy = creatorCollectionCopy(locale, collection, handle);

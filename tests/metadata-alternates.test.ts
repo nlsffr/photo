@@ -52,3 +52,19 @@ test("the two server dictionaries translate primary UI and indexable metadata", 
   assert.notEqual(en.pages.models.meta.description, fr.pages.models.meta.description);
   assert.notEqual(en.pages.terms.meta.title, fr.pages.terms.meta.title);
 });
+
+test("unprefixed creator metadata completes reciprocal alternates without dropping the numbered page", async () => {
+  // @ts-expect-error Native Node requires explicit suffixes.
+  const { loadAppModule } = await import("./helpers/load-app-module.ts");
+  const replacements: Record<string, unknown> = {
+    "@/lib/photos": { getCreatorCollectionContext: async () => ({ creator: { handle: "aria", name: "Aria", urlVersion: 3 }, stats: { mediaCount: 100, photoCount: 70, videoCount: 30, engagedCount: 10 } }) },
+  };
+  for (const [file, name] of [["InfiniteGallery", "InfiniteGallery"], ["VerifiedBadge", "VerifiedBadge"], ["Interactions", "FollowButton"], ["MediaImg", "MediaImg"], ["BackLink", "BackLink"], ["FloatingBack", "FloatingBack"], ["JsonLd", "JsonLd"]]) replacements[`@/components/${file}`] = { [name]: () => null };
+  const renderer = loadAppModule<{ creatorCollectionMetadata: (props: Record<string, unknown>) => Promise<import("next").Metadata> }>("src/features/creator/CreatorCollectionPage.tsx", replacements);
+  for (const collection of ["overview", "photos", "videos", "popular"]) for (const page of [1, 2]) {
+    const path = `/aria-v3${collection === "overview" ? "" : `/${collection}`}${page > 1 ? `?page=${page}` : ""}`;
+    const metadata = await renderer.creatorCollectionMetadata({ handleParam: "aria-v3", collection, searchParams: { page: String(page) } });
+    assert.equal(metadata.alternates?.canonical, path);
+    assert.deepEqual(metadata.alternates?.languages, { en: `/en${path}`, fr: `/fr${path}`, "x-default": path });
+  }
+});

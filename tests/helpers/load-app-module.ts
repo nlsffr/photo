@@ -1,4 +1,4 @@
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import ts from "typescript";
@@ -36,7 +36,7 @@ export function loadAppModule<T>(
           : null;
       if (!base) return nativeRequire(specifier);
       const resolved = [base, `${base}.ts`, `${base}.tsx`].find((candidate) =>
-        existsSync(candidate),
+        existsSync(candidate) && statSync(candidate).isFile(),
       );
       if (!resolved) throw new Error(`Module not found: ${base}`);
       return load(resolved);

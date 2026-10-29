@@ -234,9 +234,11 @@ export function useInteractions(): Ctx {
 export function FollowButton({
   handle,
   className = "",
+  labels = { follow: "Suivre", following: "Suivi·e" },
 }: {
   handle: string;
   className?: string;
+  labels?: { follow: string; following: string };
 }) {
   const { isFollowing, toggleFollow, ready } = useInteractions();
   const following = ready && isFollowing(handle);
@@ -251,7 +253,7 @@ export function FollowButton({
           : "bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-600)]"
       } ${className}`}
     >
-      {following ? "Suivi·e" : "Suivre"}
+      {following ? labels.following : labels.follow}
     </button>
   );
 }

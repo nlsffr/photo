@@ -1,6 +1,48 @@
 import type { Dictionary } from "./en.ts";
 
 export const frDictionary = {
+  creator: {
+    collections: {
+      overview: {
+        title: "Photos et vidéos de {name}",
+        description: "Parcourez les photos et vidéos publiques de {name}."
+      },
+      photos: {
+        title: "Photos de {name}",
+        description: "Parcourez les photos publiques partagées par {name}."
+      },
+      videos: {
+        title: "Vidéos de {name}",
+        description: "Parcourez les vidéos publiques partagées par {name}."
+      },
+      popular: {
+        title: "Médias populaires de {name}",
+        description: "Parcourez les médias publics populaires partagés par {name}."
+      }
+    },
+    tabs: {
+      overview: "Tout",
+      photos: "Photos",
+      videos: "Vidéos",
+      popular: "Populaires"
+    },
+    home: "Accueil",
+    models: "Créateurs",
+    back: "Retour",
+    followers: "abonnés",
+    media: "médias",
+    views: "vues",
+    previousPage: "Page précédente",
+    nextPage: "Page suivante",
+    page: "Page",
+    collectionsLabel: "Collections",
+    paginationLabel: "Pagination",
+    verified: "Vérifié",
+    follow: {
+      follow: "Suivre",
+      following: "Suivi·e"
+    }
+  },
   shell: {
     language: "Langue",
     menu: "Menu",

@@ -20,6 +20,8 @@ import {
 } from "@/lib/seo-policy";
 import { isRemovedContent } from "@/lib/public-content-policy";
 import type { Locale } from "@/lib/i18n/config";
+import { getDictionary } from "@/lib/i18n/dictionaries";
+import { creatorCollectionAlternates } from "@/lib/i18n/metadata";
 import { InfiniteGallery } from "@/components/InfiniteGallery";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { FollowButton } from "@/components/Interactions";
@@ -134,12 +136,19 @@ export async function creatorCollectionMetadata(
     props.collection,
     creator.name,
   );
-  const title = `${copy.title}${pagination.page > 1 ? ` — Page ${pagination.page}` : ""} — LeakFanHub`;
+  const ui = getDictionary(props.locale ?? "en").creator;
+  const title = `${copy.title}${pagination.page > 1 ? ` — ${ui.page} ${pagination.page}` : ""} — LeakFanHub`;
   const image = absUrl(creator.avatarUrl);
   return {
     title: { absolute: title },
     description: copy.description,
-    alternates: { canonical: path },
+    alternates: creatorCollectionAlternates(
+      creator.handle,
+      creator.urlVersion ?? 1,
+      props.collection,
+      props.locale,
+      pagination.page,
+    ),
     robots: {
       index:
         pagination.valid &&
@@ -150,6 +159,8 @@ export async function creatorCollectionMetadata(
     },
     openGraph: {
       type: "profile",
+      locale: props.locale === "fr" ? "fr_FR" : "en_US",
+      alternateLocale: props.locale === "fr" ? ["en_US"] : ["fr_FR"],
       title,
       description: copy.description,
       url: `${SITE}${path}`,
@@ -169,7 +180,7 @@ export async function CreatorCollectionPage(props: CreatorCollectionPageProps) {
   const { locale, collection, searchParams } = props;
   const { creator, stats, pagination, path } = await loadCollection(props);
   const language = locale ?? "en";
-  const fr = language === "fr";
+  const ui = getDictionary(language).creator;
   const handle = creator.handle;
   const copy = creatorCollectionCopy(language, collection, creator.name);
   const sortRaw = first(searchParams.sort);
@@ -251,19 +262,7 @@ export async function CreatorCollectionPage(props: CreatorCollectionPageProps) {
     ? cursorHref(page.nextCursor ?? cursor + PAGE_SIZE)
     : numberedHref(numberedPage + 1);
   const tabs = COLLECTIONS.filter((item) => collectionIsEligible(item, stats));
-  const labels = fr
-    ? {
-        overview: "Tout",
-        photos: "Photos",
-        videos: "Vidéos",
-        popular: "Populaires",
-      }
-    : {
-        overview: "All",
-        photos: "Photos",
-        videos: "Videos",
-        popular: "Popular",
-      };
+  const labels = ui.tabs;
   const personLd = {
     "@context": "https://schema.org",
     "@type": "Person",
@@ -285,13 +284,13 @@ export async function CreatorCollectionPage(props: CreatorCollectionPageProps) {
       {
         "@type": "ListItem",
         position: 1,
-        name: fr ? "Accueil" : "Home",
+        name: ui.home,
         item: `${SITE}${locale ? `/${locale}` : ""}`,
       },
       {
         "@type": "ListItem",
         position: 2,
-        name: fr ? "Créateurs" : "Models",
+        name: ui.models,
         item: `${SITE}${locale ? `/${locale}` : ""}/models`,
       },
       {
@@ -317,12 +316,12 @@ export async function CreatorCollectionPage(props: CreatorCollectionPageProps) {
       <JsonLd data={[personLd, breadcrumbLd]} />
       <FloatingBack
         fallback={locale ? `/${locale}` : "/"}
-        label={fr ? "Retour" : "Back"}
+        label={ui.back}
       />
       <div className="px-3 pt-3 sm:px-5">
         <BackLink
           fallback={locale ? `/${locale}` : "/"}
-          label={fr ? "Retour" : "Back"}
+          label={ui.back}
         />
       </div>
       <div className="px-3 pt-4 sm:px-5">
@@ -343,11 +342,11 @@ export async function CreatorCollectionPage(props: CreatorCollectionPageProps) {
           <div className="min-w-0 flex-1">
             <h1 className="flex flex-wrap items-center gap-1.5 text-lg font-bold sm:text-2xl">
               <span>{copy.title}</span>
-              {creator.verified && <VerifiedBadge size={16} />}
+              {creator.verified && <VerifiedBadge size={16} label={ui.verified} />}
             </h1>
             <p className="text-sm text-[var(--color-ink-faint)]">@{handle}</p>
           </div>
-          <FollowButton handle={handle} className="shrink-0" />
+          <FollowButton handle={handle} labels={ui.follow} className="shrink-0" />
         </div>
         {creator.bio && (
           <p className="mt-3 line-clamp-3 text-sm text-[var(--color-ink-muted)]">
@@ -361,24 +360,24 @@ export async function CreatorCollectionPage(props: CreatorCollectionPageProps) {
           <span>
             <strong>{formatCount(creator.followers)}</strong>{" "}
             <span className="text-[var(--color-ink-faint)]">
-              {fr ? "abonnés" : "followers"}
+              {ui.followers}
             </span>
           </span>
           <span>
             <strong>{stats.mediaCount}</strong>{" "}
             <span className="text-[var(--color-ink-faint)]">
-              {fr ? "médias" : "media"}
+              {ui.media}
             </span>
           </span>
           <span>
             <strong>{formatCount(stats.totalViews)}</strong>{" "}
             <span className="text-[var(--color-ink-faint)]">
-              {fr ? "vues" : "views"}
+              {ui.views}
             </span>
           </span>
         </div>
         <nav
-          aria-label="Collections"
+          aria-label={ui.collectionsLabel}
           className="no-scrollbar mt-4 flex gap-2 overflow-x-auto border-b border-[var(--color-border)] pb-3"
         >
           {tabs.map((item) => (
@@ -406,11 +405,11 @@ export async function CreatorCollectionPage(props: CreatorCollectionPageProps) {
           />
           <nav
             className="mt-8 flex justify-center gap-4"
-            aria-label="Pagination"
+            aria-label={ui.paginationLabel}
           >
             {pagination.valid && numberedPage > 1 && (
               <Link rel="prev" href={previousHref}>
-                {fr ? "Page précédente" : "Previous page"} {numberedPage - 1}
+                {ui.previousPage} {numberedPage - 1}
               </Link>
             )}
             {pagination.valid &&
@@ -421,7 +420,7 @@ export async function CreatorCollectionPage(props: CreatorCollectionPageProps) {
                   href={nextHref}
                   className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-2.5 text-sm font-semibold text-[var(--color-ink)]"
                 >
-                  {fr ? "Page suivante" : "Next page"} {numberedPage + 1} →
+                  {ui.nextPage} {numberedPage + 1} →
                 </Link>
               )}
           </nav>

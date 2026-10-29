@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { CreatorCollectionPage, creatorCollectionMetadata } from "@/features/creator/CreatorCollectionPage";
 import { randomInt } from "node:crypto";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -18,7 +19,7 @@ import { ModelsGrid } from "@/components/ModelsGrid";
 import { SavedGallery } from "@/components/SavedGallery";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { formatCount } from "@/lib/format";
-import { localePath, type Locale } from "@/lib/i18n/config";
+import { localePath, resolveLocalizedPage, type Locale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { buildLocalizedMetadata } from "@/lib/i18n/metadata";
 import { buildModelsPagePayload, MODELS_PAGE_SIZE } from "@/lib/models-pagination";
@@ -85,7 +86,21 @@ function metaCopy(locale: Locale, pathname: string) {
   return byPath[pathname as keyof typeof byPath]?.meta;
 }
 
-export function localizedPageMetadata(locale: Locale, pathname: string): Metadata {
+export async function localizedPageMetadata(
+  locale: Locale,
+  pathname: string,
+  searchParams: SearchParams,
+): Promise<Metadata> {
+  const route = resolveLocalizedPage(locale, pathname);
+  if (!route) notFound();
+  if (route.kind === "creator") {
+    return creatorCollectionMetadata({
+      locale,
+      handleParam: route.handle,
+      collection: route.collection,
+      searchParams: await searchParams,
+    });
+  }
   const copy = metaCopy(locale, pathname);
   if (copy) return buildLocalizedMetadata(locale, pathname, copy);
   return {
@@ -188,8 +203,11 @@ export async function LocalizedPage({ locale, pathname, searchParams }: Localize
       return locale === "fr" ? <FrenchPartnershipsPage /> : <EnglishContactFormPage kind="partnerships" />;
     case "/contact/presse":
       return locale === "fr" ? <FrenchPressPage /> : <EnglishContactFormPage kind="press" />;
-    default:
-      notFound();
+    default: {
+      const route = resolveLocalizedPage(locale, pathname);
+      if (!route || route.kind !== "creator") notFound();
+      return <CreatorCollectionPage locale={locale} handleParam={route.handle} collection={route.collection} searchParams={await searchParams} />;
+    }
   }
 }
 
