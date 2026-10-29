@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { registerUser, createSession } from "@/lib/auth-db";
+import { registerUser } from "@/lib/auth-db";
 import {
   SESSION_COOKIE,
   SESSION_TTL_DAYS,
@@ -47,24 +47,22 @@ export async function POST(request: Request) {
 
   const result = await registerUser({ email, username, password });
   if (!result.ok) {
-    const status = result.error === "no_db" ? 503 : 409;
+    const status =
+      result.error === "no_db" ? 503 : result.error === "failed" ? 500 : 409;
     return Response.json(
       { ok: false, error: result.error, message: MESSAGES[result.error] },
       { status },
     );
   }
 
-  const token = await createSession(result.user.id);
-  if (token) {
-    const jar = await cookies();
-    jar.set(SESSION_COOKIE, token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: SESSION_TTL_DAYS * 24 * 60 * 60,
-    });
-  }
+  const jar = await cookies();
+  jar.set(SESSION_COOKIE, result.token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: SESSION_TTL_DAYS * 24 * 60 * 60,
+  });
 
   return Response.json({ ok: true, user: result.user });
 }

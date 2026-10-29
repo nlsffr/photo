@@ -10,6 +10,10 @@ import type { RowDataPacket } from "mysql2";
 import { randomUUID } from "node:crypto";
 import { getDbPool as getPool } from "./db-pool";
 import {
+  registerWithSession,
+  type RegistrationDatabase,
+} from "./auth-registration-flow";
+import {
   hashPassword,
   verifyPassword,
   newSessionToken,
@@ -28,7 +32,7 @@ export function isAuthDbConfigured(): boolean {
 }
 
 type RegisterResult =
-  | { ok: true; user: SessionUser }
+  | { ok: true; user: SessionUser; token: string }
   | { ok: false; error: "email_taken" | "username_taken" | "no_db" | "failed" };
 
 export async function registerUser(input: {
@@ -38,45 +42,12 @@ export async function registerUser(input: {
 }): Promise<RegisterResult> {
   const db = getPool();
   if (!db) return { ok: false, error: "no_db" };
-
-  // Pre-check for friendlier errors than a raw duplicate-key exception.
-  const [existing] = await db.execute<RowDataPacket[]>(
-    "SELECT email, username FROM users WHERE email = :email OR username = :username LIMIT 1",
-    { email: input.email, username: input.username },
-  );
-  const clash = existing[0] as { email: string | null; username: string | null } | undefined;
-  if (clash) {
-    if (clash.email === input.email) return { ok: false, error: "email_taken" };
-    return { ok: false, error: "username_taken" };
-  }
-
-  const id = randomUUID();
-  const passwordHash = await hashPassword(input.password);
-  try {
-    await db.execute(
-      `INSERT INTO users (id, email, username, password_hash)
-       VALUES (:id, :email, :username, :hash)`,
-      { id, email: input.email, username: input.username, hash: passwordHash },
-    );
-  } catch (e) {
-    // Race on the unique index between the pre-check and insert.
-    const code = (e as { code?: string }).code;
-    if (code === "ER_DUP_ENTRY") {
-      const [again] = await db.execute<RowDataPacket[]>(
-        "SELECT email FROM users WHERE email = :email LIMIT 1",
-        { email: input.email },
-      );
-      return again[0]
-        ? { ok: false, error: "email_taken" }
-        : { ok: false, error: "username_taken" };
-    }
-    return { ok: false, error: "failed" };
-  }
-
-  return {
-    ok: true,
-    user: { id, email: input.email, username: input.username, isCreator: false },
-  };
+  return registerWithSession(db as unknown as RegistrationDatabase, input, {
+    hashPassword,
+    randomId: randomUUID,
+    newSessionToken,
+    sessionExpiry,
+  });
 }
 
 type LoginResult =
