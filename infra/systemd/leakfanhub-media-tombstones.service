@@ -1,0 +1,23 @@
+[Unit]
+Description=Refresh removed-media nginx tombstones
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/photo/ops/refresh-removed-media-map.py --output /opt/photo/infra/nginx/generated/removed-media-maps.conf --docker-bin /usr/bin/docker --edge-container photo-edge-1 --database-container photo-mariadb-1
+TimeoutStartSec=90s
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/photo/infra/nginx/generated /run
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX
+
+[Install]
+WantedBy=multi-user.target
