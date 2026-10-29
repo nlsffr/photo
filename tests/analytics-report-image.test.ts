@@ -11,5 +11,9 @@ test("the production image includes the operator analytics report", async () => 
     dockerfile,
     /COPY --from=builder[^\n]*\/app\/scripts\/analytics-report\.mjs[^\n]*\.\/scripts\//,
   );
+  assert.match(
+    dockerfile,
+    /mkdir -p \/ops-runtime[\s\S]*pnpm --dir \/ops-runtime add mysql2/,
+  );
 });
 

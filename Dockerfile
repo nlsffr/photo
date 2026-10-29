@@ -15,7 +15,8 @@ RUN pnpm install --frozen-lockfile
 # scripts. The Next standalone tracer does not include mysql2 for loose .mjs
 # files copied after the build.
 FROM deps AS ops-deps
-RUN pnpm --dir /ops-runtime add mysql2@3.23.1 --prod --offline \
+RUN mkdir -p /ops-runtime \
+  && pnpm --dir /ops-runtime add mysql2@3.23.1 --prod --offline \
   --config.auto-install-peers=false
 
 # ---------------------------------------------------------------------------
