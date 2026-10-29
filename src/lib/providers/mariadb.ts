@@ -423,13 +423,20 @@ export class MariaDBProvider implements DataProvider {
     const legacyTags = tags
       .map(legacyTagPrefix)
       .filter((tag): tag is string => Boolean(tag));
-    const legacyPredicates = legacyTags.map(() => "t.tag LIKE ?");
-    const tagPredicates = ["t.tag IN (?)", ...legacyPredicates].join(" OR ");
+    const tagMatches = [
+      "SELECT photo_id FROM photo_tags FORCE INDEX (idx_photo_tags_tag_id) WHERE tag IN (?)",
+      ...legacyTags.map(
+        () =>
+          "SELECT photo_id FROM photo_tags FORCE INDEX (idx_photo_tags_tag_id) WHERE tag LIKE ?",
+      ),
+    ].join(" UNION ");
     const [rows] = await this.pool.query<RowDataPacket[]>(
-      `SELECT DISTINCT ${PHOTO_SELECT}
-       ${PHOTO_FROM}
-       JOIN photo_tags t ON t.photo_id = p.id
-       WHERE (${tagPredicates}) AND p.id <> ?
+      `SET STATEMENT max_statement_time=10 FOR
+       SELECT ${PHOTO_SELECT}
+       FROM (${tagMatches}) matched
+       JOIN photos p ON p.id = matched.photo_id
+       JOIN creators c ON c.id = p.creator_id
+       WHERE p.id <> ?
        ORDER BY p.views_count + p.likes_count * 3 DESC
        LIMIT ?`,
       [tags, ...legacyTags, photo.id, limit],
