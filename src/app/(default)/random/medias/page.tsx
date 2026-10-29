@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { randomInt } from "node:crypto";
 import Link from "next/link";
 import { getPhotos } from "@/lib/photos";
 import { InfiniteGallery } from "@/components/InfiniteGallery";
@@ -12,7 +13,7 @@ export const metadata: Metadata = {
 };
 
 export default async function RandomMediasPage() {
-  const seed = Math.floor(Math.random() * 1_000_000_000);
+  const seed = randomInt(1_000_000_000);
   const page = await getPhotos({ sort: "random", seed, limit: 30 });
   return (
     <div className="px-3 py-4 sm:px-5">
