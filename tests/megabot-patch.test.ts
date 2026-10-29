@@ -28,6 +28,14 @@ ON DUPLICATE KEY UPDATE
 """
 `;
 
+const insertOnlyFixture = `PASSWORD = "must-not-appear-in-diff"
+SQL = """
+INSERT INTO photos (id, creator_id, title, description, image_url, video_url, type,
+  duration_sec, width, height, views_count, likes_count, is_ai, file_size, source_id)
+VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+"""
+`;
+
 test("MegaBot patch preview is secret-free and does not edit the worker", async () => {
   const directory = await mkdtemp(join(tmpdir(), "megabot-patch-"));
   const target = join(directory, "megabot.py");
@@ -73,6 +81,26 @@ test("MegaBot patch changes only counter identifiers and preserves a backup", as
   assert.equal(
     await readFile(`${target}.before-source-engagement`, "utf-8"),
     fixture,
+  );
+});
+
+test("MegaBot patch supports an insert-only worker without update clauses", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "megabot-patch-"));
+  const target = join(directory, "megabot.py");
+  await writeFile(target, insertOnlyFixture);
+
+  const result = spawnSync("python3", [PATCHER, target, "--write"], {
+    encoding: "utf-8",
+  });
+  const patched = await readFile(target, "utf-8");
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(patched, /source_views_count, source_likes_count/);
+  assert.doesNotMatch(patched, /source_views_count\s*=\s*VALUES/);
+  assert.doesNotMatch(result.stdout, /must-not-appear-in-diff/);
+  assert.equal(
+    await readFile(`${target}.before-source-engagement`, "utf-8"),
+    insertOnlyFixture,
   );
 });
 
