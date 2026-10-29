@@ -48,3 +48,18 @@ test("the route-owned sitemap index delegates localized pages to the static chil
   assert.match(staticRoute, /renderLocalizedStaticSitemapXml/);
   assert.match(robots, /\$\{SITE\}\/sitemap\.xml/);
 });
+
+test("expensive sitemap routes reuse one five-minute in-process rendering", async () => {
+  const [indexRoute, popularRoute] = await Promise.all([
+    readFile(join(APP_ROUTES, "sitemap.xml/route.ts"), "utf8"),
+    readFile(join(APP_ROUTES, "sitemaps/popular/route.ts"), "utf8"),
+  ]);
+
+  for (const route of [indexRoute, popularRoute]) {
+    assert.match(route, /createAsyncTtlCache/);
+    assert.match(route, /const CACHE_TTL_MS = 5 \* 60 \* 1_000/);
+    assert.match(route, /stale-while-revalidate=60/);
+  }
+  assert.match(indexRoute, /const loadSitemapIndex = createAsyncTtlCache/);
+  assert.match(popularRoute, /const loadPopularSitemap = createAsyncTtlCache/);
+});
