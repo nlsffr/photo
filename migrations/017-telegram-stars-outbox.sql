@@ -96,6 +96,10 @@ CREATE TABLE IF NOT EXISTS notification_outbox (
 
 -- The former unique key allowed only one row per (user,status), which blocked
 -- a second historical renewal after the first row became canceled.
+-- Keep an explicit user_id index first: InnoDB uses the old unique key to
+-- support fk_subscriptions_user and refuses to drop it without a replacement.
+CREATE INDEX IF NOT EXISTS idx_sub_user
+  ON subscriptions (user_id);
 DROP INDEX IF EXISTS uq_sub_user_active ON subscriptions;
 CREATE INDEX IF NOT EXISTS idx_sub_user_status_end
   ON subscriptions (user_id, status, current_period_end);

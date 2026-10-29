@@ -35,3 +35,15 @@ test("creator aggregates share the source identifier collation", async () => {
     /ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci/,
   );
 });
+
+test("premium migration preserves the subscription foreign-key index", async () => {
+  const sql = await readFile(
+    new URL("../migrations/017-telegram-stars-outbox.sql", import.meta.url),
+    "utf8",
+  );
+  const replacement = sql.indexOf("CREATE INDEX IF NOT EXISTS idx_sub_user");
+  const drop = sql.indexOf("DROP INDEX IF EXISTS uq_sub_user_active");
+
+  assert.ok(replacement >= 0);
+  assert.ok(drop > replacement, "the FK replacement index must exist before the unique key is dropped");
+});
