@@ -16,8 +16,17 @@ export interface CreatorCollectionStats {
 
 const COLLECTIONS = new Set<CreatorCollection>(["overview", "photos", "videos", "popular"]);
 const RESERVED = new Set(["photos", "videos", "popular"]);
-const HANDLE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/i;
+const HANDLE = /^[a-z0-9._-]+$/i;
+const MAX_PUBLIC_HANDLE_LENGTH = 100;
 const MAX_CREATOR_PAGE = 10_000;
+
+function isSafeCreatorHandle(handle: string): boolean {
+  return handle.length > 0
+    && handle.length <= MAX_PUBLIC_HANDLE_LENGTH
+    && handle !== "."
+    && handle !== ".."
+    && HANDLE.test(handle);
+}
 
 export function collectionIsEligible(collection: CreatorCollection, stats: CreatorCollectionStats): boolean {
   switch (collection) {
@@ -43,8 +52,7 @@ export function summarizeCreatorCollectionStats(media: readonly Pick<Photo, "typ
 export function parseCreatorCollectionPath(pathname: string): { handle: string; collection: CreatorCollection } | null {
   if (typeof pathname !== "string" || pathname.includes("?")) return null;
   const rawSegments = pathname.split("/").filter(Boolean);
-  let locale: string | null = null;
-  if (rawSegments[0] === "en" || rawSegments[0] === "fr") locale = rawSegments.shift() ?? null;
+  if (rawSegments[0] === "en" || rawSegments[0] === "fr") rawSegments.shift();
   if (rawSegments.length !== 1 && rawSegments.length !== 2) return null;
   let handle: string;
   let segment: string;
@@ -52,7 +60,7 @@ export function parseCreatorCollectionPath(pathname: string): { handle: string; 
     handle = decodeURIComponent(rawSegments[0]);
     segment = rawSegments.length === 2 ? decodeURIComponent(rawSegments[1]) : "overview";
   } catch { return null; }
-  if (!HANDLE.test(handle) || RESERVED.has(handle.toLowerCase()) || /-v0$/i.test(handle)) return null;
+  if (!isSafeCreatorHandle(handle) || RESERVED.has(handle.toLowerCase()) || /-v0$/i.test(handle)) return null;
   if (isExistingTopLevelRoute(handle)) return null;
   if (!COLLECTIONS.has(segment as CreatorCollection)) return null;
   return { handle, collection: segment as CreatorCollection };
@@ -68,10 +76,11 @@ export function parseCreatorPage(raw: string | string[] | null | undefined): { p
 
 export function creatorCollectionPath(handle: string, urlVersion: number, collection: CreatorCollection, locale?: "en" | "fr", page?: number): string {
   const safeHandle = handle.trim();
-  if (!HANDLE.test(safeHandle) || RESERVED.has(safeHandle.toLowerCase())) throw new TypeError("Invalid creator handle");
+  if (!isSafeCreatorHandle(safeHandle) || RESERVED.has(safeHandle.toLowerCase())) throw new TypeError("Invalid creator handle");
   if (!COLLECTIONS.has(collection)) throw new TypeError("Invalid collection");
   const version = Number.isInteger(urlVersion) && urlVersion > 1 ? urlVersion : 1;
-  const versionedHandle = version > 1 ? `${safeHandle}-v${version}` : safeHandle;
+  const encodedHandle = encodeURIComponent(safeHandle);
+  const versionedHandle = version > 1 ? `${encodedHandle}-v${version}` : encodedHandle;
   const prefix = locale === "en" || locale === "fr" ? `/${locale}` : "";
   const suffix = Number.isInteger(page) && (page as number) >= 2 ? `?page=${page}` : "";
   const collectionPath = collection === "overview" ? `/${versionedHandle}` : `/${versionedHandle}/${collection}`;

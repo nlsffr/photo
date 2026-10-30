@@ -40,15 +40,16 @@ test("CreatorCard preserves an explicit locale and leaves legacy callers unprefi
   assert.equal(nodes(CreatorCard({ creator, locale: "fr" }))[0].props.href, "/fr/aria-lune-v3");
 });
 
-test("media pages link to overview and the matching collection without localizing canonical media or DMCA URLs", async () => {
-  for (const [type, collection] of [["photo", "photos"], ["video", "videos"], ["pack", "overview"]] as const) {
+test("media pages link to overview without a creator-wide aggregate or localized canonical media URLs", async () => {
+  for (const type of ["photo", "video", "pack"] as const) {
     const queries: string[] = [];
     const media = { ...photo, type };
     const route = loadAppModule<{ default: (props: unknown) => Promise<ReactNode>; generateMetadata: (props: unknown) => Promise<Metadata> }>("src/app/(default)/[handle]/[id]/page.tsx", {
       ...boundaries,
       "@/lib/photos": {
         getPhotoByIdForPage: async () => { queries.push("media"); return media; },
-        getCreatorCollectionContext: async () => { queries.push("context"); return { creator, stats: { mediaCount: 16, photoCount: 12, videoCount: 4, engagedCount: 5, totalViews: 90, totalLikes: 10 } }; },
+        getCreator: async () => { queries.push("creator"); return creator; },
+        getCreatorCollectionContext: async () => { throw new Error("Unexpected creator-wide aggregate"); },
         getRelatedPhotos: async () => { queries.push("related"); return []; },
         withCreator: (item: Photo) => ({ ...item, creator }),
       },
@@ -57,10 +58,11 @@ test("media pages link to overview and the matching collection without localizin
     const tree = await route.default(props);
     const hrefs = nodes(tree).map((node) => node.props.href).filter(Boolean);
     assert.ok(hrefs.includes("/aria-lune-v3"));
-    assert.ok(hrefs.includes(collection === "overview" ? "/aria-lune-v3" : `/aria-lune-v3/${collection}`));
+    assert.equal(hrefs.includes("/aria-lune-v3/photos"), false);
+    assert.equal(hrefs.includes("/aria-lune-v3/videos"), false);
     assert.ok(hrefs.includes("/dmca?photo=db-id"));
     assert.ok(hrefs.every((href) => typeof href === "string" && !/^\/(en|fr)\//.test(href)));
-    assert.deepEqual(queries, ["media", "context", "related"]);
+    assert.deepEqual(queries, ["media", "creator", "related"]);
     const ld = scripts(tree);
     assert.equal(ld.find((item) => item["@type"] === (type === "video" ? "VideoObject" : "ImageObject"))!.author.url, "https://leakfanhub.com/aria-lune-v3");
     assert.equal((await route.generateMetadata(props)).alternates?.canonical, "/aria-lune/123-v2");
@@ -134,15 +136,15 @@ test("localized discovery surfaces keep creator links and model schema in the cu
   }
 });
 
-test("media pages under collection thresholds keep only the overview backlink with the same data-read count", async () => {
-  for (const [type, collection] of [["photo", "photos"], ["video", "videos"]] as const) {
+test("media pages keep one bounded creator read regardless of collection eligibility", async () => {
+  for (const type of ["photo", "video"] as const) {
     const reads: string[] = [];
     const route = loadAppModule<{ default: (props: unknown) => Promise<ReactNode> }>("src/app/(default)/[handle]/[id]/page.tsx", {
       ...boundaries,
       "@/lib/photos": {
         getPhotoByIdForPage: async () => { reads.push("media"); return { ...photo, type }; },
         getCreator: async () => { reads.push("creator"); return creator; },
-        getCreatorCollectionContext: async () => { reads.push("context"); return { creator, stats: { mediaCount: 14, photoCount: 11, videoCount: 3, engagedCount: 2, totalViews: 50, totalLikes: 10 } }; },
+        getCreatorCollectionContext: async () => { throw new Error("Unexpected creator-wide aggregate"); },
         getRelatedPhotos: async () => { reads.push("related"); return []; },
         withCreator: (item: Photo) => ({ ...item, creator }),
       },
@@ -150,7 +152,8 @@ test("media pages under collection thresholds keep only the overview backlink wi
     const tree = await route.default({ params: Promise.resolve({ handle: "aria-lune", id: "123-v2" }) });
     const hrefs = nodes(tree).map((node) => node.props.href).filter(Boolean);
     assert.ok(hrefs.includes("/aria-lune-v3"));
-    assert.equal(hrefs.includes(`/aria-lune-v3/${collection}`), false, "a collection below its public threshold must not receive a dead link");
-    assert.deepEqual(reads, ["media", "context", "related"], "the combined context replaces the existing creator read");
+    assert.equal(hrefs.includes("/aria-lune-v3/photos"), false);
+    assert.equal(hrefs.includes("/aria-lune-v3/videos"), false);
+    assert.deepEqual(reads, ["media", "creator", "related"]);
   }
 });

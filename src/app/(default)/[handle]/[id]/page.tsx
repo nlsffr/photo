@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
-  getCreatorCollectionContext,
+  getCreator,
   getPhotoByIdForPage,
   getRelatedPhotos,
   withCreator,
@@ -22,7 +22,7 @@ import { BackLink } from "@/components/BackLink";
 import { FloatingBack } from "@/components/FloatingBack";
 import { RecordView } from "@/components/RecordView";
 import { buildMediaPagePresentation } from "@/lib/media-seo";
-import { collectionIsEligible, creatorCollectionPath } from "@/lib/creator-collections";
+import { creatorCollectionPath } from "@/lib/creator-collections";
 
 export const revalidate = 300;
 
@@ -77,17 +77,14 @@ export default async function MediaByHandlePage({
   if (raw.creatorHandle.toLowerCase() !== handle.toLowerCase()) notFound();
   if (!isCurrentMediaVersion(raw.urlVersion, parsed.version)) notFound();
 
-  const context = await getCreatorCollectionContext(raw.creatorHandle);
-  if (!context || isRemovedContent(context.creator)) notFound();
-  const { creator, stats } = context;
+  const creator = await getCreator(raw.creatorHandle);
+  if (!creator || isRemovedContent(creator)) notFound();
   const photo = withCreator(raw, creator);
   const related = await getRelatedPhotos(raw, 36);
 
   const sid = photo.sourceId || parsed.base;
   const creatorPath = creatorHref(photo.creatorHandle, creator.urlVersion);
-  const matchingCollection = photo.type === "video" ? "videos" : photo.type === "photo" ? "photos" : "overview";
-  const collection = collectionIsEligible(matchingCollection, stats) ? matchingCollection : "overview";
-  const collectionPath = creatorCollectionPath(photo.creatorHandle, creator.urlVersion ?? 1, collection);
+  const collectionPath = creatorCollectionPath(photo.creatorHandle, creator.urlVersion ?? 1, "overview");
   const mediaPath = mediaHref({ ...photo, sourceId: sid });
   const presentation = buildMediaPagePresentation(photo, {
     site: SITE,
@@ -247,7 +244,7 @@ export default async function MediaByHandlePage({
             href={collectionPath}
             className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-center text-sm font-semibold"
           >
-            All @{photo.creatorHandle} {collection === "overview" ? "media" : collection} →
+            All @{photo.creatorHandle} media →
           </Link>
 
           <Link

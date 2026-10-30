@@ -18,13 +18,31 @@ test("collection eligibility follows the public-content thresholds", async () =>
 
 test("parses collection routes safely, including localized and versioned handles", async () => {
   const { parseCreatorCollectionPath } = await policyPromise;
-  for (const path of ["/alice/photos", "/en/alice/photos", "/fr/alice-v3/videos"]) assert.ok(parseCreatorCollectionPath(path));
+  for (const path of [
+    "/alice/photos",
+    "/en/alice/photos",
+    "/fr/alice-v3/videos",
+    "/tina_kitsune/photos",
+    "/en/little.warren/videos",
+    "/fr/___evasavagiou/popular",
+    "/blackmagicmodel.../photos",
+  ]) assert.ok(parseCreatorCollectionPath(path), path);
   assert.deepEqual(parseCreatorCollectionPath("/alice"), { handle: "alice", collection: "overview" });
   assert.deepEqual(parseCreatorCollectionPath("/en/alice"), { handle: "alice", collection: "overview" });
   assert.deepEqual(parseCreatorCollectionPath("/fr/alice-v3"), { handle: "alice-v3", collection: "overview" });
   assert.equal(parseCreatorCollectionPath("/contact"), null);
   assert.equal(parseCreatorCollectionPath("/en/contact"), null);
-  for (const path of ["/photos/videos", "/alice/unknown", "/%E0%A4%A/photos", "/photos/photos", "/alice-v0/popular"]) assert.equal(parseCreatorCollectionPath(path), null);
+  for (const path of [
+    "/photos/videos",
+    "/alice/unknown",
+    "/%E0%A4%A/photos",
+    "/photos/photos",
+    "/alice-v0/popular",
+    "/./photos",
+    "/../photos",
+    "/alice%2Fbob/photos",
+    `/${"a".repeat(101)}/photos`,
+  ]) assert.equal(parseCreatorCollectionPath(path), null, path);
 });
 
 test("parses safe page numbers and builds localized versioned canonical paths", async () => {
@@ -38,6 +56,11 @@ test("parses safe page numbers and builds localized versioned canonical paths", 
   assert.equal(creatorCollectionPath("alice", 3, "overview", "fr", 2), "/fr/alice-v3?page=2");
   assert.equal(creatorCollectionPath("alice", 3, "photos", "fr", 1), "/fr/alice-v3/photos");
   assert.equal(creatorCollectionPath("alice", 3, "photos", "en", 2), "/en/alice-v3/photos?page=2");
+  assert.equal(creatorCollectionPath("tina_kitsune", 1, "overview", "en"), "/en/tina_kitsune");
+  assert.equal(creatorCollectionPath("little.warren", 1, "photos", "fr"), "/fr/little.warren/photos");
+  for (const handle of [".", "..", "alice/bob", "alice%2Fbob", "a".repeat(101)]) {
+    assert.throws(() => creatorCollectionPath(handle, 1, "overview"), /Invalid creator handle/, handle);
+  }
 });
 
 test("summarizes media counts and engagement", async () => {
