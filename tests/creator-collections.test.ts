@@ -17,7 +17,7 @@ test("collection eligibility follows the public-content thresholds", async () =>
 });
 
 test("parses collection routes safely, including localized and versioned handles", async () => {
-  const { parseCreatorCollectionPath } = await policyPromise;
+  const { isRoutableCreatorHandle, parseCreatorCollectionPath } = await policyPromise;
   for (const path of [
     "/alice/photos",
     "/en/alice/photos",
@@ -30,7 +30,17 @@ test("parses collection routes safely, including localized and versioned handles
   assert.deepEqual(parseCreatorCollectionPath("/alice"), { handle: "alice", collection: "overview" });
   assert.deepEqual(parseCreatorCollectionPath("/en/alice"), { handle: "alice", collection: "overview" });
   assert.deepEqual(parseCreatorCollectionPath("/fr/alice-v3"), { handle: "alice-v3", collection: "overview" });
-  assert.equal(parseCreatorCollectionPath("/contact"), null);
+  for (const handle of ["contact", "models", "sitemaps", "en", "fr", "photos", "videos", "popular"]) {
+    assert.equal(isRoutableCreatorHandle(handle), false, handle);
+    assert.equal(parseCreatorCollectionPath(`/${handle}`), null, handle);
+  }
+  assert.equal(isRoutableCreatorHandle("foo-v2"), false);
+  for (const handle of ["tina_kitsune", "little.warren", "blackmagicmodel..."]) {
+    assert.equal(isRoutableCreatorHandle(handle), true, handle);
+  }
+  assert.deepEqual(parseCreatorCollectionPath("/alice-v2/photos"), { handle: "alice-v2", collection: "photos" });
+  assert.deepEqual(parseCreatorCollectionPath("/foo-v2"), { handle: "foo-v2", collection: "overview" });
+  assert.equal(parseCreatorCollectionPath("/contact-v2/photos"), null);
   assert.equal(parseCreatorCollectionPath("/en/contact"), null);
   for (const path of [
     "/photos/videos",
@@ -58,7 +68,7 @@ test("parses safe page numbers and builds localized versioned canonical paths", 
   assert.equal(creatorCollectionPath("alice", 3, "photos", "en", 2), "/en/alice-v3/photos?page=2");
   assert.equal(creatorCollectionPath("tina_kitsune", 1, "overview", "en"), "/en/tina_kitsune");
   assert.equal(creatorCollectionPath("little.warren", 1, "photos", "fr"), "/fr/little.warren/photos");
-  for (const handle of [".", "..", "alice/bob", "alice%2Fbob", "a".repeat(101)]) {
+  for (const handle of [".", "..", "alice/bob", "alice%2Fbob", "a".repeat(101), "contact", "models", "sitemaps", "en", "fr", "photos", "videos", "popular", "foo-v2"]) {
     assert.throws(() => creatorCollectionPath(handle, 1, "overview"), /Invalid creator handle/, handle);
   }
 });

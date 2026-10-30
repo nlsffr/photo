@@ -12,6 +12,7 @@ import {
   type SitemapPartition,
 } from "./sitemap-partitions";
 import {
+  CREATOR_SITEMAP_BUCKETS,
   MAX_MEDIA_SITEMAP_FILES,
   MEDIA_SITEMAP_CHUNK_SIZE,
   isSitemapPartitionDate,
@@ -235,12 +236,21 @@ export async function getPopularSitemapMedia(
 
 export async function getCreatorSitemapProfiles(
   collection: CreatorCollection,
-  limit = 24_001,
+  bucket: number,
+  limit = 50_001,
 ): Promise<CreatorSitemapProfile[]> {
-  const safeLimit = Math.min(24_001, Math.max(1, Math.floor(limit)));
+  const safeBucket = Math.floor(bucket);
+  if (
+    !Number.isInteger(bucket)
+    || safeBucket < 0
+    || safeBucket >= CREATOR_SITEMAP_BUCKETS
+  ) {
+    throw new TypeError("Invalid creator sitemap bucket");
+  }
+  const safeLimit = Math.min(50_001, Math.max(1, Math.floor(limit)));
   const [rows] = await requireDbPool().query<CreatorSitemapProfileRow[]>(
     creatorSitemapProfilesSql(collection),
-    [safeLimit],
+    [safeBucket, safeLimit],
   );
   return rows.map((row) => ({
     handle: row.handle,

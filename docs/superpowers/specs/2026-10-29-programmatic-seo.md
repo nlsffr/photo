@@ -130,10 +130,10 @@ only. Imported competitor aliases and generated typos are not trusted SEO data.
 A creator request uses at most four database round trips: creator with public
 counts, one bounded media page, verified aliases, and related creators when
 shown. `hasPart` reuses the already loaded page and is capped at 12 items. It
-never triggers per-item queries. Sitemap partitions use one grouped/keyset
-query whose projection includes active media count, photo count, video count,
-engaged media count and last public media update. Supporting indexes and
-`EXPLAIN` plans are verified before deployment.
+never triggers per-item queries. Each creator sitemap bucket uses one bounded
+query over the materialized public counters (media, photos, videos, engaged
+media and last public media update), filtered by a deterministic creator-ID
+hash. Supporting indexes and `EXPLAIN` plans are verified before deployment.
 
 ## Internationalization
 
@@ -150,17 +150,20 @@ content to justify multiplying them.
 
 ## Sitemap architecture
 
-Replace the single profile file with immutable keyset partitions of about 1,000
-creators for:
+Replace the single profile file with 64 immutable hash buckets per creator
+family (`CRC32(creator_id) mod 64`) for:
 
 - profile overview;
 - photos sections;
 - videos sections;
 - popular sections.
 
-The public collection endpoints are grouped below
-`/sitemaps/collections/{photos|videos|popular}`; the profile overview keeps its
-own partition family. The sitemap index is updated for each new family.
+The canonical bucket endpoints are grouped below
+`/sitemaps/creators/{overview|photos|videos|popular}/{00..63}`. The legacy
+`/sitemaps/profiles` and `/sitemaps/collections/{photos|videos|popular}`
+endpoints remain stable sitemap indexes over the corresponding buckets. This
+keeps membership deterministic as the catalog grows and gives each family a
+capacity of 1,536,000 eligible creators at the 24,000-profile XML guard.
 
 Each localized entry has reciprocal alternates and `x-default`. A query supplies
 public media count, photo count, video count and `updated_at`, and applies the

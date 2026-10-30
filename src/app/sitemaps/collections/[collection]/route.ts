@@ -1,10 +1,12 @@
-import { loadCreatorSitemap } from "@/lib/creator-sitemap-data";
+import { creatorSitemapPartitionLocations } from "@/lib/creator-sitemap-partitions";
 import type { CreatorCollection } from "@/lib/creator-collections";
+import { renderSitemapIndex } from "@/lib/sitemap-xml";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 300;
 
 const COLLECTIONS = new Set<CreatorCollection>(["photos", "videos", "popular"]);
+const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").replace(/\/$/, "");
 
 export async function GET(
   _request: Request,
@@ -16,7 +18,7 @@ export async function GET(
   }
   const collection = rawCollection as CreatorCollection;
   try {
-    return new Response(await loadCreatorSitemap(collection), {
+    return new Response(renderSitemapIndex(creatorSitemapPartitionLocations(SITE, collection)), {
       headers: {
         "Content-Type": "application/xml; charset=utf-8",
         "Cache-Control": "public, max-age=300, stale-while-revalidate=60",

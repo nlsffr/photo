@@ -53,6 +53,7 @@ test("creator sitemap query enforces each public quality threshold", async () =>
 
   for (const sql of [overview, photos, videos, popular]) {
     assert.match(sql, /creator_collection_stats stats/);
+    assert.match(sql, /MOD\(CRC32\(c\.id\), 64\) = \?/);
     assert.doesNotMatch(sql, /FROM photos|GROUP BY|SUM\(|MAX\(|EXISTS/);
   }
   assert.match(overview, /stats\.media_count >= 1/);
@@ -106,7 +107,6 @@ test("sitemap index advertises every creator collection sitemap", async () => {
     "utf8",
   );
 
-  for (const collection of ["photos", "videos", "popular"]) {
-    assert.match(source, new RegExp(`sitemaps/collections/${collection}`));
-  }
+  assert.match(source, /creatorSitemapPartitionLocations\(SITE\)/);
+  assert.doesNotMatch(source, /sitemaps\/profiles|sitemaps\/collections\//);
 });

@@ -1,4 +1,5 @@
 import { createAsyncTtlCache } from "@/lib/async-ttl-cache";
+import { creatorSitemapPartitionLocations } from "@/lib/creator-sitemap-partitions";
 import { getSitemapMediaPartitions } from "@/lib/sitemap-data";
 import { renderSitemapIndex } from "@/lib/sitemap-xml";
 
@@ -16,11 +17,8 @@ const loadSitemapIndex = createAsyncTtlCache(async () => {
   const locations = [
     `${SITE}/sitemaps/static`,
     `${SITE}/sitemaps/popular`,
-    `${SITE}/sitemaps/profiles`,
-    `${SITE}/sitemaps/collections/photos`,
-    `${SITE}/sitemaps/collections/videos`,
-    `${SITE}/sitemaps/collections/popular`,
     `${SITE}/sitemaps/tags`,
+    ...creatorSitemapPartitionLocations(SITE),
     ...partitions.map((partition) => `${SITE}${partition.path}`),
   ];
   return renderSitemapIndex(locations);

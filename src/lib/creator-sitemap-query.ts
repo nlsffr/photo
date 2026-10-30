@@ -1,6 +1,8 @@
 // @ts-expect-error Node's native type stripping requires the explicit suffix.
 import { activeCreatorSql } from "./providers/active-content-sql.ts";
 import type { CreatorCollection } from "./creator-collections.ts";
+// @ts-expect-error Node's native type stripping requires the explicit suffix.
+import { CREATOR_SITEMAP_BUCKETS } from "./seo-policy.ts";
 
 const SELECT_CREATOR = `c.handle,
             COALESCE(c.url_version, 1) AS url_version,
@@ -21,6 +23,7 @@ export function creatorSitemapProfilesSql(collection: CreatorCollection): string
      STRAIGHT_JOIN creator_collection_stats stats
        ON stats.creator_id = c.id AND ${eligibility}
      WHERE ${activeCreatorSql("c")}
+       AND MOD(CRC32(c.id), ${CREATOR_SITEMAP_BUCKETS}) = ?
      ORDER BY c.id
      LIMIT ?`;
 }

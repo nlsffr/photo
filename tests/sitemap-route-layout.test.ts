@@ -49,19 +49,21 @@ test("the route-owned sitemap index delegates localized pages to the static chil
   assert.match(robots, /\$\{SITE\}\/sitemap\.xml/);
 });
 
-test("creator collection sitemaps reuse a bounded five-minute cache per collection", async () => {
-  const [profileRoute, collectionRoute, dataSource] = await Promise.all([
+test("creator collection sitemap buckets reuse a bounded five-minute cache", async () => {
+  const [profileRoute, collectionRoute, bucketRoute, dataSource] = await Promise.all([
     readFile(join(APP_ROUTES, "sitemaps/profiles/route.ts"), "utf8"),
     readFile(join(APP_ROUTES, "sitemaps/collections/[collection]/route.ts"), "utf8"),
+    readFile(join(APP_ROUTES, "sitemaps/creators/[collection]/[bucket]/route.ts"), "utf8"),
     readFile(new URL("../src/lib/creator-sitemap-data.ts", import.meta.url), "utf8"),
   ]);
 
-  assert.match(profileRoute, /loadCreatorSitemap\("overview"\)/);
-  assert.match(collectionRoute, /loadCreatorSitemap\(collection\)/);
+  assert.match(profileRoute, /creatorSitemapPartitionLocations\(SITE, "overview"\)/);
+  assert.match(collectionRoute, /creatorSitemapPartitionLocations\(SITE, collection\)/);
+  assert.match(bucketRoute, /loadCreatorSitemap\(collection, bucket\)/);
   assert.match(dataSource, /createAsyncTtlCacheMap/);
   assert.match(dataSource, /getCreatorSitemapProfiles/);
   assert.match(dataSource, /const CACHE_TTL_MS = 5 \* 60 \* 1_000/);
-  assert.match(dataSource, /CREATOR_SITEMAP_PROFILE_LIMIT \+ 1/);
+  assert.match(dataSource, /CREATOR_SITEMAP_QUERY_LIMIT \+ 1/);
   assert.match(dataSource, /assertCreatorSitemapCapacity\(profiles\)/);
 });
 

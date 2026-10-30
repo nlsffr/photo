@@ -14,7 +14,8 @@ export function isSitemapPartitionDate(value: string): boolean {
 
 /** A sitemap index may contain at most 50,000 child sitemap entries. */
 const MAX_SITEMAPS_PER_INDEX = 50_000;
-const NON_MEDIA_SITEMAPS = 7;
+export const CREATOR_SITEMAP_BUCKETS = 64;
+const NON_MEDIA_SITEMAPS = 3 + (4 * CREATOR_SITEMAP_BUCKETS);
 export const MAX_MEDIA_SITEMAP_FILES =
   MAX_SITEMAPS_PER_INDEX - NON_MEDIA_SITEMAPS;
 

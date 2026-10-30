@@ -3,6 +3,7 @@ import { creatorCollectionPath } from "./creator-collections.ts";
 import type { CreatorCollection } from "./creator-collections.ts";
 
 export const CREATOR_SITEMAP_PROFILE_LIMIT = 24_000;
+export const CREATOR_SITEMAP_QUERY_LIMIT = 50_000;
 
 export type CreatorSitemapProfile = {
   handle: string;

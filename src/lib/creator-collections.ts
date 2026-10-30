@@ -17,6 +17,8 @@ export interface CreatorCollectionStats {
 const COLLECTIONS = new Set<CreatorCollection>(["overview", "photos", "videos", "popular"]);
 const RESERVED = new Set(["photos", "videos", "popular"]);
 const HANDLE = /^[a-z0-9._-]+$/i;
+const VERSION_SUFFIX = /-v\d+$/i;
+const PUBLIC_VERSION_SUFFIX = /^(.*)-v([1-9]\d*)$/i;
 const MAX_PUBLIC_HANDLE_LENGTH = 100;
 const MAX_CREATOR_PAGE = 10_000;
 
@@ -26,6 +28,21 @@ function isSafeCreatorHandle(handle: string): boolean {
     && handle !== "."
     && handle !== ".."
     && HANDLE.test(handle);
+}
+
+/**
+ * True only when a database handle can own an unambiguous public creator URL.
+ * Version-like suffixes are reserved for the URL lifecycle (`alice-v2`).
+ */
+export function isRoutableCreatorHandle(handle: string): boolean {
+  const normalized = handle.trim();
+  const lowered = normalized.toLowerCase();
+  return isSafeCreatorHandle(normalized)
+    && !VERSION_SUFFIX.test(normalized)
+    && !RESERVED.has(lowered)
+    && lowered !== "en"
+    && lowered !== "fr"
+    && !isExistingTopLevelRoute(normalized);
 }
 
 export function collectionIsEligible(collection: CreatorCollection, stats: CreatorCollectionStats): boolean {
@@ -60,8 +77,10 @@ export function parseCreatorCollectionPath(pathname: string): { handle: string; 
     handle = decodeURIComponent(rawSegments[0]);
     segment = rawSegments.length === 2 ? decodeURIComponent(rawSegments[1]) : "overview";
   } catch { return null; }
-  if (!isSafeCreatorHandle(handle) || RESERVED.has(handle.toLowerCase()) || /-v0$/i.test(handle)) return null;
-  if (isExistingTopLevelRoute(handle)) return null;
+  const versioned = PUBLIC_VERSION_SUFFIX.exec(handle);
+  const databaseHandle = versioned?.[1] ?? handle;
+  if (!isRoutableCreatorHandle(databaseHandle)) return null;
+  if (!versioned && VERSION_SUFFIX.test(handle)) return null;
   if (!COLLECTIONS.has(segment as CreatorCollection)) return null;
   return { handle, collection: segment as CreatorCollection };
 }
@@ -76,7 +95,7 @@ export function parseCreatorPage(raw: string | string[] | null | undefined): { p
 
 export function creatorCollectionPath(handle: string, urlVersion: number, collection: CreatorCollection, locale?: "en" | "fr", page?: number): string {
   const safeHandle = handle.trim();
-  if (!isSafeCreatorHandle(safeHandle) || RESERVED.has(safeHandle.toLowerCase())) throw new TypeError("Invalid creator handle");
+  if (!isRoutableCreatorHandle(safeHandle)) throw new TypeError("Invalid creator handle");
   if (!COLLECTIONS.has(collection)) throw new TypeError("Invalid collection");
   const version = Number.isInteger(urlVersion) && urlVersion > 1 ? urlVersion : 1;
   const encodedHandle = encodeURIComponent(safeHandle);

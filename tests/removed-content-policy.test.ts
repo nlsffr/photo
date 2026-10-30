@@ -126,6 +126,7 @@ test("removed sitemap entries cannot linger in a day-long stale cache", async ()
     [
       "../src/app/sitemaps/profiles/route.ts",
       "../src/app/sitemaps/collections/[collection]/route.ts",
+      "../src/app/sitemaps/creators/[collection]/[bucket]/route.ts",
       "../src/app/sitemaps/popular/route.ts",
     ].map((path) => readFile(new URL(path, import.meta.url), "utf8")),
   );
