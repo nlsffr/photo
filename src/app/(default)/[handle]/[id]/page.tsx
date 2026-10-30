@@ -9,7 +9,10 @@ import {
 } from "@/lib/photos";
 import { formatAge, formatCount } from "@/lib/format";
 import { creatorHref, mediaHref, parseVersionedSlug } from "@/lib/types";
-import { isCurrentMediaVersion } from "@/lib/seo-policy";
+import {
+  isCurrentMediaVersion,
+  isReservedCreatorHandle,
+} from "@/lib/seo-policy";
 import { isRemovedContent } from "@/lib/public-content-policy";
 import { PhotoCard } from "@/components/PhotoCard";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
@@ -28,22 +31,13 @@ export const revalidate = 300;
 
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").replace(/\/$/, "");
 
-const RESERVED = new Set([
-  "api", "creator", "models", "photo", "media", "_next",
-  "favicon.ico", "robots.txt", "sitemap.xml", "sitemaps", "saved", "liked",
-  "search", "trending-medias", "most-liked", "random", "tiktok",
-  "trust-and-safety", "welcome", "tag", "add", "premium",
-  "feed", "pour-toi", "classements", "recherche", "about", "dmca",
-  "connexion", "inscription", "favoris", "abonnements",
-]);
-
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ handle: string; id: string }>;
 }): Promise<Metadata> {
   const { handle, id } = await params;
-  if (RESERVED.has(handle.toLowerCase())) {
+  if (isReservedCreatorHandle(handle)) {
     notFound();
   }
   // getPhotoById ignore le suffixe -v{N} pour la requête (source_id = base).
@@ -69,7 +63,7 @@ export default async function MediaByHandlePage({
   params: Promise<{ handle: string; id: string }>;
 }) {
   const { handle, id } = await params;
-  if (RESERVED.has(handle.toLowerCase())) notFound();
+  if (isReservedCreatorHandle(handle)) notFound();
 
   const parsed = parseVersionedSlug(id);
   const raw = await getPhotoByIdForPage(id);

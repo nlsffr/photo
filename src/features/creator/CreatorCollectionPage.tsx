@@ -9,6 +9,7 @@ import {
   collectionIsEligible,
   creatorCollectionCopy,
   creatorCollectionPath,
+  isRoutableCreatorHandle,
   parseCreatorCollectionPath,
   parseCreatorPage,
 } from "@/lib/creator-collections";
@@ -42,18 +43,6 @@ const VALID_SORTS: SortKey[] = [
   "trending",
   "longest",
 ];
-const RESERVED = new Set([
-  "api",
-  "creator",
-  "photo",
-  "media",
-  "_next",
-  "saved",
-  "liked",
-  "search",
-  "random",
-  "tag",
-]);
 const COLLECTIONS: CreatorCollection[] = [
   "overview",
   "photos",
@@ -92,7 +81,7 @@ async function loadCollection({
   )
     notFound();
   const parsed = parseVersionedSlug(handleParam);
-  if (RESERVED.has(parsed.base.toLowerCase())) notFound();
+  if (!isRoutableCreatorHandle(parsed.base)) notFound();
   const context = await getCreatorCollectionContext(parsed.base);
   if (!context || isRemovedContent(context.creator)) notFound();
   const { creator, stats } = context;

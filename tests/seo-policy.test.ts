@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readdir } from "node:fs/promises";
 import test from "node:test";
 
 async function loadPolicy() {
@@ -166,6 +167,25 @@ test("distinguishes real top-level pages from route namespaces", async () => {
     "liked",
   ]) {
     assert.equal(isExistingTopLevelRoute(path), false, `${path} is a namespace`);
+  }
+});
+
+test("reserves every static, technical, collection, locale, and asset creator handle", async () => {
+  const { isReservedCreatorHandle } = await loadPolicy();
+
+  for (const handle of [
+    "models", "api", "creator", "photo", "media", "_next", "saved", "liked",
+    "search", "random", "tag", "photos", "videos", "popular", "en", "fr",
+    "favicon.svg", "file.svg", "google652c2e22ed1e9315.html",
+  ]) {
+    assert.equal(isReservedCreatorHandle(handle), true, handle);
+    assert.equal(isReservedCreatorHandle(handle.toUpperCase()), true, handle.toUpperCase());
+  }
+  for (const handle of ["alice", "tina_kitsune", "little.warren", "emiru.jpg", "alice-V2"]) {
+    assert.equal(isReservedCreatorHandle(handle), false, handle);
+  }
+  for (const asset of await readdir(new URL("../public", import.meta.url))) {
+    assert.equal(isReservedCreatorHandle(asset), true, `public/${asset}`);
   }
 });
 

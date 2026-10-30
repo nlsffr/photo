@@ -75,6 +75,33 @@ const EXISTING_TOP_LEVEL_ROUTES = new Set([
   "trust-and-safety",
   "welcome",
 ]);
+const CREATOR_RESERVED_NAMESPACES = new Set([
+  "_next",
+  "api",
+  "creator",
+  "en",
+  "fr",
+  "liked",
+  "media",
+  "photo",
+  "photos",
+  "popular",
+  "random",
+  "saved",
+  "search",
+  "tag",
+  "videos",
+]);
+const PUBLIC_ROOT_ASSETS = new Set([
+  "favicon.svg",
+  "file.svg",
+  "globe.svg",
+  "google652c2e22ed1e9315.html",
+  "next.svg",
+  "vercel.svg",
+  "window.svg",
+  "yandex_6d2a8a1dcea473d0.html",
+]);
 
 export const STATIC_SITEMAP_ENTRIES = [
   { path: "/", changeFrequency: "hourly", priority: 1 },
@@ -149,6 +176,14 @@ export function isAllowedReservedTwoSegmentPath(
 
 export function isExistingTopLevelRoute(pathSegment: string): boolean {
   return EXISTING_TOP_LEVEL_ROUTES.has(pathSegment.toLowerCase());
+}
+
+/** Every segment that can never own a creator profile at the site root. */
+export function isReservedCreatorHandle(pathSegment: string): boolean {
+  const normalized = pathSegment.trim().toLowerCase();
+  return EXISTING_TOP_LEVEL_ROUTES.has(normalized)
+    || CREATOR_RESERVED_NAMESPACES.has(normalized)
+    || PUBLIC_ROOT_ASSETS.has(normalized);
 }
 
 export function normalizeTagSlug(raw: unknown): string | null {

@@ -11,6 +11,7 @@ import {
   isAllowedReservedTwoSegmentPath,
   isCurrentMediaVersion,
   isExistingTopLevelRoute,
+  isReservedCreatorHandle,
   normalizeTagSlug,
   safeDecodePathSegment,
   shouldCanonicalizeRequest,
@@ -26,17 +27,6 @@ import {
 const CANONICAL_URL = new URL(
   process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com",
 );
-
-const RESERVED = new Set([
-  "api", "creator", "models", "photo", "media", "_next",
-  "favicon.ico", "robots.txt", "sitemap.xml", "sitemaps", "saved", "liked",
-  "search", "trending-medias", "most-liked", "random", "tiktok",
-  "trust-and-safety", "welcome", "tag", "add", "premium",
-  "feed", "pour-toi", "classements", "recherche", "about", "dmca",
-  "connexion", "inscription", "favoris", "abonnements", "identite",
-  "contact", "conditions", "confidentialite", "mentions-legales",
-  "influenceuses-tendances", "qu-est-ce-que-lumengallery",
-]);
 
 /** Removed profiles are gone at every URL version. */
 export async function proxy(request: NextRequest) {
@@ -123,7 +113,7 @@ export async function proxy(request: NextRequest) {
     if (handle == null || id == null) return missing();
     const firstSegment = handle.toLowerCase();
     if (!handle) return missing();
-    if (RESERVED.has(firstSegment)) {
+    if (isReservedCreatorHandle(firstSegment)) {
       if (isAllowedReservedTwoSegmentPath(firstSegment, id)) {
         return NextResponse.next();
       }
@@ -155,7 +145,7 @@ export async function proxy(request: NextRequest) {
       const collection = parseCreatorCollectionPath(pathname);
       if (!collection) return missing();
       const parsed = parseVersionedSlug(collection.handle);
-      if (RESERVED.has(parsed.base.toLowerCase())) return missing();
+      if (isReservedCreatorHandle(parsed.base)) return missing();
       try {
         const creator = await getCreator(parsed.base);
         const decision = creatorRouteDecision(creator, parsed.version);
@@ -191,10 +181,10 @@ export async function proxy(request: NextRequest) {
   if (!raw || raw.includes(".") || isExistingTopLevelRoute(raw)) {
     return NextResponse.next();
   }
-  if (RESERVED.has(raw.toLowerCase())) return missing();
+  if (isReservedCreatorHandle(raw)) return missing();
 
   const parsed = parseVersionedSlug(raw);
-  if (RESERVED.has(parsed.base.toLowerCase())) return missing();
+  if (isReservedCreatorHandle(parsed.base)) return missing();
 
   try {
     const creator = await getCreator(parsed.base);

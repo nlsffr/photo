@@ -2,7 +2,7 @@ import type { Photo } from "./types";
 // @ts-expect-error Node’s native type stripping requires the explicit .ts suffix.
 import { getDictionary } from "./i18n/dictionaries.ts";
 // @ts-expect-error Node’s native type stripping requires the explicit .ts suffix.
-import { isExistingTopLevelRoute } from "./seo-policy.ts";
+import { isReservedCreatorHandle } from "./seo-policy.ts";
 
 export type CreatorCollection = "overview" | "photos" | "videos" | "popular";
 export interface CreatorCollectionStats {
@@ -15,10 +15,9 @@ export interface CreatorCollectionStats {
 }
 
 const COLLECTIONS = new Set<CreatorCollection>(["overview", "photos", "videos", "popular"]);
-const RESERVED = new Set(["photos", "videos", "popular"]);
 const HANDLE = /^[a-z0-9._-]+$/i;
-const VERSION_SUFFIX = /-v\d+$/i;
-const PUBLIC_VERSION_SUFFIX = /^(.*)-v([1-9]\d*)$/i;
+const VERSION_SUFFIX = /-v\d+$/;
+const PUBLIC_VERSION_SUFFIX = /^(.*)-v([1-9]\d*)$/;
 const MAX_PUBLIC_HANDLE_LENGTH = 100;
 const MAX_CREATOR_PAGE = 10_000;
 
@@ -39,10 +38,7 @@ export function isRoutableCreatorHandle(handle: string): boolean {
   const lowered = normalized.toLowerCase();
   return isSafeCreatorHandle(normalized)
     && !VERSION_SUFFIX.test(normalized)
-    && !RESERVED.has(lowered)
-    && lowered !== "en"
-    && lowered !== "fr"
-    && !isExistingTopLevelRoute(normalized);
+    && !isReservedCreatorHandle(lowered);
 }
 
 export function collectionIsEligible(collection: CreatorCollection, stats: CreatorCollectionStats): boolean {
