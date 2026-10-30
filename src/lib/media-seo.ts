@@ -116,6 +116,19 @@ function mediaKind(type: MediaType): string {
   return "photo";
 }
 
+function isIdentifierDescription(
+  description: string,
+  identifiers: readonly string[],
+): boolean {
+  const compact = description.toLowerCase().replace(/\s+/g, "");
+  const candidates = identifiers
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+  if (candidates.includes(compact)) return true;
+  const labelled = compact.match(/^(?:source|media|id)[:#-]?(.+)$/);
+  return Boolean(labelled && candidates.includes(labelled[1]));
+}
+
 function validIsoDate(value: string | null | undefined): string | undefined {
   if (!value) return undefined;
   const timestamp = Date.parse(value);
@@ -156,11 +169,15 @@ export function durationIso(seconds: number | null | undefined): string | undefi
 export function buildMediaSeo(media: MediaSeoInput, site: string): MediaSeo {
   const publicId = media.sourceId?.trim() || media.id;
   const fallback = `${media.creatorHandle} ${mediaKind(media.type)} #${publicId}`;
-  const name = bounded(plainText(media.title) || fallback, MAX_MEDIA_NAME);
+  const sourceTitle = plainText(media.title);
+  const name = bounded(sourceTitle || fallback, MAX_MEDIA_NAME);
   const sourceDescription = plainText(media.description);
-  const fallbackDescription = `${mediaKind(media.type)[0]?.toUpperCase()}${mediaKind(media.type).slice(1)} by @${media.creatorHandle} on LeakFanHub (media ${publicId}).`;
+  const titleDetail = sourceTitle ? `: ${bounded(sourceTitle, MAX_MEDIA_NAME)}` : "";
+  const fallbackDescription = `${mediaKind(media.type)[0]?.toUpperCase()}${mediaKind(media.type).slice(1)} by @${media.creatorHandle} on LeakFanHub${titleDetail} (media ${publicId}).`;
+  const hasInformativeDescription = sourceDescription
+    && !isIdentifierDescription(sourceDescription, [publicId, media.id]);
   const description = bounded(
-    sourceDescription || fallbackDescription,
+    hasInformativeDescription ? sourceDescription : fallbackDescription,
     MAX_VIDEO_DESCRIPTION,
   );
   const uploadDate = validIsoDate(media.createdAt);

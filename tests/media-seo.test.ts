@@ -62,6 +62,36 @@ test("description is plain factual text and remains within Google video limits",
   assert.ok(seo.description.startsWith("story & detail"));
 });
 
+test("source identifiers never become public descriptions", async () => {
+  const { buildMediaPagePresentation } = await loadMediaSeo();
+  for (const description of [
+    "source:98123",
+    " Source : 98123 ",
+    "98123",
+    "photo-uuid",
+    "<p>source:98123</p>",
+  ]) {
+    const presentation = buildMediaPagePresentation(
+      { ...baseMedia, description },
+      {
+        site: "https://leakfanhub.com",
+        canonicalPath: "/alice/98123",
+        creatorName: "Alice Example",
+        creatorPath: "/alice",
+      },
+    );
+
+    assert.equal(
+      presentation.description,
+      "Video by @alice on LeakFanHub: A real launch title (media 98123).",
+      description,
+    );
+    assert.equal(presentation.metadata.description, presentation.description);
+    assert.equal(presentation.mediaLd?.description, presentation.description);
+    assert.doesNotMatch(presentation.description, /^source\s*:/i);
+  }
+});
+
 test("video structured data includes a valid upload date and direct content URL", async () => {
   const { buildMediaSeo } = await loadMediaSeo();
   const seo = buildMediaSeo(baseMedia, "https://leakfanhub.com");
