@@ -64,6 +64,14 @@ function numericSummary(row) {
 }
 
 const connection = await mysql.createConnection(databaseUrl);
+const concurrentConnection = await mysql.createConnection(databaseUrl);
+
+async function waitForBlockedUpdate(promise, label) {
+  let settled = false;
+  promise.finally(() => { settled = true; }).catch(() => undefined);
+  await new Promise((resolve) => setTimeout(resolve, 75));
+  assert.equal(settled, false, `${label} did not contend on the summary row`);
+}
 
 async function summary(creatorId) {
   const [rows] = await connection.query(
@@ -105,7 +113,8 @@ try {
   );
 
   const migration = isolatedMigration(await readFile(migrationPath, "utf8"));
-  for (const statement of splitMigration(migration)) await connection.query(statement);
+  const migrationStatements = splitMigration(migration);
+  for (const statement of migrationStatements) await connection.query(statement);
 
   await connection.query(
     `INSERT INTO \`${names.creators}\` (id) VALUES ('creator-1'), ('creator-2')`,
@@ -193,8 +202,139 @@ try {
   );
   assert.deepEqual(publicRows.map((row) => row.id), ["creator-1"]);
 
-  console.log(JSON.stringify({ ok: true, scenarios: 8 }));
+  await connection.query(
+    `INSERT INTO \`${names.creators}\` (id)
+     VALUES ('creator-3'), ('creator-4'), ('creator-5'), ('creator-6'), ('creator-7')`,
+  );
+  await connection.query(
+    `INSERT INTO \`${names.photos}\`
+       (id, creator_id, type, source_views_count, source_likes_count, created_at)
+     VALUES
+       ('photo-4', 'creator-3', 'photo', 0, 0, '2026-10-30 11:00:00'),
+       ('photo-5', 'creator-3', 'photo', 0, 0, '2026-10-30 11:05:00'),
+       ('photo-6', 'creator-4', 'photo', 0, 0, '2026-10-30 12:00:00'),
+       ('photo-7', 'creator-4', 'video', 0, 0, '2026-10-30 12:05:00'),
+       ('photo-8', 'creator-5', 'photo', 0, 0, '2026-10-30 13:00:00'),
+       ('photo-9', 'creator-5', 'video', 0, 0, '2026-10-30 13:05:00'),
+       ('photo-10', 'creator-7', 'photo', 0, 0, '2026-10-30 13:10:00')`,
+  );
+
+  // Defensive decrements must tolerate an already-drifted zero row without an
+  // unsigned subtraction error; the second migration below reconciles it.
+  await connection.query(
+    `UPDATE \`${names.stats}\`
+     SET media_count = 0, photo_count = 0, video_count = 0,
+         engaged_count = 0, last_content_at = NULL
+     WHERE creator_id = 'creator-7'`,
+  );
+  await connection.query(
+    `UPDATE \`${names.photos}\`
+     SET removed_from_index_at = '2026-10-30 13:11:00'
+     WHERE id = 'photo-10'`,
+  );
+  assert.deepEqual(await summary("creator-7"), {
+    mediaCount: 0, photoCount: 0, videoCount: 0, engagedCount: 0,
+    lastContentAt: null,
+  });
+
+  // Two writers flip engagement on different media for one creator. The second
+  // trigger must add its delta after the first commits, not write a stale total.
+  await connection.beginTransaction();
+  await concurrentConnection.beginTransaction();
+  await connection.query(
+    `UPDATE \`${names.photos}\` SET source_views_count = 1 WHERE id = 'photo-4'`,
+  );
+  const concurrentEngagement = concurrentConnection.query(
+    `UPDATE \`${names.photos}\` SET source_likes_count = 1 WHERE id = 'photo-5'`,
+  );
+  await waitForBlockedUpdate(concurrentEngagement, "concurrent engagement update");
+  await connection.commit();
+  await concurrentEngagement;
+  await concurrentConnection.commit();
+  assert.deepEqual(await summary("creator-3"), {
+    mediaCount: 2, photoCount: 2, videoCount: 0, engagedCount: 2,
+    lastContentAt: "2026-10-30T11:05:00.000Z",
+  });
+
+  // Concurrent removals must decrement twice and repair the maximum timestamp.
+  await connection.beginTransaction();
+  await concurrentConnection.beginTransaction();
+  await connection.query(
+    `UPDATE \`${names.photos}\` SET removed_from_index_at = '2026-10-30 14:00:00'
+     WHERE id = 'photo-6'`,
+  );
+  const concurrentRemoval = concurrentConnection.query(
+    `UPDATE \`${names.photos}\` SET removed_from_index_at = '2026-10-30 14:00:01'
+     WHERE id = 'photo-7'`,
+  );
+  await waitForBlockedUpdate(concurrentRemoval, "concurrent removal update");
+  await connection.commit();
+  await concurrentRemoval;
+  await concurrentConnection.commit();
+  assert.deepEqual(await summary("creator-4"), {
+    mediaCount: 0, photoCount: 0, videoCount: 0, engagedCount: 0,
+    lastContentAt: null,
+  });
+
+  // Moving one row while another row is deleted exercises both creator rows
+  // without allowing an absolute aggregate to resurrect the source count.
+  await connection.beginTransaction();
+  await concurrentConnection.beginTransaction();
+  await connection.query(
+    `UPDATE \`${names.photos}\` SET creator_id = 'creator-6' WHERE id = 'photo-8'`,
+  );
+  const concurrentDelete = concurrentConnection.query(
+    `DELETE FROM \`${names.photos}\` WHERE id = 'photo-9'`,
+  );
+  await waitForBlockedUpdate(concurrentDelete, "concurrent move/delete");
+  await connection.commit();
+  await concurrentDelete;
+  await concurrentConnection.commit();
+  assert.deepEqual(await summary("creator-5"), {
+    mediaCount: 0, photoCount: 0, videoCount: 0, engagedCount: 0,
+    lastContentAt: null,
+  });
+  assert.deepEqual(await summary("creator-6"), {
+    mediaCount: 1, photoCount: 1, videoCount: 0, engagedCount: 0,
+    lastContentAt: "2026-10-30T13:00:00.000Z",
+  });
+
+  // A second application is safe and reconciles to the same source of truth.
+  for (const statement of migrationStatements) await connection.query(statement);
+  const [finalActualRows] = await connection.query(
+    `SELECT creator_id, media_count, photo_count, video_count, engaged_count, last_content_at
+     FROM \`${names.stats}\` ORDER BY creator_id`,
+  );
+  const [finalExpectedRows] = await connection.query(
+    `SELECT creator_id, COUNT(*) AS media_count,
+            COALESCE(SUM(type = 'photo'), 0) AS photo_count,
+            COALESCE(SUM(type = 'video'), 0) AS video_count,
+            COALESCE(SUM(COALESCE(source_views_count, 0) > 0
+              OR COALESCE(source_likes_count, 0) > 0), 0) AS engaged_count,
+            MAX(created_at) AS last_content_at
+     FROM \`${names.photos}\`
+     WHERE removed_from_index_at IS NULL
+     GROUP BY creator_id ORDER BY creator_id`,
+  );
+  const expectedByCreator = new Map(
+    finalExpectedRows.map((row) => [row.creator_id, numericSummary(row)]),
+  );
+  for (const row of finalActualRows) {
+    const actual = numericSummary(row);
+    const expected = expectedByCreator.get(row.creator_id) ?? {
+      mediaCount: 0, photoCount: 0, videoCount: 0, engagedCount: 0,
+      lastContentAt: null,
+    };
+    assert.deepEqual(actual, expected, `second migration drifted ${row.creator_id}`);
+    expectedByCreator.delete(row.creator_id);
+  }
+  assert.equal(expectedByCreator.size, 0, "second migration missed public creators");
+
+  console.log(JSON.stringify({ ok: true, scenarios: 13 }));
 } finally {
+  await connection.rollback().catch(() => undefined);
+  await concurrentConnection.rollback().catch(() => undefined);
   await cleanup();
+  await concurrentConnection.end();
   await connection.end();
 }

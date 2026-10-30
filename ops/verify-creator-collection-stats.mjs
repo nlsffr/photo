@@ -3,6 +3,8 @@ import mysql from "mysql2/promise";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL is required");
+const sitemapBuckets = 64;
+const maxCreatorsPerSitemap = 24_000;
 
 function normalized(row) {
   return {
@@ -18,7 +20,8 @@ function normalized(row) {
 
 const connection = await mysql.createConnection(databaseUrl);
 try {
-  await connection.beginTransaction();
+  await connection.query("SET TRANSACTION READ ONLY");
+  await connection.query("START TRANSACTION WITH CONSISTENT SNAPSHOT");
   const [storedRows] = await connection.query(
     `SELECT creator_id, media_count, photo_count, video_count,
             engaged_count, last_content_at
@@ -51,6 +54,21 @@ try {
      FROM creators c
      LEFT JOIN creator_collection_stats stats ON stats.creator_id = c.id
      WHERE c.removed_from_index_at IS NULL`,
+  );
+  const [bucketRows] = await connection.query(
+    `SELECT MOD(CRC32(c.id), ?) AS bucket,
+            COALESCE(SUM(stats.media_count >= 1), 0) AS overview,
+            COALESCE(SUM(stats.photo_count >= 12), 0) AS photos,
+            COALESCE(SUM(stats.video_count >= 4), 0) AS videos,
+            COALESCE(SUM(
+              stats.media_count >= 24 AND stats.engaged_count >= 8
+            ), 0) AS popular
+     FROM creators c
+     LEFT JOIN creator_collection_stats stats ON stats.creator_id = c.id
+     WHERE c.removed_from_index_at IS NULL
+     GROUP BY MOD(CRC32(c.id), ?)
+     ORDER BY bucket`,
+    [sitemapBuckets, sitemapBuckets],
   );
   await connection.commit();
 
@@ -85,6 +103,26 @@ try {
     0,
     `creator collection stats differ from public media: ${JSON.stringify(mismatches.slice(0, 5))}`,
   );
+  const bucketMaxima = { overview: 0, photos: 0, videos: 0, popular: 0 };
+  for (const row of bucketRows) {
+    const bucket = Number(row.bucket);
+    assert.ok(
+      Number.isInteger(bucket) && bucket >= 0 && bucket < sitemapBuckets,
+      `invalid creator sitemap bucket: ${row.bucket}`,
+    );
+    for (const collection of Object.keys(bucketMaxima)) {
+      bucketMaxima[collection] = Math.max(
+        bucketMaxima[collection],
+        Number(row[collection]),
+      );
+    }
+  }
+  for (const [collection, count] of Object.entries(bucketMaxima)) {
+    assert.ok(
+      count <= maxCreatorsPerSitemap,
+      `${collection} bucket exceeds creator sitemap capacity: ${count} > ${maxCreatorsPerSitemap}`,
+    );
+  }
   const counts = countRows[0];
   console.log(JSON.stringify({
     ok: true,
@@ -95,6 +133,8 @@ try {
     photos: Number(counts.photos),
     videos: Number(counts.videos),
     popular: Number(counts.popular),
+    sitemapBuckets,
+    maxCreatorsPerBucket: bucketMaxima,
   }));
 } catch (error) {
   await connection.rollback();

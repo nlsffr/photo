@@ -28,6 +28,12 @@ test("creator collection summary migration maintains only public eligibility cou
     sql,
     /LOCK TABLES photos AS p READ, creators READ, creator_collection_stats WRITE/,
   );
+  assert.match(sql, /SET SESSION lock_wait_timeout = 5/);
+  assert.match(sql, /SET SESSION innodb_lock_wait_timeout = 5/);
+  assert.ok(
+    (sql.match(/SET STATEMENT max_statement_time=15 FOR/g) ?? []).length >= 2,
+    "both reset and grouped backfill must be time bounded",
+  );
   assert.match(sql, /UNLOCK TABLES/);
 });
 
@@ -46,5 +52,17 @@ test("creator collection counters ignore ordinary view writes and reconcile stru
   assert.match(sql, /OLD\.created_at <=> NEW\.created_at/);
   assert.match(sql, /OLD\.source_views_count[\s\S]*NEW\.source_views_count/);
   assert.match(sql, /OLD\.source_likes_count[\s\S]*NEW\.source_likes_count/);
-  assert.ok((sql.match(/ON DUPLICATE KEY UPDATE/g) ?? []).length >= 4);
+  assert.ok((sql.match(/ON DUPLICATE KEY UPDATE/g) ?? []).length >= 3);
+
+  const updateTrigger = sql.match(
+    /CREATE TRIGGER trg_photos_collection_stats_au[\s\S]*?END\$\$/,
+  )?.[0] ?? "";
+  const deleteTrigger = sql.match(
+    /CREATE TRIGGER trg_photos_collection_stats_ad[\s\S]*?END\$\$/,
+  )?.[0] ?? "";
+  assert.match(updateTrigger, /media_count = IF\(media_count > 0, media_count - 1, 0\)/);
+  assert.match(updateTrigger, /media_count = media_count \+ VALUES\(media_count\)/);
+  assert.match(deleteTrigger, /media_count = IF\(media_count > 0, media_count - 1, 0\)/);
+  assert.doesNotMatch(updateTrigger, /COUNT\(p\.id\)/);
+  assert.doesNotMatch(deleteTrigger, /COUNT\(p\.id\)/);
 });
