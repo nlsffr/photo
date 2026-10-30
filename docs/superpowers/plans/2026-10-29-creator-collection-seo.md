@@ -256,4 +256,3 @@ git commit -m "feat: enrich creator collection structured data"
 After all reviewed tasks, run `node --experimental-strip-types --test tests/*.test.ts && npm run build`, then start the production build on an unused local port with demo data. Check representative eligible/ineligible overview, photos, videos and popular routes in unprefixed/EN/FR forms; page 2 canonicals; invalid/reserved routes; JSON-LD parsing; and absence of localized media routes. Browser-check desktop/mobile tabs, load-more append behavior, direct page-2 access, back navigation, 404 handling and layout stability.
 
 Do not deploy while the VPS origin and SSH remain unavailable. Deployment later requires a production DB collision audit for public IDs `photos`, `videos`, `popular`, remote build, health checks, representative 200/404/410 responses and Search Console validation.
-

@@ -1,7 +1,7 @@
 # LeakFanHub Programmatic SEO — Design Specification
 
-**Date:** 2026-10-29  
-**Status:** Approved for implementation  
+**Date:** 2026-10-29
+**Status:** Approved for implementation
 **Branch:** `fix/search-indexing-20261029`
 
 ## Intent
