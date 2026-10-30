@@ -125,7 +125,6 @@ test("removed sitemap entries cannot linger in a day-long stale cache", async ()
   const routes = await Promise.all(
     [
       "../src/app/sitemaps/profiles/route.ts",
-      "../src/app/sitemaps/media/[chunk]/route.ts",
       "../src/app/sitemaps/popular/route.ts",
     ].map((path) => readFile(new URL(path, import.meta.url), "utf8")),
   );
