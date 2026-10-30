@@ -40,7 +40,9 @@ def mysql(sql):
 def sql_text(value):
     if value is None:
         return "NULL"
-    return "CONVERT(X'" + str(value).encode("utf-8").hex() + "' USING utf8mb4)"
+    # Production tables use several utf8mb4 collations. An explicit collation
+    # avoids MariaDB's illegal-mix error for an IN list of converted literals.
+    return "CONVERT(X'" + str(value).encode("utf-8").hex() + "' USING utf8mb4) COLLATE utf8mb4_unicode_ci"
 
 
 def ensure_schema():

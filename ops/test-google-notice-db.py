@@ -26,12 +26,12 @@ def main():
         created = True
         listener.DB = database
         listener.mysql("""
-          CREATE TABLE creators (id VARCHAR(36) PRIMARY KEY, handle VARCHAR(100) UNIQUE,
+          CREATE TABLE creators (id VARCHAR(36) PRIMARY KEY, handle VARCHAR(100) COLLATE utf8mb4_unicode_ci UNIQUE,
             is_hidden TINYINT NOT NULL DEFAULT 0, removed_from_index_at DATETIME NULL,
-            url_version INT NOT NULL DEFAULT 1) ENGINE=InnoDB;
-          CREATE TABLE photos (id VARCHAR(36) PRIMARY KEY, creator_id VARCHAR(36), source_id VARCHAR(191),
+            url_version INT NOT NULL DEFAULT 1) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+          CREATE TABLE photos (id VARCHAR(36) PRIMARY KEY, creator_id VARCHAR(36), source_id VARCHAR(191) COLLATE utf8mb4_general_ci,
             is_hidden TINYINT NOT NULL DEFAULT 0, removed_from_index_at DATETIME NULL,
-            url_version INT NOT NULL DEFAULT 1) ENGINE=InnoDB;
+            url_version INT NOT NULL DEFAULT 1) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
           INSERT INTO creators (id,handle,url_version) VALUES ('creator-one','example',3),('creator-two','other',1);
           INSERT INTO photos (id,creator_id,source_id,url_version) VALUES ('photo-one','creator-one','123',2),('photo-two','creator-two','456',1);
         """)
