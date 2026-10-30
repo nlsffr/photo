@@ -170,8 +170,9 @@ test("distinguishes real top-level pages from route namespaces", async () => {
 });
 
 test("uses conservative media chunks without truncating the catalog", async () => {
-  const { mediaSitemapFileCount } = await loadPolicy();
+  const { MAX_MEDIA_SITEMAP_FILES, mediaSitemapFileCount } = await loadPolicy();
 
+  assert.equal(MAX_MEDIA_SITEMAP_FILES, 49_993);
   assert.equal(mediaSitemapFileCount(0), 0);
   assert.equal(mediaSitemapFileCount(1), 1);
   assert.equal(mediaSitemapFileCount(80_001), 41);

@@ -3,7 +3,7 @@ import "server-only";
 import type { RowDataPacket } from "mysql2";
 import { requireDbPool } from "./db-pool";
 import { toIso, type MediaType } from "./types";
-import { activeCreatorSql, activeMediaSql } from "./providers/active-content-sql";
+import { activeMediaSql } from "./providers/active-content-sql";
 import {
   buildSitemapPartitions,
   decodeSitemapCursor,
@@ -22,6 +22,9 @@ import {
   SITEMAP_PARTITION_BOUNDARIES_SQL,
   sitemapPartitionMediaSql,
 } from "./sitemap-query";
+import type { CreatorSitemapProfile } from "./creator-sitemap";
+import type { CreatorCollection } from "./creator-collections";
+import { creatorSitemapProfilesSql } from "./creator-sitemap-query";
 
 export type SitemapMedia = {
   id: string;
@@ -37,12 +40,6 @@ export type SitemapMedia = {
   type: MediaType;
   durationSec?: number;
   views: number;
-};
-
-export type SitemapProfile = {
-  handle: string;
-  urlVersion: number;
-  updatedAt: string | null;
 };
 
 type SitemapMediaRow = RowDataPacket & {
@@ -61,10 +58,11 @@ type SitemapMediaRow = RowDataPacket & {
   views_count: number | string | null;
 };
 
-type SitemapProfileRow = RowDataPacket & {
+type CreatorSitemapProfileRow = RowDataPacket & {
   handle: string;
   url_version: number | null;
   updated_at: Date | string | null;
+  last_content_at: Date | string | null;
 };
 
 type SitemapBoundaryRow = RowDataPacket & {
@@ -235,20 +233,19 @@ export async function getPopularSitemapMedia(
   return rows.map(mapSitemapMedia);
 }
 
-export async function getSitemapProfiles(): Promise<SitemapProfile[]> {
-  const [rows] = await requireDbPool().query<SitemapProfileRow[]>(
-    `SET STATEMENT max_statement_time=10 FOR
-     SELECT c.handle,
-            COALESCE(c.url_version, 1) AS url_version,
-            c.updated_at
-     FROM creators c
-     WHERE ${activeCreatorSql("c")}
-     ORDER BY c.id
-     LIMIT 50000`,
+export async function getCreatorSitemapProfiles(
+  collection: CreatorCollection,
+  limit = 24_001,
+): Promise<CreatorSitemapProfile[]> {
+  const safeLimit = Math.min(24_001, Math.max(1, Math.floor(limit)));
+  const [rows] = await requireDbPool().query<CreatorSitemapProfileRow[]>(
+    creatorSitemapProfilesSql(collection),
+    [safeLimit],
   );
   return rows.map((row) => ({
     handle: row.handle,
     urlVersion: Number(row.url_version) || 1,
     updatedAt: toIso(row.updated_at),
+    lastContentAt: toIso(row.last_content_at),
   }));
 }

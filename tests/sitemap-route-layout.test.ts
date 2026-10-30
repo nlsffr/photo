@@ -49,6 +49,22 @@ test("the route-owned sitemap index delegates localized pages to the static chil
   assert.match(robots, /\$\{SITE\}\/sitemap\.xml/);
 });
 
+test("creator collection sitemaps reuse a bounded five-minute cache per collection", async () => {
+  const [profileRoute, collectionRoute, dataSource] = await Promise.all([
+    readFile(join(APP_ROUTES, "sitemaps/profiles/route.ts"), "utf8"),
+    readFile(join(APP_ROUTES, "sitemaps/collections/[collection]/route.ts"), "utf8"),
+    readFile(new URL("../src/lib/creator-sitemap-data.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(profileRoute, /loadCreatorSitemap\("overview"\)/);
+  assert.match(collectionRoute, /loadCreatorSitemap\(collection\)/);
+  assert.match(dataSource, /createAsyncTtlCacheMap/);
+  assert.match(dataSource, /getCreatorSitemapProfiles/);
+  assert.match(dataSource, /const CACHE_TTL_MS = 5 \* 60 \* 1_000/);
+  assert.match(dataSource, /CREATOR_SITEMAP_PROFILE_LIMIT \+ 1/);
+  assert.match(dataSource, /assertCreatorSitemapCapacity\(profiles\)/);
+});
+
 test("expensive sitemap routes reuse one five-minute in-process rendering", async () => {
   const [indexRoute, popularRoute] = await Promise.all([
     readFile(join(APP_ROUTES, "sitemap.xml/route.ts"), "utf8"),

@@ -17,6 +17,9 @@ const loadSitemapIndex = createAsyncTtlCache(async () => {
     `${SITE}/sitemaps/static`,
     `${SITE}/sitemaps/popular`,
     `${SITE}/sitemaps/profiles`,
+    `${SITE}/sitemaps/collections/photos`,
+    `${SITE}/sitemaps/collections/videos`,
+    `${SITE}/sitemaps/collections/popular`,
     `${SITE}/sitemaps/tags`,
     ...partitions.map((partition) => `${SITE}${partition.path}`),
   ];
