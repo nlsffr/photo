@@ -127,6 +127,109 @@ internal is ever reachable from the public internet. Only the edge is public.
 - Optional Grafana + Prometheus + Loki (VPN-only).
 - The app exposes `/api/healthz` (liveness) and `/api/readyz` (readiness).
 
+### First-party traffic and live presence
+
+Apply `migrations/016-analytics-presence.sql` and set a stable server-only
+`ANALYTICS_HASH_SECRET` (at least 16 characters; 32+ random bytes recommended).
+If it is temporarily omitted, the app falls back to the existing
+`SESSION_SECRET`; neither value is exposed to the browser.
+
+The measurements have deliberately separate meanings:
+
+- registered accounts are rows in `users`;
+- unexpired sessions are 30-day login credentials and are **not** people online;
+- daily visitors are random first-party visitor cookies aggregated by UTC day;
+- live presence is a heartbeat observed during the last five minutes.
+
+Run the operator-only report inside the production app container (the VPS host
+does not need a separate Node.js installation):
+
+```bash
+docker exec photo-app-1 node scripts/analytics-report.mjs
+# Optional UTC day:
+docker exec photo-app-1 node scripts/analytics-report.mjs 2026-10-29
+```
+
+Before this migration, nginx logs and `media_views` can only provide estimates:
+proxy addresses, bots, cached responses, and missing anonymous identifiers make
+them unsuitable for an exact unique-visitor count.
+
+### Telegram Stars premium and durable form notifications
+
+The implementation follows Telegram's official digital-goods flow:
+
+- `sendInvoice` uses currency `XTR`, exactly one price, and omits
+  `provider_token`: https://core.telegram.org/bots/api#sendinvoice
+- every pre-checkout query is validated and answered within Telegram's
+  ten-second deadline: https://core.telegram.org/bots/api#answerprecheckoutquery
+- Premium activates only after `successful_payment`, whose Telegram charge ID
+  is persisted for idempotency/refunds:
+  https://core.telegram.org/bots/api#successfulpayment
+- the update offset is saved only after successful processing or durable
+  quarantine of a permanent validation failure, following `getUpdates`:
+  https://core.telegram.org/bots/api#getupdates
+
+No bot token or database password is added to the repository. Reuse the
+existing values in `/opt/photo/.env`; do not rotate them for this rollout. The
+systemd units set `TELEGRAM_WORKER_DATABASE_HOST=127.0.0.1`, so a shared
+`DATABASE_URL` that names the Docker host `mariadb` works from the VPS host
+without copying its username or password into a second variable.
+
+```bash
+cd /opt/photo-seo-fix
+docker exec -i photo-mariadb-1 mariadb -u"$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" \
+  < migrations/017-telegram-stars-outbox.sql
+
+python3 -m pip install -r workers/requirements.txt
+install -m 0644 infra/systemd/leakfanhub-telegram-premium.service /etc/systemd/system/
+install -m 0644 infra/systemd/leakfanhub-notification-worker.service /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now leakfanhub-telegram-premium.service
+systemctl enable --now leakfanhub-notification-worker.service
+```
+
+Verify without making a real purchase:
+
+```bash
+systemctl is-active leakfanhub-telegram-premium.service leakfanhub-notification-worker.service
+journalctl -u leakfanhub-telegram-premium.service -n 30 --no-pager
+journalctl -u leakfanhub-notification-worker.service -n 30 --no-pager
+```
+
+Then sign in, open `/premium`, create one order, and verify that the deep link
+opens `@LeakFanHubBot` with the exact Stars invoice. Do not mark an order paid
+manually: activation is accepted only from Telegram's `successful_payment`.
+
+Rollback is reversible: stop and disable both units, then roll back the app
+image. Migration 017 is additive and may remain in place; pending orders expire
+after 30 minutes and no existing credentials are changed.
+
+### Search Console report and canonical sitemap
+
+Reuse the existing service-account file; this rollout does not create, replace,
+print, or rotate a Google credential. The script requests only a Search Console
+OAuth scope: read-only for reports, or read/write only when `--submit-sitemap`
+is explicitly supplied.
+
+```bash
+python3 -m pip install -r scripts/requirements-search-console.txt
+python3 scripts/search-console-report.py \
+  --key-file /opt/photo/dmca/gsc_key.json \
+  --inspect-url https://leakfanhub.com/ \
+  --inspect-url https://leakfanhub.com/models
+
+# After the public /sitemap.xml smoke check succeeds:
+python3 scripts/search-console-report.py \
+  --key-file /opt/photo/dmca/gsc_key.json \
+  --sitemap https://leakfanhub.com/sitemap.xml \
+  --submit-sitemap
+```
+
+Output is a bounded summary of properties, Search Analytics totals, and URL
+Inspection verdicts. It never emits the OAuth token, private key, or raw API
+responses. Search Console accepts a full sitemap URL through `sitemaps.submit`:
+https://developers.google.com/webmaster-tools/v1/sitemaps/submit
+
 ## Local development
 
 ```bash

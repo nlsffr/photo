@@ -66,6 +66,18 @@ src/
 | POST | `/api/views` | Increment view |
 | GET | `/api/premium/status` | Premium flag |
 
+## Account status
+
+- Registration, email-or-username login, 30-day server sessions, logout, and
+  subscription-backed premium checks are implemented.
+- Email verification and password recovery are **not active**. Production has
+  no outbound email provider configured, so the UI must not claim that a reset
+  message can be sent yet.
+- The implementation plan is tracked in
+  `docs/superpowers/plans/2026-10-29-account-recovery.md`. Enable it only after
+  an outbound sender is configured, then perform the documented test-account
+  round trip before advertising recovery as available.
+
 ## Redis keys
 
 ```

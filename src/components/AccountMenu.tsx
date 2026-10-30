@@ -4,9 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useSession } from "./Session";
+import { useLocale } from "./LocaleProvider";
+import { localePath } from "@/lib/i18n/config";
 
 export function AccountMenu() {
   const { user, loading, logout } = useSession();
+  const { locale, t } = useLocale();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
@@ -32,14 +35,14 @@ export function AccountMenu() {
     return (
       <>
         <Link
-          href="/inscription"
+          href={localePath(locale, "/inscription")}
           className="hidden items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-3.5 py-2 text-sm font-bold text-white hover:bg-[var(--color-accent-600)] sm:inline-flex"
         >
-          S’inscrire
+          {t("shell.navigation.signup")}
         </Link>
         <Link
-          href="/connexion"
-          aria-label="Connexion"
+          href={localePath(locale, "/connexion")}
+          aria-label={t("shell.navigation.login")}
           className="grid h-9 w-9 place-items-center rounded-full bg-[var(--color-surface-2)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
@@ -60,7 +63,7 @@ export function AccountMenu() {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        aria-label="Mon compte"
+        aria-label={t("shell.account.label")}
         aria-expanded={open}
         className="grid h-9 w-9 place-items-center rounded-full bg-[var(--color-accent)] text-sm font-black text-white"
       >
@@ -79,30 +82,30 @@ export function AccountMenu() {
           </div>
           <nav className="flex flex-col py-1 text-sm">
             <Link
-              href="/favoris"
+              href={localePath(locale, "/favoris")}
               onClick={() => setOpen(false)}
               className="px-4 py-2 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink)]"
             >
-              Mes enregistrements
+              {t("shell.account.saved")}
             </Link>
             <Link
-              href="/abonnements"
+              href={localePath(locale, "/abonnements")}
               onClick={() => setOpen(false)}
               className="px-4 py-2 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink)]"
             >
-              Mes abonnements
+              {t("shell.account.following")}
             </Link>
             <button
               type="button"
               onClick={async () => {
                 setOpen(false);
                 await logout();
-                router.push("/");
+                router.push(localePath(locale, "/"));
                 router.refresh();
               }}
               className="px-4 py-2 text-left text-red-400 hover:bg-[var(--color-surface-2)]"
             >
-              Se déconnecter
+              {t("shell.account.logout")}
             </button>
           </nav>
         </div>

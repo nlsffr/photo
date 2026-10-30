@@ -11,12 +11,14 @@ export function CreatorCard({ creator }: { creator: CreatorWithStats }) {
   return (
     <Link
       href={creatorHref(creator.handle, creator.urlVersion)}
+      prefetch={false}
       className="group block overflow-hidden rounded-2xl bg-[var(--color-surface)] ring-1 ring-[var(--color-border)] transition hover:ring-[var(--color-accent)]/60"
     >
       <div className="relative aspect-[3/4] overflow-hidden bg-[var(--color-surface-2)]">
         {img ? (
           <MediaImg
             src={img}
+            fallbackSrc={creator.coverUrl}
             alt={creator.name}
             fill
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"

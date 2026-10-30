@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { registerUser, createSession } from "@/lib/auth-db";
+import { registerUser } from "@/lib/auth-db";
 import {
   SESSION_COOKIE,
   SESSION_TTL_DAYS,
@@ -7,7 +7,7 @@ import {
   validateEmail,
   validatePassword,
 } from "@/lib/auth";
-import { anonKey, rateLimit, sweep } from "@/lib/ratelimit";
+import { rateLimitRequest, sweep } from "@/lib/ratelimit";
 
 const MESSAGES: Record<string, string> = {
   email_taken: "Cet e-mail est déjà utilisé.",
@@ -18,8 +18,12 @@ const MESSAGES: Record<string, string> = {
 
 export async function POST(request: Request) {
   sweep();
-  const coarse = request.headers.get("x-ratelimit-bucket") ?? "shared-auth-bucket";
-  const { allowed } = rateLimit(anonKey(`register:${coarse}`), 10, 600_000);
+  const { allowed } = rateLimitRequest(request, {
+    scope: "register",
+    limit: 10,
+    peerLimit: 100,
+    windowMs: 600_000,
+  });
   if (!allowed) {
     return Response.json({ ok: false, error: "rate_limited", message: "Trop de tentatives, réessaie plus tard." }, { status: 429 });
   }
@@ -43,24 +47,22 @@ export async function POST(request: Request) {
 
   const result = await registerUser({ email, username, password });
   if (!result.ok) {
-    const status = result.error === "no_db" ? 503 : 409;
+    const status =
+      result.error === "no_db" ? 503 : result.error === "failed" ? 500 : 409;
     return Response.json(
       { ok: false, error: result.error, message: MESSAGES[result.error] },
       { status },
     );
   }
 
-  const token = await createSession(result.user.id);
-  if (token) {
-    const jar = await cookies();
-    jar.set(SESSION_COOKIE, token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: SESSION_TTL_DAYS * 24 * 60 * 60,
-    });
-  }
+  const jar = await cookies();
+  jar.set(SESSION_COOKIE, result.token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: SESSION_TTL_DAYS * 24 * 60 * 60,
+  });
 
   return Response.json({ ok: true, user: result.user });
 }

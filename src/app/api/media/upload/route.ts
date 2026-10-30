@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCreator } from "@/lib/photos";
+import { isRemovedContent } from "@/lib/public-content-policy";
 
 export async function POST(request: Request) {
   try {
@@ -22,7 +23,7 @@ export async function POST(request: Request) {
     }
 
     const found = await getCreator(creator);
-    if (!found) {
+    if (!found || isRemovedContent(found)) {
       return NextResponse.json(
         { error: "Créateur inconnu — choisis un handle existant" },
         { status: 400 },

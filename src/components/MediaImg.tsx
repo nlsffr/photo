@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useState } from "react";
+import { normalizeMediaSources } from "@/lib/types";
 
 /**
  * Gallery media. /media/* bypasses Next optimizer (nginx → B2).
@@ -9,6 +10,7 @@ import { useState } from "react";
  */
 export function MediaImg({
   src,
+  fallbackSrc,
   alt,
   fill,
   width,
@@ -18,6 +20,7 @@ export function MediaImg({
   priority,
 }: {
   src: string;
+  fallbackSrc?: string;
   alt: string;
   fill?: boolean;
   width?: number;
@@ -26,14 +29,22 @@ export function MediaImg({
   className?: string;
   priority?: boolean;
 }) {
-  const [failed, setFailed] = useState(false);
-  const safeSrc = (src || "").trim();
+  const sources = normalizeMediaSources(src, fallbackSrc);
+  const sourceKey = sources.join("\u0000");
+  const [sourceState, setSourceState] = useState({ key: sourceKey, index: 0 });
+  const sourceIndex = sourceState.key === sourceKey ? sourceState.index : 0;
+  const safeSrc = sources[sourceIndex] || "";
+  const tryNextSource = () =>
+    setSourceState((current) => ({
+      key: sourceKey,
+      index: current.key === sourceKey ? current.index + 1 : 1,
+    }));
   const isLocalMedia =
     safeSrc.startsWith("/media/") ||
     safeSrc.startsWith("/media?") ||
     (!safeSrc.includes("://") && safeSrc.includes("/media/"));
 
-  if (!safeSrc || failed) {
+  if (!safeSrc) {
     if (fill) {
       return (
         <div
@@ -73,7 +84,7 @@ export function MediaImg({
           className={className}
           loading={priority ? "eager" : "lazy"}
           decoding="async"
-          onError={() => setFailed(true)}
+          onError={tryNextSource}
           style={{
             position: "absolute",
             inset: 0,
@@ -94,7 +105,7 @@ export function MediaImg({
         className={className}
         loading={priority ? "eager" : "lazy"}
         decoding="async"
-        onError={() => setFailed(true)}
+        onError={tryNextSource}
       />
     );
   }
@@ -110,7 +121,7 @@ export function MediaImg({
       className={className}
       priority={priority}
       unoptimized
-      onError={() => setFailed(true)}
+      onError={tryNextSource}
     />
   );
 }

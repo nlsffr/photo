@@ -7,6 +7,11 @@ import { SearchBar } from "./SearchBar";
 import { AccountMenu } from "./AccountMenu";
 import { BrandLogo } from "./BrandLogo";
 import { LanguageSwitcher, useLocale } from "./LocaleProvider";
+import {
+  localizedHref,
+  localePath,
+  stripLocalePrefix,
+} from "@/lib/i18n/config";
 
 type NavItem = {
   href: string;
@@ -64,18 +69,19 @@ const SECTIONS: NavSection[] = [
 
 function NavContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
-  const { t } = useLocale();
+  const routePath = stripLocalePrefix(pathname).pathname;
+  const { locale, t } = useLocale();
   return (
     <nav className="flex flex-col gap-4">
       {SECTIONS.map((section, si) => (
         <div key={si} className="flex flex-col gap-0.5">
           {section.titleKey && (
             <p className="px-3 pb-1 pt-2 text-xs font-bold uppercase tracking-wide text-[var(--color-ink-faint)]">
-              {t(section.titleKey)}
+              {t(`shell.navigation.${section.titleKey}`)}
             </p>
           )}
           {section.items.map((item) => {
-            const isActive = item.active?.(pathname) ?? false;
+            const isActive = item.active?.(routePath) ?? false;
             const color =
               item.accent === "gold"
                 ? "text-amber-400"
@@ -90,13 +96,13 @@ function NavContent({ onNavigate }: { onNavigate?: () => void }) {
             return (
               <Link
                 key={item.href + item.labelKey}
-                href={item.href}
-                prefetch={true}
+                href={localizedHref(locale, item.href)}
+                prefetch={false}
                 onClick={onNavigate}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2 text-[15px] font-medium transition-colors ${color} ${bg}`}
               >
                 <span className="shrink-0">{item.icon}</span>
-                {t(item.labelKey)}
+                {t(`shell.navigation.${item.labelKey}`)}
               </Link>
             );
           })}
@@ -174,16 +180,17 @@ function TabIcon({ name }: { name: (typeof TABS)[number]["icon"] }) {
 
 function BottomTabs() {
   const pathname = usePathname();
-  const { t } = useLocale();
+  const routePath = stripLocalePrefix(pathname).pathname;
+  const { locale, t } = useLocale();
   return (
     <nav className="fixed inset-x-0 bottom-0 z-50 flex h-[calc(3.75rem+env(safe-area-inset-bottom))] items-stretch border-t border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-bg)_92%,transparent)] pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden">
       {TABS.map((tab) => {
-        const active = tab.active(pathname);
+        const active = tab.active(routePath);
         return (
           <Link
             key={tab.href}
-            href={tab.href}
-            prefetch={true}
+            href={localizedHref(locale, tab.href)}
+            prefetch={false}
             className={`flex flex-1 flex-col items-center justify-center gap-1 text-[10px] font-medium leading-none ${
               active ? "text-[var(--color-accent)]" : "text-[var(--color-ink-muted)]"
             }`}
@@ -191,7 +198,9 @@ function BottomTabs() {
             <span className="grid h-[22px] w-[22px] place-items-center">
               <TabIcon name={tab.icon} />
             </span>
-            <span className="w-full truncate text-center">{t(tab.labelKey)}</span>
+            <span className="w-full truncate text-center">
+              {t(`shell.navigation.${tab.labelKey}`)}
+            </span>
           </Link>
         );
       })}
@@ -200,13 +209,18 @@ function BottomTabs() {
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
   const pathname = usePathname();
-  const isFeed = pathname.startsWith("/feed") || pathname.startsWith("/tiktok");
+  const routePath = stripLocalePrefix(pathname).pathname;
+  const { locale, t } = useLocale();
+  const [openPath, setOpenPath] = useState<string | null>(null);
+  const open = openPath === pathname;
+  const isFeed = routePath.startsWith("/feed") || routePath.startsWith("/tiktok");
 
   useEffect(() => {
-    setOpen(false);
-  }, [pathname]);
+    if (openPath === null || openPath === pathname) return;
+    const frame = window.requestAnimationFrame(() => setOpenPath(null));
+    return () => window.cancelAnimationFrame(frame);
+  }, [openPath, pathname]);
 
   useEffect(() => {
     if (!open) return;
@@ -222,8 +236,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <header className="sticky top-0 z-40 flex min-h-14 items-center gap-2 border-b border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-bg)_90%,transparent)] px-3 pt-[env(safe-area-inset-top)] backdrop-blur-xl sm:gap-3 sm:px-4">
         <button
           type="button"
-          onClick={() => setOpen(true)}
-          aria-label="Menu"
+          onClick={() => setOpenPath(pathname)}
+          aria-label={t("shell.menu")}
           className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-2)] lg:hidden"
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
@@ -231,7 +245,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </svg>
         </button>
 
-        <BrandLogo />
+        <BrandLogo href={localePath(locale, "/")} />
 
         <div className="ml-auto hidden min-w-0 max-w-xs flex-1 sm:block md:max-w-sm">
           <Suspense fallback={<div className="h-9 w-full rounded-full border border-[var(--color-border)] bg-[var(--color-surface)]" />}>
@@ -241,14 +255,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <div className="ml-auto flex shrink-0 items-center gap-1 sm:ml-0 sm:gap-1.5">
           <Link
-            href="/premium"
+            href={localePath(locale, "/premium")}
+            prefetch={false}
             className="hidden rounded-full bg-amber-400/15 px-3 py-1.5 text-xs font-bold text-amber-400 hover:bg-amber-400/25 sm:inline"
           >
             Premium
           </Link>
           <Link
-            href="/add"
-            aria-label="Add"
+            href={localePath(locale, "/add")}
+            prefetch={false}
+            aria-label={t("shell.add")}
             className="hidden h-9 w-9 place-items-center rounded-lg bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-600)] sm:grid"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
@@ -256,8 +272,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </svg>
           </Link>
           <Link
-            href="/recherche"
-            aria-label="Search"
+            href={localePath(locale, "/recherche")}
+            prefetch={false}
+            aria-label={t("shell.search")}
             className="grid h-9 w-9 place-items-center rounded-lg text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-2)] sm:hidden"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
@@ -290,20 +307,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {open && (
         <div className="fixed inset-0 z-[60] lg:hidden">
-          <button type="button" className="absolute inset-0 bg-black/50" aria-label="Close menu" onClick={() => setOpen(false)} />
+          <button type="button" className="absolute inset-0 bg-black/50" aria-label={t("shell.closeMenu")} onClick={() => setOpenPath(null)} />
           <div className="absolute inset-y-0 left-0 flex w-[min(20rem,88vw)] flex-col bg-[var(--color-bg)] shadow-2xl">
             <div className="flex items-center justify-between gap-2 border-b border-[var(--color-border)] p-3 pb-2">
-              <BrandLogo />
-              <button onClick={() => setOpen(false)} aria-label="Close" className="grid h-8 w-8 place-items-center rounded-lg text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-2)]">
+              <BrandLogo href={localePath(locale, "/")} />
+              <button onClick={() => setOpenPath(null)} aria-label={t("shell.closeMenu")} className="grid h-8 w-8 place-items-center rounded-lg text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-2)]">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
                   <path d="M18 6 6 18M6 6l12 12" />
                 </svg>
               </button>
             </div>
             <div className="flex-1 overflow-y-auto overscroll-contain px-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
-              <NavContent onNavigate={() => setOpen(false)} />
+              <NavContent onNavigate={() => setOpenPath(null)} />
               <div className="mt-4 border-t border-[var(--color-border)] pt-4">
-                <p className="mb-2 px-1 text-xs font-bold uppercase tracking-wide text-[var(--color-ink-faint)]">Langue</p>
+                <p className="mb-2 px-1 text-xs font-bold uppercase tracking-wide text-[var(--color-ink-faint)]">{t("shell.language")}</p>
                 <LanguageSwitcher className="w-full" placement="up" />
               </div>
             </div>
@@ -316,19 +333,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {!isFeed && (
         <footer className="mt-auto border-t border-[var(--color-border)] bg-[var(--color-surface)] pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0">
           <div className="mx-auto flex max-w-[1600px] flex-col items-center gap-5 px-4 py-8 text-center sm:px-6">
-            <BrandLogo size="md" />
+            <BrandLogo href={localePath(locale, "/")} size="md" />
             <p className="max-w-xl text-xs text-[var(--color-ink-muted)]">
-              18+ only. Tolérance zéro : tout contenu impliquant des mineurs est interdit et doit être signalé immédiatement.
+              {t("shell.footerSafety")}
             </p>
             <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm text-[var(--color-ink-muted)]">
-              <Link href="/conditions" className="hover:text-[var(--color-ink)]">Conditions</Link>
-              <Link href="/confidentialite" className="hover:text-[var(--color-ink)]">Confidentialité</Link>
-              <Link href="/trust-and-safety" className="hover:text-[var(--color-ink)]">Trust & Safety</Link>
-              <Link href="/dmca" className="hover:text-[var(--color-ink)]">DMCA</Link>
-              <Link href="/contact" className="hover:text-[var(--color-ink)]">Contact</Link>
-              <Link href="/contact/signalement" className="font-semibold text-[var(--color-accent)] hover:underline">Signaler</Link>
+              <Link href={localePath(locale, "/conditions")} prefetch={false} className="hover:text-[var(--color-ink)]">{t("shell.navigation.terms")}</Link>
+              <Link href={localePath(locale, "/confidentialite")} prefetch={false} className="hover:text-[var(--color-ink)]">{t("shell.navigation.privacy")}</Link>
+              <Link href={localePath(locale, "/trust-and-safety")} prefetch={false} className="hover:text-[var(--color-ink)]">{t("shell.navigation.trust")}</Link>
+              <Link href={localePath(locale, "/dmca")} prefetch={false} className="hover:text-[var(--color-ink)]">{t("shell.navigation.dmca")}</Link>
+              <Link href={localePath(locale, "/contact")} prefetch={false} className="hover:text-[var(--color-ink)]">{t("shell.navigation.contact")}</Link>
+              <Link href={localePath(locale, "/contact/signalement")} prefetch={false} className="font-semibold text-[var(--color-accent)] hover:underline">{t("shell.footerReport")}</Link>
             </nav>
-            <p className="text-xs text-[var(--color-ink-faint)]">© 2026 LeakFanHub · 18+ only</p>
+            <p className="text-xs text-[var(--color-ink-faint)]">
+              © 2026 LeakFanHub · {locale === "fr" ? "18+ uniquement" : "18+ only"}
+            </p>
           </div>
         </footer>
       )}

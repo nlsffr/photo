@@ -2,15 +2,19 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useLocale } from "@/components/LocaleProvider";
+import { localizedHref } from "@/lib/i18n/config";
 
-const TABS: { key: string | null; label: string }[] = [
-  { key: null, label: "Tout" },
-  { key: "0", label: "Réel" },
-  { key: "1", label: "IA" },
+const TABS: { key: string | null; labelKey: string }[] = [
+  { key: null, labelKey: "aiFilters.all" },
+  { key: "0", labelKey: "aiFilters.real" },
+  { key: "1", labelKey: "aiFilters.ai" },
 ];
 
 export function AiFilterTabs({ basePath = "/" }: { basePath?: string }) {
   const searchParams = useSearchParams();
+  const { locale, t } = useLocale();
+  const effectiveBasePath = localizedHref(locale, basePath);
   const active = searchParams.get("ai");
 
   function hrefFor(ai: string | null) {
@@ -18,17 +22,17 @@ export function AiFilterTabs({ basePath = "/" }: { basePath?: string }) {
     if (ai === null) p.delete("ai");
     else p.set("ai", ai);
     const qs = p.toString();
-    return qs ? `${basePath}?${qs}` : basePath;
+    return qs ? `${effectiveBasePath}?${qs}` : effectiveBasePath;
   }
 
   return (
     <div className="inline-flex items-center gap-1 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] p-1">
-      {TABS.map((t) => {
-        const isActive = (t.key ?? null) === (active ?? null);
+      {TABS.map((tab) => {
+        const isActive = (tab.key ?? null) === (active ?? null);
         return (
           <Link
-            key={t.label}
-            href={hrefFor(t.key)}
+            key={tab.key ?? "all"}
+            href={hrefFor(tab.key)}
             scroll={false}
             className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
               isActive
@@ -36,7 +40,7 @@ export function AiFilterTabs({ basePath = "/" }: { basePath?: string }) {
                 : "text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
             }`}
           >
-            {t.label}
+            {t(tab.labelKey)}
           </Link>
         );
       })}

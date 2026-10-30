@@ -1,17 +1,8 @@
 import "server-only";
-import mysql from "mysql2/promise";
-import type { RowDataPacket } from "mysql2";
+import type { ResultSetHeader, RowDataPacket } from "mysql2";
 import { randomUUID } from "node:crypto";
-
-function getPool(): mysql.Pool | null {
-  const url = process.env.DATABASE_URL;
-  if (!url) return null;
-  return mysql.createPool({
-    uri: url,
-    connectionLimit: Number(process.env.DB_POOL_SIZE ?? 10),
-    waitForConnections: true,
-  });
-}
+import { getDbPool as getPool } from "./db-pool";
+import { activeCreatorSql, activeMediaSql } from "./providers/active-content-sql";
 
 export interface InteractionState {
   liked: string[];
@@ -24,17 +15,28 @@ export async function getInteractions(userId: string): Promise<InteractionState>
   if (!db) return { liked: [], saved: [], followed: [] };
   try {
     const [likes] = await db.execute<RowDataPacket[]>(
-      "SELECT photo_id FROM likes WHERE user_id = ?",
+      `SELECT l.photo_id
+       FROM likes l
+       JOIN photos p ON p.id = l.photo_id
+       JOIN creators c ON c.id = p.creator_id
+       WHERE l.user_id = ?
+         AND ${activeMediaSql("p", "c")}`,
       [userId],
     );
     const [saves] = await db.execute<RowDataPacket[]>(
-      "SELECT photo_id FROM saves WHERE user_id = ?",
+      `SELECT s.photo_id
+       FROM saves s
+       JOIN photos p ON p.id = s.photo_id
+       JOIN creators c ON c.id = p.creator_id
+       WHERE s.user_id = ?
+         AND ${activeMediaSql("p", "c")}`,
       [userId],
     );
     const [follows] = await db.execute<RowDataPacket[]>(
       `SELECT c.handle FROM follows f
        JOIN creators c ON c.id = f.creator_id
-       WHERE f.follower_id = ?`,
+       WHERE f.follower_id = ?
+         AND ${activeCreatorSql("c")}`,
       [userId],
     );
     return {
@@ -64,10 +66,17 @@ export async function toggleLike(
     ]);
     return { on: false };
   }
-  await db.execute(
-    "INSERT INTO likes (id, user_id, photo_id) VALUES (?, ?, ?)",
+  const [inserted] = await db.execute<ResultSetHeader>(
+    `INSERT INTO likes (id, user_id, photo_id)
+     SELECT ?, ?, p.id
+     FROM photos p
+     JOIN creators c ON c.id = p.creator_id
+     WHERE p.id = ?
+       AND ${activeMediaSql("p", "c")}
+     LIMIT 1`,
     [randomUUID(), userId, photoId],
   );
+  if (inserted.affectedRows !== 1) throw new Error("photo_not_found");
   return { on: true };
 }
 
@@ -88,10 +97,17 @@ export async function toggleSave(
     ]);
     return { on: false };
   }
-  await db.execute(
-    "INSERT INTO saves (id, user_id, photo_id) VALUES (?, ?, ?)",
+  const [inserted] = await db.execute<ResultSetHeader>(
+    `INSERT INTO saves (id, user_id, photo_id)
+     SELECT ?, ?, p.id
+     FROM photos p
+     JOIN creators c ON c.id = p.creator_id
+     WHERE p.id = ?
+       AND ${activeMediaSql("p", "c")}
+     LIMIT 1`,
     [randomUUID(), userId, photoId],
   );
+  if (inserted.affectedRows !== 1) throw new Error("photo_not_found");
   return { on: true };
 }
 
@@ -102,10 +118,12 @@ export async function toggleFollow(
   const db = getPool();
   if (!db) throw new Error("no_db");
   const [creators] = await db.execute<RowDataPacket[]>(
-    "SELECT id FROM creators WHERE handle = ? LIMIT 1",
+    "SELECT id, removed_from_index_at FROM creators WHERE handle = ? LIMIT 1",
     [handle],
   );
-  const creator = creators[0] as { id: string } | undefined;
+  const creator = creators[0] as
+    | { id: string; removed_from_index_at: Date | string | null }
+    | undefined;
   if (!creator) throw new Error("creator_not_found");
 
   const [rows] = await db.execute<RowDataPacket[]>(
@@ -119,10 +137,17 @@ export async function toggleFollow(
     );
     return { on: false };
   }
-  await db.execute(
-    "INSERT INTO follows (id, follower_id, creator_id) VALUES (?, ?, ?)",
+  if (creator.removed_from_index_at) throw new Error("creator_not_found");
+  const [inserted] = await db.execute<ResultSetHeader>(
+    `INSERT INTO follows (id, follower_id, creator_id)
+     SELECT ?, ?, c.id
+     FROM creators c
+     WHERE c.id = ?
+       AND ${activeCreatorSql("c")}
+     LIMIT 1`,
     [randomUUID(), userId, creator.id],
   );
+  if (inserted.affectedRows !== 1) throw new Error("creator_not_found");
   return { on: true };
 }
 
@@ -137,7 +162,13 @@ export async function mergeLocalState(
   for (const photoId of local.liked ?? []) {
     try {
       await db.execute(
-        "INSERT IGNORE INTO likes (id, user_id, photo_id) VALUES (?, ?, ?)",
+        `INSERT IGNORE INTO likes (id, user_id, photo_id)
+         SELECT ?, ?, p.id
+         FROM photos p
+         JOIN creators c ON c.id = p.creator_id
+         WHERE p.id = ?
+           AND ${activeMediaSql("p", "c")}
+         LIMIT 1`,
         [randomUUID(), userId, photoId],
       );
     } catch {
@@ -147,7 +178,13 @@ export async function mergeLocalState(
   for (const photoId of local.saved ?? []) {
     try {
       await db.execute(
-        "INSERT IGNORE INTO saves (id, user_id, photo_id) VALUES (?, ?, ?)",
+        `INSERT IGNORE INTO saves (id, user_id, photo_id)
+         SELECT ?, ?, p.id
+         FROM photos p
+         JOIN creators c ON c.id = p.creator_id
+         WHERE p.id = ?
+           AND ${activeMediaSql("p", "c")}
+         LIMIT 1`,
         [randomUUID(), userId, photoId],
       );
     } catch {
@@ -157,7 +194,11 @@ export async function mergeLocalState(
   for (const handle of local.followed ?? []) {
     try {
       const [creators] = await db.execute<RowDataPacket[]>(
-        "SELECT id FROM creators WHERE handle = ? LIMIT 1",
+        `SELECT id
+         FROM creators c
+         WHERE handle = ?
+           AND ${activeCreatorSql("c")}
+         LIMIT 1`,
         [handle],
       );
       const c = creators[0] as { id: string } | undefined;

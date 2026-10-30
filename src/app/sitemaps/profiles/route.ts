@@ -1,8 +1,10 @@
-import { getModels } from "@/lib/photos";
+import { createAsyncTtlCache } from "@/lib/async-ttl-cache";
+import { getSitemapProfiles } from "@/lib/sitemap-data";
 import { creatorHref, toIso } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
-export const revalidate = 3600;
+export const revalidate = 300;
+const CACHE_TTL_MS = 5 * 60 * 1_000;
 
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").replace(
   /\/$/,
@@ -17,29 +19,15 @@ function xmlEscape(value: string): string {
     .replace(/"/g, "&" + "quot;");
 }
 
-export async function GET() {
-  const now = new Date().toISOString();
-  let models: {
-    handle: string;
-    urlVersion?: number;
-    updatedAt?: string | null;
-    removedFromIndexAt?: string | null;
-  }[] = [];
-  try {
-    models = await getModels("followers");
-  } catch {
-    models = [];
-  }
-
-  const urls = models
-    .filter((m) => !m.removedFromIndexAt)
-    .map((m) => {
-      const href = creatorHref(m.handle, m.urlVersion);
-      const lastmod = toIso(m.updatedAt) ?? now;
+const loadProfileSitemap = createAsyncTtlCache(async () => {
+  const profiles = await getSitemapProfiles();
+  const urls = profiles
+    .map((profile) => {
+      const href = creatorHref(profile.handle, profile.urlVersion);
+      const lastmod = toIso(profile.updatedAt);
       return `  <url>
     <loc>${xmlEscape(`${SITE}${href}`)}</loc>
-    <lastmod>${lastmod}</lastmod>
-    <changefreq>daily</changefreq>
+${lastmod ? `    <lastmod>${lastmod}</lastmod>\n` : ""}    <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>`;
     })
@@ -51,10 +39,24 @@ ${urls}
 </urlset>
 `;
 
+  return body;
+}, CACHE_TTL_MS);
+
+export async function GET() {
+  let body: string;
+  try {
+    body = await loadProfileSitemap();
+  } catch {
+    return new Response("Sitemap temporarily unavailable\n", {
+      status: 503,
+      headers: { "Retry-After": "60", "Cache-Control": "no-store" },
+    });
+  }
+
   return new Response(body, {
     headers: {
       "Content-Type": "application/xml; charset=utf-8",
-      "Cache-Control": "public, max-age=3600",
+      "Cache-Control": "public, max-age=300, stale-while-revalidate=60",
     },
   });
 }

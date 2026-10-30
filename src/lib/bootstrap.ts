@@ -9,13 +9,9 @@
 import "server-only";
 import { setDataProvider } from "./data-provider";
 import { log } from "./logger";
+import { createAsyncOnce } from "./async-once";
 
-let initialised = false;
-
-export async function ensureDataProvider() {
-  if (initialised) return;
-  initialised = true;
-
+export const ensureDataProvider = createAsyncOnce(async () => {
   // Preview mode: in-memory demo data (rights-free placeholders) for design work.
   if (process.env.DEMO_DATA === "1") {
     const { DemoProvider } = await import("./providers/demo");
@@ -36,4 +32,4 @@ export async function ensureDataProvider() {
     // We intentionally don't log the error details (could include the DSN).
     log.fatal("[bootstrap] data provider init failed");
   }
-}
+});

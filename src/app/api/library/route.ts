@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import mysql from "mysql2/promise";
 import type { RowDataPacket } from "mysql2";
 import { getSessionUser } from "@/lib/auth-db";
 import { SESSION_COOKIE } from "@/lib/auth";
+import { getDbPool } from "@/lib/db-pool";
+import {
+  activeCreatorSql,
+  activeMediaSql,
+} from "@/lib/providers/active-content-sql";
 
 export const dynamic = "force-dynamic";
-
-async function pool() {
-  const url = process.env.DATABASE_URL;
-  if (!url) return null;
-  return mysql.createPool({ uri: url, connectionLimit: 5, waitForConnections: true });
-}
 
 function mapPhoto(r: RowDataPacket) {
   return {
@@ -29,6 +27,7 @@ function mapPhoto(r: RowDataPacket) {
     ageMinutes: 0,
     trending: 0,
     isAi: Boolean(r.is_ai),
+    urlVersion: Number(r.url_version) || 1,
     creatorHandle: r.handle,
     tags: [] as string[],
     creator: {
@@ -36,6 +35,7 @@ function mapPhoto(r: RowDataPacket) {
       name: r.creator_name || r.handle,
       avatarUrl: r.avatar_url || "",
       verified: Boolean(r.verified),
+      urlVersion: Number(r.creator_url_version) || 1,
     },
   };
 }
@@ -53,17 +53,22 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "auth_required", items: [], creators: [] }, { status: 401 });
   }
 
-  const db = await pool();
+  const db = getDbPool();
   if (!db) return NextResponse.json({ items: [], creators: [] });
 
   try {
     if (kind === "creators") {
       const [rows] = await db.execute<RowDataPacket[]>(
         `SELECT c.id, c.handle, c.name, c.avatar_url, c.verified, c.followers_count,
-                (SELECT COUNT(*) FROM photos p WHERE p.creator_id = c.id) AS photo_count
+                COALESCE(c.url_version, 1) AS url_version,
+                (SELECT COUNT(*)
+                 FROM photos p
+                 WHERE p.creator_id = c.id
+                   AND ${activeMediaSql("p", "c")}) AS photo_count
          FROM follows f
          JOIN creators c ON c.id = f.creator_id
          WHERE f.follower_id = ?
+           AND ${activeCreatorSql("c")}
          ORDER BY f.created_at DESC
          LIMIT 200`,
         [user.id],
@@ -75,6 +80,7 @@ export async function GET(req: NextRequest) {
         verified: Boolean(r.verified),
         followers: Number(r.followers_count) || 0,
         photoCount: Number(r.photo_count) || 0,
+        urlVersion: Number(r.url_version) || 1,
       }));
       return NextResponse.json({ creators, items: [] });
     }
@@ -83,11 +89,14 @@ export async function GET(req: NextRequest) {
       const [rows] = await db.execute<RowDataPacket[]>(
         `SELECT p.id, p.source_id, p.title, p.image_url, p.video_url, p.type,
                 p.duration_sec, p.width, p.height, p.views_count, p.likes_count,
-                p.is_ai, c.handle, c.name AS creator_name, c.avatar_url, c.verified
+                p.is_ai, COALESCE(p.url_version, 1) AS url_version,
+                c.handle, c.name AS creator_name, c.avatar_url, c.verified,
+                COALESCE(c.url_version, 1) AS creator_url_version
          FROM follows f
          JOIN photos p ON p.creator_id = f.creator_id
          JOIN creators c ON c.id = p.creator_id
          WHERE f.follower_id = ?
+           AND ${activeMediaSql("p", "c")}
          ORDER BY p.created_at DESC
          LIMIT 200`,
         [user.id],
@@ -99,11 +108,14 @@ export async function GET(req: NextRequest) {
     const [rows] = await db.execute<RowDataPacket[]>(
       `SELECT p.id, p.source_id, p.title, p.image_url, p.video_url, p.type,
               p.duration_sec, p.width, p.height, p.views_count, p.likes_count,
-              p.is_ai, c.handle, c.name AS creator_name, c.avatar_url, c.verified
+              p.is_ai, COALESCE(p.url_version, 1) AS url_version,
+              c.handle, c.name AS creator_name, c.avatar_url, c.verified,
+              COALESCE(c.url_version, 1) AS creator_url_version
        FROM ${table} x
        JOIN photos p ON p.id = x.photo_id
        JOIN creators c ON c.id = p.creator_id
        WHERE x.user_id = ?
+         AND ${activeMediaSql("p", "c")}
        ORDER BY x.created_at DESC
        LIMIT 500`,
       [user.id],

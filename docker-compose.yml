@@ -21,6 +21,7 @@ services:
       S3_ACCESS_KEY: minioadmin
       S3_SECRET_KEY: minioadmin
       S3_BUCKET: lumengallery-media
+      ANALYTICS_HASH_SECRET: local-development-analytics-secret
     depends_on:
       mariadb:
         condition: service_healthy

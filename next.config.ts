@@ -65,6 +65,29 @@ const htmlCacheHeaders = [
   },
 ];
 
+const localizedIndexablePaths = [
+  "/",
+  "/models",
+  "/trending-medias",
+  "/most-liked",
+  "/classements",
+  "/influenceuses-tendances",
+  "/about",
+  "/dmca",
+  "/trust-and-safety",
+  "/contact",
+  "/conditions",
+  "/confidentialite",
+  "/mentions-legales",
+  "/qu-est-ce-que-lumengallery",
+];
+
+const localizedHtmlCacheRoutes = ["en", "fr"].flatMap((locale) =>
+  localizedIndexablePaths.map((pathname) =>
+    pathname === "/" ? `/${locale}` : `/${locale}${pathname}`,
+  ),
+);
+
 const nextConfig: NextConfig = {
   turbopack: { root: projectRoot },
   allowedDevOrigins: [
@@ -109,15 +132,13 @@ const nextConfig: NextConfig = {
       { source: "/icon", headers: mediaCacheHeaders },
       { source: "/apple-icon", headers: mediaCacheHeaders },
       { source: "/media/:path*", headers: mediaCacheHeaders },
+      ...localizedHtmlCacheRoutes.map((source) => ({ source, headers: htmlCacheHeaders })),
       { source: "/", headers: htmlCacheHeaders },
       { source: "/models", headers: htmlCacheHeaders },
       { source: "/models/:path*", headers: htmlCacheHeaders },
       { source: "/trending-medias", headers: htmlCacheHeaders },
       { source: "/most-liked", headers: htmlCacheHeaders },
       { source: "/tag/:path*", headers: htmlCacheHeaders },
-      { source: "/sitemaps", headers: htmlCacheHeaders },
-      { source: "/sitemaps/:path*", headers: htmlCacheHeaders },
-      { source: "/sitemap.xml", headers: htmlCacheHeaders },
     ];
   },
 };

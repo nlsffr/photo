@@ -1,21 +1,41 @@
-import Link from 'next/link';
+import Link from "next/link";
+import { localizedHref, type Locale } from "@/lib/i18n/config";
 
-export default function InternalLinks() {
-  const popularTags = [
-    { name: "Trending Galleries", slug: "/sitemaps/popular" },
-    { name: "Top Profiles", slug: "/sitemaps/profiles" },
-    { name: "Latest Media HD", slug: "/sitemaps/media/1" },
-  ];
+const COPY = {
+  en: {
+    label: "Popular galleries",
+    title: "Trending and popular galleries",
+    links: ["Trending galleries", "Top creators", "Most liked media"],
+  },
+  fr: {
+    label: "Galeries populaires",
+    title: "Tendances et galeries populaires",
+    links: ["Galeries tendance", "Créateurs populaires", "Médias les plus aimés"],
+  },
+} as const;
+
+const TARGETS = ["/trending-medias", "/models", "/most-liked"] as const;
+
+export default function InternalLinks({ locale }: { locale: Locale }) {
+  const copy = COPY[locale];
+  const popularTags = TARGETS.map((slug, index) => ({
+    name: copy.links[index],
+    slug,
+  }));
 
   return (
-    <nav className="my-8 p-6 bg-gray-900 rounded-lg border border-gray-800" aria-label="Maillage SEO">
-      <h3 className="text-lg font-semibold text-white mb-4">🔥 Tendances et Galeries Populaires</h3>
+    <nav
+      className="my-8 rounded-lg border border-gray-800 bg-gray-900 p-6"
+      aria-label={copy.label}
+    >
+      <h3 className="mb-4 text-lg font-semibold text-white">🔥 {copy.title}</h3>
       <ul className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {popularTags.map((tag, idx) => (
-          <li key={idx}>
-            <Link 
-              href={tag.slug}
-              className="text-gray-400 hover:text-white hover:underline block text-sm transition-colors"
+        {popularTags.map((tag) => (
+          <li key={tag.slug}>
+            <Link
+              href={localizedHref(locale, tag.slug)}
+              prefetch={false}
+              className="block text-sm text-gray-400 transition-colors hover:text-white hover:underline"
             >
               ➔ {tag.name}
             </Link>

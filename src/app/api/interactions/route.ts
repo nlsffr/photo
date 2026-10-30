@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "unknown_action" }, { status: 400 });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "failed";
-    if (msg === "creator_not_found") {
+    if (msg === "creator_not_found" || msg === "photo_not_found") {
       return NextResponse.json({ error: msg }, { status: 404 });
     }
     console.error("[interactions]", e);

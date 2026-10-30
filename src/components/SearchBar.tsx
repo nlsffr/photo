@@ -3,17 +3,22 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { creatorHref } from "@/lib/types";
+import { localePath } from "@/lib/i18n/config";
+import { useLocale } from "./LocaleProvider";
 
 type Hit = {
   handle: string;
   name: string;
   avatarUrl: string;
   followers?: number;
+  urlVersion?: number;
 };
 
 export function SearchBar() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { locale, t } = useLocale();
   const [value, setValue] = useState("");
   const [hits, setHits] = useState<Hit[]>([]);
   const [open, setOpen] = useState(false);
@@ -57,7 +62,8 @@ export function SearchBar() {
     e.preventDefault();
     const q = value.trim();
     setOpen(false);
-    router.push(q ? `/recherche?q=${encodeURIComponent(q)}` : "/recherche");
+    const searchPath = localePath(locale, "/recherche");
+    router.push(q ? `${searchPath}?q=${encodeURIComponent(q)}` : searchPath);
   }
 
   return (
@@ -74,15 +80,15 @@ export function SearchBar() {
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onFocus={() => hits.length > 0 && setOpen(true)}
-          placeholder="Search a model, tag…"
-          aria-label="Search"
+          placeholder={t("shell.searchInput.placeholder")}
+          aria-label={t("shell.searchInput.label")}
           autoComplete="off"
           className="w-full rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] py-2 pl-10 pr-9 text-sm text-[var(--color-ink)] placeholder:text-[var(--color-ink-faint)] outline-none transition focus:border-[var(--color-accent)] focus:ring-2 focus:ring-[var(--color-accent-soft)]"
         />
         {value.length > 0 && (
           <button
             type="button"
-            aria-label="Clear"
+            aria-label={t("shell.searchInput.clear")}
             onClick={() => {
               setValue("");
               setHits([]);
@@ -102,7 +108,7 @@ export function SearchBar() {
           {hits.map((h, i) => (
             <li key={h.handle}>
               <Link
-                href={`/creator/${encodeURIComponent(h.handle)}`}
+                href={creatorHref(h.handle, h.urlVersion)}
                 onClick={() => setOpen(false)}
                 className="flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-[var(--color-surface-2)]"
               >
@@ -136,13 +142,12 @@ export function SearchBar() {
               onClick={() => {
                 const q = value.trim();
                 setOpen(false);
-                router.push(
-                  q ? `/recherche?q=${encodeURIComponent(q)}` : "/recherche",
-                );
+                const searchPath = localePath(locale, "/recherche");
+                router.push(q ? `${searchPath}?q=${encodeURIComponent(q)}` : searchPath);
               }}
               className="w-full px-3 py-2 text-left text-xs font-semibold text-[var(--color-accent)] hover:bg-[var(--color-surface-2)]"
             >
-              Search « {value.trim()} » →
+              {t("shell.searchInput.submit")} « {value.trim()} » →
             </button>
           </li>
         </ul>

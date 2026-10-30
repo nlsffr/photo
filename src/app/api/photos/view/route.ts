@@ -1,13 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
-import mysql from "mysql2/promise";
 import { cookies } from "next/headers";
 import { getSessionUser } from "@/lib/auth-db";
 import { SESSION_COOKIE } from "@/lib/auth";
+import { getDbPool } from "@/lib/db-pool";
+import { recordLocalPhotoView } from "@/lib/source-engagement";
+import { checkPhotoViewRateLimit } from "@/lib/photo-view-policy";
+import { rateLimitRequest, sweep } from "@/lib/ratelimit";
 
 export const dynamic = "force-dynamic";
 
-/** POST { photoId } — increment views_count (once per rough session client-side). */
+/** POST { photoId } — record one first-party view. */
 export async function POST(req: NextRequest) {
+  sweep();
+  const rate = checkPhotoViewRateLimit(req, rateLimitRequest);
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: "rate_limited" },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(Math.ceil((rate.resetAt - Date.now()) / 1000)),
+          "X-RateLimit-Remaining": "0",
+        },
+      },
+    );
+  }
+
   let body: { photoId?: string };
   try {
     body = await req.json();
@@ -19,34 +37,30 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "invalid" }, { status: 400 });
   }
 
-  const url = process.env.DATABASE_URL;
-  if (!url) return NextResponse.json({ ok: false }, { status: 500 });
+  const db = getDbPool();
+  if (!db) return NextResponse.json({ ok: false }, { status: 500 });
 
   try {
-    const conn = await mysql.createConnection(url);
-    await conn.execute(
-      `UPDATE photos SET views_count = views_count + 1 WHERE id = ?`,
-      [photoId],
-    );
-    // optional analytics row
+    let userId: string | null = null;
     try {
       const jar = await cookies();
       const token = jar.get(SESSION_COOKIE)?.value;
-      let userId: string | null = null;
       if (token) {
         const u = await getSessionUser(token);
         userId = u?.id ?? null;
       }
-      await conn.execute(
-        `INSERT INTO media_views (photo_id, user_id) VALUES (?, ?)`,
-        [photoId, userId],
-      );
     } catch {
-      /* media_views may miss columns — ignore */
+      userId = null;
     }
-    await conn.end();
-    return NextResponse.json({ ok: true });
+    await recordLocalPhotoView(db, photoId, userId);
+    return NextResponse.json(
+      { ok: true },
+      { headers: { "X-RateLimit-Remaining": String(rate.remaining) } },
+    );
   } catch (e) {
+    if (e instanceof Error && e.message === "photo_not_found") {
+      return NextResponse.json({ error: "photo_not_found" }, { status: 404 });
+    }
     console.error("[view]", e);
     return NextResponse.json({ ok: false }, { status: 500 });
   }

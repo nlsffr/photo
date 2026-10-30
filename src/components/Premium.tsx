@@ -7,6 +7,7 @@ import {
   useEffect,
   useState,
 } from "react";
+import { useRouter } from "next/navigation";
 import { useSession } from "./Session";
 
 interface PremiumCtx {
@@ -20,6 +21,7 @@ interface PremiumCtx {
 const Ctx = createContext<PremiumCtx | null>(null);
 
 export function PremiumProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const { user, loading: sessionLoading } = useSession();
   const [isPremium, setIsPremium] = useState(false);
   const [ready, setReady] = useState(false);
@@ -56,8 +58,8 @@ export function PremiumProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const startCheckout = useCallback(async () => {
-    window.location.href = "/premium";
-  }, []);
+    router.push("/premium");
+  }, [router]);
 
   return (
     <Ctx.Provider value={{ isPremium, ready, setPremium, refresh, startCheckout }}>

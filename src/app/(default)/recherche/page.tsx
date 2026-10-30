@@ -1,0 +1,139 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { Suspense } from "react";
+import { getPhotos, getAllTags, searchCreators } from "@/lib/photos";
+import { creatorHref, type MediaType } from "@/lib/types";
+import { SearchForm } from "@/components/SearchForm";
+import { InfiniteGallery } from "@/components/InfiniteGallery";
+import { MediaTypeTabs } from "@/components/MediaTypeTabs";
+import { AiFilterTabs } from "@/components/AiFilterTabs";
+import { MediaImg } from "@/components/MediaImg";
+import { VerifiedBadge } from "@/components/VerifiedBadge";
+import { formatCount } from "@/lib/format";
+import type { Locale } from "@/lib/i18n/config";
+import { getDictionary } from "@/lib/i18n/dictionaries";
+
+export const metadata: Metadata = {
+  title: "Search",
+  robots: { index: false, follow: true },
+};
+
+function first(v?: string | string[]): string | undefined {
+  return Array.isArray(v) ? v[0] : v;
+}
+
+export default async function SearchPage({
+  searchParams,
+  locale = "en",
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  locale?: Locale;
+}) {
+  const copy = getDictionary(locale).search;
+  const numberLocale = locale === "fr" ? "fr-FR" : "en-US";
+  const sp = await searchParams;
+  const q = first(sp.q);
+  const tag = first(sp.tag);
+  const typeRaw = first(sp.type);
+  const type: MediaType | undefined =
+    typeRaw === "photo" || typeRaw === "video" ? typeRaw : undefined;
+  const aiRaw = first(sp.ai);
+  const ai = aiRaw === "0" || aiRaw === "1" ? aiRaw : undefined;
+  const isAi = ai === "1" ? true : ai === "0" ? false : undefined;
+
+  const hasQuery = Boolean((q && q.trim()) || tag);
+
+  const label = q ? q : tag ? `#${tag}` : null;
+  const page = hasQuery
+    ? await getPhotos({ q, tag, type, isAi, sort: "popular" })
+    : await getPhotos({ type, isAi, sort: "trending" });
+  const allTags = await getAllTags();
+  // Dès 1 caractère : suggestions profils (préfixe / fuzzy côté provider)
+  const creators =
+    q && q.trim().length >= 1 ? await searchCreators(q.trim(), 12) : [];
+
+  return (
+    <div className="px-3 py-5 sm:px-5">
+      <h1 className="mb-4 text-2xl font-bold tracking-tight">
+        <span className="text-[var(--color-accent)]">{copy.title}</span>
+        {label && (
+          <span className="text-[var(--color-ink-muted)]"> / {label}</span>
+        )}
+      </h1>
+
+      <div className="mb-6 max-w-4xl">
+        <Suspense fallback={<div className="h-32" />}>
+          <SearchForm tags={allTags} />
+        </Suspense>
+      </div>
+
+      {creators.length > 0 && (
+        <section className="mb-8">
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-[var(--color-ink-faint)]">
+            {copy.creators}
+          </h2>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {creators.map((c, i) => (
+              <Link
+                key={c.handle}
+                href={creatorHref(c.handle, c.urlVersion)}
+                className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 transition-colors hover:border-[var(--color-accent)]/50"
+              >
+                <MediaImg
+                  src={c.avatarUrl || "/media/placeholder.jpg"}
+                  alt={c.name}
+                  width={48}
+                  height={48}
+                  className="h-12 w-12 rounded-full object-cover"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="flex items-center gap-1.5 font-semibold">
+                    <span className="truncate">{c.name}</span>
+                    {c.verified && <VerifiedBadge size={13} />}
+                    {i < 3 && (
+                      <span className="shrink-0 rounded-full bg-[var(--color-accent)]/15 px-1.5 py-0.5 text-[10px] font-bold text-[var(--color-accent)]">
+                        TOP
+                      </span>
+                    )}
+                  </p>
+                  <p className="truncate text-sm text-[var(--color-ink-muted)]">
+                    @{c.handle}
+                    {c.followers
+                      ? ` · ${formatCount(c.followers)} ${copy.followers}`
+                      : ""}
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-[var(--color-ink-muted)]">
+          {hasQuery
+            ? `${page.total.toLocaleString(numberLocale)} ${page.total === 1 ? copy.result : copy.results}`
+            : copy.trendingNow}
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Suspense fallback={<div className="h-9 w-28" />}>
+            <AiFilterTabs basePath="/recherche" />
+          </Suspense>
+          <Suspense fallback={<div className="h-9 w-52" />}>
+            <MediaTypeTabs basePath="/recherche" />
+          </Suspense>
+        </div>
+      </div>
+
+      <InfiniteGallery
+        key={`${q ?? ""}|${tag ?? ""}|${type ?? ""}|${ai ?? ""}|${hasQuery}`}
+        initial={page}
+        params={
+          hasQuery
+            ? { sort: "popular", q, tag, type, ai }
+            : { sort: "trending", type, ai }
+        }
+      />
+    </div>
+  );
+}

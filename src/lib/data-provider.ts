@@ -36,7 +36,13 @@ export interface DataProvider {
   }>;
   getTags(): Promise<string[]>;
   /** Fast aggregated models list (SQL when available). */
-  getModels?(sort: "followers" | "views"): Promise<CreatorWithStats[]>;
+  getModels?(
+    sort: "followers" | "views",
+    limit?: number,
+    offset?: number,
+  ): Promise<CreatorWithStats[]>;
+  /** Fast count for paginated model lists. */
+  getModelCount?(): Promise<number>;
   /** Search creators by name/handle. */
   searchCreators?(q: string, limit?: number): Promise<Creator[]>;
   getRankings?(limit?: number): Promise<
@@ -73,6 +79,9 @@ export class EmptyDataProvider implements DataProvider {
   }
   async getModels(): Promise<CreatorWithStats[]> {
     return [];
+  }
+  async getModelCount(): Promise<number> {
+    return 0;
   }
   async searchCreators(): Promise<Creator[]> {
     return [];

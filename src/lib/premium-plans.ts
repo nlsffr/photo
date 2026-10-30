@@ -1,5 +1,5 @@
 export type PlanId = "week" | "month" | "quarter" | "year";
-export type PayMethod = "card" | "stars" | "crypto";
+export type PayMethod = "stars";
 
 export interface PremiumPlan {
   id: PlanId;
@@ -53,15 +53,14 @@ export const PLANS: PremiumPlan[] = [
   },
 ];
 
+export function isPlanId(id: unknown): id is PlanId {
+  return typeof id === "string" && PLANS.some((plan) => plan.id === id);
+}
+
 export function getPlan(id: string | null | undefined): PremiumPlan {
-  return PLANS.find((p) => p.id === id) ?? PLANS[0];
+  const plan = PLANS.find((candidate) => candidate.id === id);
+  if (!plan) throw new Error("unknown_plan");
+  return plan;
 }
 
 /** Telegram bot username without @ — set TELEGRAM_BOT_USERNAME in env */
-export function telegramPremiumLink(plan: PlanId, userId?: string): string {
-  const bot =
-    (typeof process !== "undefined" && process.env.NEXT_PUBLIC_TELEGRAM_BOT) ||
-    "LeakFanHubBot";
-  const payload = `premium_${plan}${userId ? `_${userId.slice(0, 12)}` : ""}`;
-  return `https://t.me/${bot}?start=${encodeURIComponent(payload)}`;
-}

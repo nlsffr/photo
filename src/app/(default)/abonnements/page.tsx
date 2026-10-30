@@ -1,0 +1,20 @@
+import type { Metadata } from "next";
+import { FollowingFeed } from "@/components/FollowingFeed";
+
+export const metadata: Metadata = {
+  title: "Abonnements",
+  robots: { index: false, follow: true },
+};
+export const dynamic = "force-dynamic";
+
+export default function AbonnementsPage() {
+  return (
+    <div className="px-3 py-5 sm:px-5">
+      <h1 className="mb-1 text-2xl font-bold tracking-tight">Abonnements</h1>
+      <p className="mb-4 text-sm text-[var(--color-ink-faint)]">
+        Les modèles que tu suis et leurs publications.
+      </p>
+      <FollowingFeed />
+    </div>
+  );
+}

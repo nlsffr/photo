@@ -1,18 +1,9 @@
 import "server-only";
-import mysql from "mysql2/promise";
 import type { RowDataPacket } from "mysql2";
 import { randomUUID } from "node:crypto";
 import { getPlan, type PlanId } from "./premium-plans";
-
-function getPool(): mysql.Pool | null {
-  const url = process.env.DATABASE_URL;
-  if (!url) return null;
-  return mysql.createPool({
-    uri: url,
-    connectionLimit: Number(process.env.DB_POOL_SIZE ?? 10),
-    waitForConnections: true,
-  });
-}
+import { getDbPool as getPool } from "./db-pool";
+import { premiumEntitlementState } from "./premium-entitlement";
 
 export async function isUserPremium(userId: string): Promise<boolean> {
   const db = getPool();
@@ -24,7 +15,6 @@ export async function isUserPremium(userId: string): Promise<boolean> {
     );
     const u = rows[0] as { is_premium: number } | undefined;
     if (u?.is_premium) {
-      // Check subscription not expired if present
       const [subs] = await db.execute<RowDataPacket[]>(
         `SELECT current_period_end FROM subscriptions
          WHERE user_id = ? AND status = 'active'
@@ -32,18 +22,20 @@ export async function isUserPremium(userId: string): Promise<boolean> {
         [userId],
       );
       const sub = subs[0] as { current_period_end: Date | string | null } | undefined;
-      if (sub?.current_period_end) {
-        const end = new Date(sub.current_period_end);
-        if (end.getTime() < Date.now()) {
-          await db.execute(`UPDATE users SET is_premium = 0 WHERE id = ?`, [userId]);
-          await db.execute(
-            `UPDATE subscriptions SET status = 'canceled' WHERE user_id = ? AND status = 'active'`,
-            [userId],
-          );
-          return false;
-        }
-      }
-      return true;
+      const entitlement = premiumEntitlementState({
+        isPremium: true,
+        periodEnd: sub?.current_period_end,
+      });
+      if (entitlement === "active") return true;
+
+      await db.execute(`UPDATE users SET is_premium = 0 WHERE id = ?`, [userId]);
+      await db.execute(
+        `UPDATE subscriptions SET status = 'canceled'
+         WHERE user_id = ? AND status = 'active'
+           AND (current_period_end IS NULL OR current_period_end <= NOW())`,
+        [userId],
+      );
+      return false;
     }
     return false;
   } catch {

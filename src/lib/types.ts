@@ -16,8 +16,8 @@ export interface Creator {
   /** ISO timestamp (creators.updated_at) — lastmod sitemap. */
   updatedAt?: string | null;
   /**
-   * Si non-null, l'ancienne URL /{handle} répond 410 Gone.
-   * L'URL versionnée courante reste 200. Colonne removed_from_index_at.
+   * Si non-null, toutes les URL publiques du créateur sont retirées.
+   * Colonne MariaDB creators.removed_from_index_at.
    */
   removedFromIndexAt?: string | null;
 }
@@ -28,6 +28,8 @@ export interface Photo {
   id: string;
   sourceId?: string;
   title: string;
+  /** Source-authored description used for page and rich-result metadata. */
+  description?: string;
   imageUrl: string;
   width: number;
   height: number;
@@ -35,6 +37,12 @@ export interface Photo {
   tags: string[];
   views: number;
   likes: number;
+  /** Popularity imported from the upstream source by ingestion. */
+  sourceViews?: number;
+  /** Likes imported from the upstream source by ingestion. */
+  sourceLikes?: number;
+  /** First-party views recorded by this site. */
+  localViews?: number;
   ageMinutes: number;
   trending: number;
   type: MediaType;
@@ -47,11 +55,14 @@ export interface Photo {
   urlVersion?: number;
   /** ISO timestamp (photos.updated_at) — lastmod sitemap. */
   updatedAt?: string | null;
-  /** Si non-null, l'URL n'est pas émise dans le sitemap. */
+  /** ISO timestamp (photos.created_at) — immutable publication date. */
+  createdAt?: string | null;
+  /** Si non-null, le média est retiré de toutes les surfaces publiques. */
   removedFromIndexAt?: string | null;
 }
 
 export type SortKey =
+  | "discover"
   | "recent"
   | "trending"
   | "popular"
@@ -157,4 +168,14 @@ export function toIso(value: unknown): string | null {
   if (value == null || value === "") return null;
   const d = value instanceof Date ? value : new Date(String(value));
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+/** Ordered image candidates, normalized once so a failed source can fall back safely. */
+export function normalizeMediaSources(
+  ...sources: Array<string | null | undefined>
+): string[] {
+  const normalized = sources
+    .map((source) => (source || "").trim())
+    .filter(Boolean);
+  return [...new Set(normalized)];
 }
