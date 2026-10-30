@@ -4,6 +4,7 @@ import { LocalizedLink as Link } from "./LocalizedLink";
 import { useLocale } from "./LocaleProvider";
 import { usePremium } from "./Premium";
 import { DISCOVERY_COPY } from "@/features/i18n/discovery-copy";
+import { getPlan } from "@/lib/premium-plans";
 
 /** Ads shown only for non-premium users. Full-width friendly. */
 export function AdSlot({
@@ -19,6 +20,11 @@ export function AdSlot({
   if (hide || !ready || isPremium) return null;
 
   if (variant === "interstitial") {
+    const monthlyPlan = getPlan("month");
+    const number = new Intl.NumberFormat(locale);
+    const premiumLabel = copy.premium
+      .replace("{stars}", number.format(monthlyPlan.stars))
+      .replace("{days}", number.format(monthlyPlan.days));
     return (
       <div
         className="flex w-full min-h-[72px] flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-3 text-center text-xs text-[var(--color-ink-faint)]"
@@ -26,7 +32,7 @@ export function AdSlot({
       >
         <span>{copy.ad}</span>
         <Link href="/premium" className="font-semibold text-[var(--color-accent)] hover:underline">
-          {copy.premium}
+          {premiumLabel}
         </Link>
       </div>
     );

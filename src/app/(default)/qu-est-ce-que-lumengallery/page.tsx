@@ -36,7 +36,7 @@ const FAQ = [
   },
   {
     q: "C’est gratuit ?",
-    a: "Oui, l’accès à la galerie est gratuit. Premium ($4.99/mois) offrira des options avancées sans pubs.",
+    a: "Oui, l’accès à la galerie est gratuit. Les tarifs et la durée d’accès Premium sont indiqués sur la page Premium, en Stars Telegram.",
   },
   {
     q: "D’où vient le contenu ?",
