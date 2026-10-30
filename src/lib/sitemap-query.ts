@@ -1,5 +1,7 @@
-const INDEXABLE_MEDIA_SQL =
-  "p.removed_from_index_at IS NULL AND c.removed_from_index_at IS NULL";
+// @ts-expect-error Node's native type stripping requires the explicit suffix.
+import { activeMediaSql } from "./providers/active-content-sql.ts";
+
+const INDEXABLE_MEDIA_SQL = activeMediaSql("p", "c");
 
 export const SITEMAP_MEDIA_SELECT = `
   p.id,

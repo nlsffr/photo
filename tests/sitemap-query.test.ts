@@ -18,7 +18,7 @@ test("partition boundaries rank every physical row before filtering removals", a
   assert.match(sql, /ROW_NUMBER\(\) OVER/);
   assert.match(sql, /AS partition_row_num/);
   assert.doesNotMatch(sql, /\bAS row_number\b/i);
-  assert.match(sql, /CASE WHEN p\.removed_from_index_at IS NULL AND c\.removed_from_index_at IS NULL THEN 1 ELSE 0 END AS is_indexable/);
+  assert.match(sql, /CASE WHEN p\.removed_from_index_at IS NULL AND c\.removed_from_index_at IS NULL AND c\.is_hidden = 0 AND p\.is_hidden = 0 THEN 1 ELSE 0 END AS is_indexable/);
   assert.match(sql, /HAVING SUM\(is_indexable\) > 0/);
   assert.doesNotMatch(
     sql.slice(sql.indexOf("FROM photos"), sql.indexOf("), chunked AS")),

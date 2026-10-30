@@ -277,7 +277,7 @@ test("cold proxy plus metadata and page share one combined context and stay with
     execute: async (sql: string) => {
       calls.push({ operation: "execute", sql });
       if (sql.includes("AS mediaCount")) return [[{ ...rawCreator, ...rawStats }], []];
-      if (sql.includes("FROM creators WHERE")) return [[rawCreator], []];
+      if (/FROM creators c\s+WHERE/.test(sql)) return [[rawCreator], []];
       if (sql.includes("p.source_id AS source_id")) return [[mediaRow], []];
       throw new Error(`Unexpected SQL: ${sql}`);
     },

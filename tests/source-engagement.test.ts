@@ -90,6 +90,8 @@ test("recording a local view cannot change imported source engagement", async ()
       if (/UPDATE photos p[\s\S]*JOIN creators c[\s\S]*SET p\.local_views_count/.test(sql)) {
         assert.match(sql, /p\.removed_from_index_at IS NULL/);
         assert.match(sql, /c\.removed_from_index_at IS NULL/);
+        assert.match(sql, /p\.is_hidden = 0/);
+        assert.match(sql, /c\.is_hidden = 0/);
         state.localViews += 1;
         return [{ affectedRows: 1 }];
       }

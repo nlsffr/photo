@@ -29,19 +29,18 @@ SET STATEMENT max_statement_time=20 FOR
 SELECT 'creator', c.handle, COALESCE(c.avatar_url, ''),
        COALESCE(c.cover_url, '')
 FROM creators c
-WHERE c.removed_from_index_at IS NOT NULL
+WHERE c.removed_from_index_at IS NOT NULL OR c.is_hidden = 1
 UNION ALL
 SELECT 'photo', '', COALESCE(p.image_url, ''),
        COALESCE(p.video_url, '')
-FROM photos p FORCE INDEX (idx_photos_sitemap)
-WHERE p.removed_from_index_at IS NOT NULL
+FROM photos p
+WHERE p.removed_from_index_at IS NOT NULL OR p.is_hidden = 1
 UNION ALL
 SELECT 'photo', '', COALESCE(p.image_url, ''),
        COALESCE(p.video_url, '')
 FROM creators c
 STRAIGHT_JOIN photos p ON p.creator_id = c.id
-WHERE c.removed_from_index_at IS NOT NULL
-  AND c.handle NOT REGEXP '^[A-Za-z0-9_.-]{1,100}$'
+WHERE (c.removed_from_index_at IS NOT NULL OR c.is_hidden = 1)
   AND p.removed_from_index_at IS NULL
 """.strip()
 
@@ -80,7 +79,7 @@ def _fixture_tombstones(
     paths: set[str] = set()
 
     for creator in payload.get("creators", []):
-        if not isinstance(creator, dict) or not creator.get("removedFromIndexAt"):
+        if not isinstance(creator, dict) or not (creator.get("removedFromIndexAt") or creator.get("isHidden")):
             continue
         handle = creator.get("handle")
         if isinstance(handle, str) and SAFE_HANDLE.fullmatch(handle):
@@ -94,6 +93,8 @@ def _fixture_tombstones(
         if not (
             photo.get("removedFromIndexAt")
             or photo.get("creatorRemovedFromIndexAt")
+            or photo.get("isHidden")
+            or photo.get("creatorIsHidden")
         ):
             continue
         paths.update(_media_paths(photo.get("imageUrl"), allowed_hosts))

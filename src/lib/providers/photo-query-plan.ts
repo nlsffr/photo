@@ -74,6 +74,8 @@ function discoveryArm(
   const where = [
     `${photo}.removed_from_index_at IS NULL`,
     `${creator}.removed_from_index_at IS NULL`,
+    `${photo}.is_hidden = 0`,
+    `${creator}.is_hidden = 0`,
   ];
   if (filters.creator) where.push(`${creator}.handle = :creator`);
   if (filters.type) where.push(`${photo}.type = :type`);

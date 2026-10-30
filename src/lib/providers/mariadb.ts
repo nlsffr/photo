@@ -285,7 +285,11 @@ export class MariaDBProvider implements DataProvider {
 
   async getCreator(handle: string): Promise<Creator | undefined> {
     const rows = await this.q<RowDataPacket>(
-      "SELECT handle, name, avatar_url, cover_url, bio, location, followers_count, verified, COALESCE(url_version, 1) AS url_version, updated_at, removed_from_index_at FROM creators WHERE handle = :handle LIMIT 1",
+      `SELECT handle, name, avatar_url, cover_url, bio, location, followers_count, verified,
+              COALESCE(url_version, 1) AS url_version, updated_at, removed_from_index_at
+       FROM creators c
+       WHERE c.handle = :handle AND c.is_hidden = 0
+       LIMIT 1`,
       { handle },
     );
     const r = rows[0];
@@ -718,6 +722,7 @@ export class MariaDBProvider implements DataProvider {
              FROM photos p FORCE INDEX (idx_photos_creator_views)
              WHERE p.creator_id IN (?)
                AND p.removed_from_index_at IS NULL
+               AND p.is_hidden = 0
                AND p.image_url <> ''
            ) ranked
            WHERE ranked.row_number = 1`,

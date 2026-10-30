@@ -89,7 +89,9 @@ export async function recordLocalPhotoView(
        SET p.local_views_count = COALESCE(p.local_views_count, 0) + 1
        WHERE p.id = ?
          AND p.removed_from_index_at IS NULL
-         AND c.removed_from_index_at IS NULL`,
+         AND c.removed_from_index_at IS NULL
+         AND p.is_hidden = 0
+         AND c.is_hidden = 0`,
       [photoId],
     );
     if (affectedRows(updated) !== 1) throw new Error("photo_not_found");

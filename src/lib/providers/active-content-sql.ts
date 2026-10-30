@@ -5,12 +5,14 @@ function sqlAlias(alias: string): string {
   return alias;
 }
 export function activeCreatorSql(creatorAlias = "c"): string {
-  return `${sqlAlias(creatorAlias)}.removed_from_index_at IS NULL`;
+  const creator = sqlAlias(creatorAlias);
+  return `${creator}.removed_from_index_at IS NULL AND ${creator}.is_hidden = 0`;
 }
 
 export function activeMediaSql(
   photoAlias = "p",
   creatorAlias = "c",
 ): string {
-  return `${sqlAlias(photoAlias)}.removed_from_index_at IS NULL AND ${activeCreatorSql(creatorAlias)}`;
+  const photo = sqlAlias(photoAlias);
+  return `${photo}.removed_from_index_at IS NULL AND ${activeCreatorSql(creatorAlias)} AND ${photo}.is_hidden = 0`;
 }

@@ -51,6 +51,12 @@ exit 0
         avatarUrl: "/media/creators/activecreator/avatar.webp",
       },
       {
+        handle: "hiddencreator",
+        isHidden: true,
+        removedFromIndexAt: null,
+        avatarUrl: "/media/creators/hiddencreator/avatar.webp",
+      },
+      {
         handle: 'evil"; include /tmp/pwned;',
         removedFromIndexAt: "2026-10-29T00:00:00Z",
         avatarUrl: "/media/unsafe/avatar.webp",
@@ -67,6 +73,18 @@ exit 0
         removedFromIndexAt: null,
         creatorRemovedFromIndexAt: null,
         imageUrl: "/media/creators/activecreator/active.webp",
+      },
+      {
+        isHidden: true,
+        removedFromIndexAt: null,
+        creatorRemovedFromIndexAt: null,
+        imageUrl: "/media/hidden-photo.webp",
+      },
+      {
+        creatorIsHidden: true,
+        removedFromIndexAt: null,
+        creatorRemovedFromIndexAt: null,
+        imageUrl: "/media/hidden-parent-photo.webp",
       },
       {
         removedFromIndexAt: "2026-10-29T00:00:00Z",
@@ -91,6 +109,9 @@ exit 0
 
   const generated = await readFile(output, "utf8");
   assert.match(generated, /"pinkchyu" 1;/);
+  assert.match(generated, /"hiddencreator" 1;/);
+  assert.match(generated, /"\/media\/hidden-photo\.webp" 1;/);
+  assert.match(generated, /"\/media\/hidden-parent-photo\.webp" 1;/);
   assert.match(generated, /"\/media\/unsafe\/avatar\.webp" 1;/);
   assert.match(generated, /"\/media\/creators\/activecreator\/removed\.webp" 1;/);
   assert.match(generated, /"\/media\/shared\/removed\.mp4" 1;/);
@@ -143,7 +164,9 @@ class Cursor:
         assert query.startswith("SET STATEMENT max_statement_time=20 FOR")
         assert "removed_from_index_at IS NOT NULL" in query
         assert query.count("UNION ALL") == 2
-        assert "FROM photos p FORCE INDEX (idx_photos_sitemap)" in query
+        assert "FROM photos p" in query
+        assert "p.is_hidden = 1" in query
+        assert "c.is_hidden = 1" in query
         assert "FROM creators c\\nSTRAIGHT_JOIN photos p ON p.creator_id = c.id" in query
         assert "p.removed_from_index_at IS NOT NULL\\n   OR" not in query
         assert "HEX(" not in query

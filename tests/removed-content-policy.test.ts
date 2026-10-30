@@ -43,13 +43,13 @@ test("active creator URLs still enforce their one canonical version", async () =
   assert.equal(creatorRouteDecision(activeV3, 3), "serve");
 });
 
-test("the canonical SQL predicate requires both the media and creator to be active", async () => {
+test("the canonical SQL predicate rejects hidden media and creators as well as removals", async () => {
   const { activeCreatorSql, activeMediaSql } = await loadSqlPolicy();
 
-  assert.equal(activeCreatorSql("owner"), "owner.removed_from_index_at IS NULL");
+  assert.equal(activeCreatorSql("owner"), "owner.removed_from_index_at IS NULL AND owner.is_hidden = 0");
   assert.equal(
     activeMediaSql("asset", "owner"),
-    "asset.removed_from_index_at IS NULL AND owner.removed_from_index_at IS NULL",
+    "asset.removed_from_index_at IS NULL AND owner.removed_from_index_at IS NULL AND owner.is_hidden = 0 AND asset.is_hidden = 0",
   );
 });
 
