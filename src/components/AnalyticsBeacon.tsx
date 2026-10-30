@@ -13,7 +13,8 @@ let lastPageView: LastAnalyticsPageView | null = null;
 
 function transmit(event: AnalyticsClientEvent) {
   const body = JSON.stringify(event);
-  if (navigator.sendBeacon?.("/api/analytics", body)) return;
+  // JSON opts Beacon into CORS mode for compatibility with the origin check.
+  if (navigator.sendBeacon?.("/api/analytics", new Blob([body], { type: "application/json" }))) return;
   void fetch("/api/analytics", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
