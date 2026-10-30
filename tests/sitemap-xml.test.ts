@@ -138,10 +138,28 @@ test("localized sitemap entries submit both translations with reciprocal alterna
   assert.deepEqual(englishModels.alternates.languages, {
     en: "https://leakfanhub.com/en/models",
     fr: "https://leakfanhub.com/fr/models",
+    es: "https://leakfanhub.com/es/models",
+    de: "https://leakfanhub.com/de/models",
+    it: "https://leakfanhub.com/it/models",
+    pt: "https://leakfanhub.com/pt/models",
+    nl: "https://leakfanhub.com/nl/models",
     "x-default": "https://leakfanhub.com/models",
   });
   assert.deepEqual(frenchModels.alternates, englishModels.alternates);
   assert.equal(entries.some((entry) => /\/[^/]+\/[^/]+-v\d+$/.test(entry.url)), false);
+  assert.equal(entries.length, 58);
+  assert.equal(new Set(entries.map((entry) => entry.url)).size, 58);
+  for (const locale of ["es", "de", "it", "pt", "nl"]) {
+    const translated = entries.filter((entry) => new URL(entry.url).pathname.startsWith(`/${locale}`));
+    assert.equal(translated.length, 6);
+    assert.ok(translated.every((entry) => Object.keys(entry.alternates.languages).length === 8));
+  }
+  const about = entries.find((entry) => entry.url.endsWith("/fr/about"));
+  assert.deepEqual(about?.alternates.languages, {
+    en: "https://leakfanhub.com/en/about",
+    fr: "https://leakfanhub.com/fr/about",
+    "x-default": "https://leakfanhub.com/about",
+  });
 });
 
 test("custom static sitemap XML declares xhtml and reciprocal hreflang links", async () => {

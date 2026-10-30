@@ -12,7 +12,7 @@ type Route = {
 };
 const creator = { handle: "aria-lune", name: "Aria $& Lune", bio: "Ma bio / My bio", avatarUrl: "", followers: 100, verified: true, urlVersion: 3, removedFromIndexAt: null };
 const stats = { mediaCount: 100, photoCount: 70, videoCount: 30, engagedCount: 10, totalViews: 800, totalLikes: 20 };
-function setup(locale: "en" | "fr", options: { removed?: boolean; empty?: boolean } = {}) {
+function setup(locale: "en" | "fr" | "es" | "de" | "it" | "pt" | "nl", options: { removed?: boolean; empty?: boolean } = {}) {
   const queries: Record<string, unknown>[] = [];
   const FollowButton = () => null;
   const VerifiedBadge = () => null;
@@ -113,6 +113,17 @@ test("localized media, extra segments and non-EN/FR prefixes never dispatch as c
     }
   }
   assert.equal(resolveLocalizedPage("es" as "en", "/aria-lune-v3"), null);
+});
+
+test("discovery-only locale wrappers reject untranslated editorial and creator pages", async () => {
+  for (const locale of ["es", "de", "it", "pt", "nl"] as const) {
+    const { route, props, render, queries } = setup(locale);
+    for (const path of ["/about", "/contact/support", "/aria-lune-v3", "/aria-lune-v3/photos"]) {
+      await assert.rejects(render(path), /NOT_FOUND/, `${locale}${path}`);
+      await assert.rejects(route.generateMetadata(props(path)), /NOT_FOUND/, `${locale}${path}`);
+    }
+    assert.equal(queries.length, 0, "unsupported routes never query a creator gallery");
+  }
 });
 
 test("localized routes preserve renderer version, removal, query and redirect policy", async () => {

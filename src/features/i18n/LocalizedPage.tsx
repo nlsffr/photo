@@ -19,7 +19,8 @@ import { ModelsGrid } from "@/components/ModelsGrid";
 import { SavedGallery } from "@/components/SavedGallery";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { formatCount } from "@/lib/format";
-import { localePath, resolveLocalizedPage, type Locale } from "@/lib/i18n/config";
+import { isCreatorLocale, localePath, localizedHref, resolveLocalizedPage, type Locale } from "@/lib/i18n/config";
+import { DISCOVERY_COPY } from "./discovery-copy";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { buildLocalizedMetadata } from "@/lib/i18n/metadata";
 import { buildModelsPagePayload, MODELS_PAGE_SIZE } from "@/lib/models-pagination";
@@ -95,6 +96,7 @@ export async function localizedPageMetadata(
   const route = resolveLocalizedPage(locale, pathname);
   if (!route) notFound();
   if (route.kind === "creator") {
+    if (!isCreatorLocale(locale)) notFound();
     return creatorCollectionMetadata({
       locale,
       handleParam: route.handle,
@@ -147,6 +149,7 @@ function getFunctionalTitle(locale: Locale, pathname: string): string {
 }
 
 export async function LocalizedPage({ locale, pathname, searchParams }: LocalizedPageProps) {
+  if (!resolveLocalizedPage(locale, pathname)) notFound();
   switch (pathname) {
     case "/":
       return <LocalizedHome locale={locale} searchParams={searchParams} />;
@@ -206,7 +209,7 @@ export async function LocalizedPage({ locale, pathname, searchParams }: Localize
       return locale === "fr" ? <FrenchPressPage /> : <EnglishContactFormPage kind="press" />;
     default: {
       const route = resolveLocalizedPage(locale, pathname);
-      if (!route || route.kind !== "creator") notFound();
+      if (!route || route.kind !== "creator" || !isCreatorLocale(locale)) notFound();
       return <CreatorCollectionPage locale={locale} handleParam={route.handle} collection={route.collection} searchParams={await searchParams} />;
     }
   }
@@ -234,7 +237,7 @@ async function LocalizedHome({ locale, searchParams }: { locale: Locale; searchP
     url: homeUrl,
     potentialAction: {
       "@type": "SearchAction",
-      target: `${SITE}${localePath(locale, "/recherche")}?q={search_term_string}`,
+      target: `${SITE}${localizedHref(locale, "/recherche")}?q={search_term_string}`,
       "query-input": "required name=search_term_string",
     },
   };
@@ -285,7 +288,7 @@ async function LocalizedModels({ locale, searchParams }: { locale: Locale; searc
       itemListElement: page.items.slice(0, 50).map((model, index) => ({
         "@type": "ListItem",
         position: start + index + 1,
-        url: `${SITE}${creatorCollectionPath(model.handle, model.urlVersion ?? 1, "overview", locale)}`,
+        url: `${SITE}${creatorCollectionPath(model.handle, model.urlVersion ?? 1, "overview", isCreatorLocale(locale) ? locale : undefined)}`,
         name: model.name || model.handle,
       })),
     },
@@ -320,11 +323,13 @@ async function LocalizedTrending({ locale, searchParams }: { locale: Locale; sea
   const sp = await searchParams;
   const typeRaw = first(sp.type);
   const type: MediaType | undefined = typeRaw === "photo" || typeRaw === "video" ? typeRaw : undefined;
+  const copy = getDictionary(locale).pages.trending.meta;
+  const labels = DISCOVERY_COPY[locale].windows;
   const windows = [
-    { key: "day", label: locale === "fr" ? "24 h" : "24 hours", minutes: 1_440 },
-    { key: "week", label: locale === "fr" ? "7 jours" : "7 days", minutes: 10_080 },
-    { key: "month", label: locale === "fr" ? "30 jours" : "30 days", minutes: 43_200 },
-    { key: "all", label: locale === "fr" ? "Tout" : "All time", minutes: 5_256_000 },
+    { key: "day", label: labels[0], minutes: 1_440 },
+    { key: "week", label: labels[1], minutes: 10_080 },
+    { key: "month", label: labels[2], minutes: 43_200 },
+    { key: "all", label: labels[3], minutes: 5_256_000 },
   ];
   const windowKey = first(sp.window) || "week";
   const windowDef = windows.find((item) => item.key === windowKey) || windows[1];
@@ -335,9 +340,9 @@ async function LocalizedTrending({ locale, searchParams }: { locale: Locale; sea
 
   return (
     <div className="px-3 py-4 sm:px-5">
-      <h1 className="mb-1 text-2xl font-bold">{locale === "fr" ? "Tendances" : "Trending"}</h1>
+      <h1 className="mb-1 text-2xl font-bold">{copy.title}</h1>
       <p className="mb-4 text-sm text-[var(--color-ink-muted)]">
-        {locale === "fr" ? "Classés par engagement : vues et likes." : "Ranked by engagement from views and likes."}
+        {copy.description}
       </p>
       <div className="mb-4 flex flex-wrap gap-2">
         {windows.map((item) => (
@@ -355,10 +360,11 @@ async function LocalizedMostLiked({ locale, searchParams }: { locale: Locale; se
   const parsed = cursorRaw ? Number.parseInt(cursorRaw, 10) : Number.NaN;
   const cursor = Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
   const page = await getPhotos({ sort: "liked", limit: 24, cursor });
+  const copy = getDictionary(locale).pages.mostLiked.meta;
   return (
     <div className="px-3 py-4 sm:px-5">
-      <h1 className="mb-1 text-2xl font-bold">{locale === "fr" ? "Plus aimés" : "Most liked"}</h1>
-      <p className="mb-4 text-sm text-[var(--color-ink-muted)]">{locale === "fr" ? "Triés uniquement par likes." : "Ranked only by likes."}</p>
+      <h1 className="mb-1 text-2xl font-bold">{copy.title}</h1>
+      <p className="mb-4 text-sm text-[var(--color-ink-muted)]">{copy.description}</p>
       <InfiniteGallery initial={page} params={{ sort: "liked" }} />
     </div>
   );
@@ -367,22 +373,24 @@ async function LocalizedMostLiked({ locale, searchParams }: { locale: Locale; se
 async function LocalizedRankings({ locale }: { locale: Locale }) {
   const ranked = await getRankings(30);
   const maxScore = ranked[0]?.score || 1;
+  const dictionary = getDictionary(locale);
+  const copy = dictionary.pages.rankings.meta;
   return (
     <div className="mx-auto max-w-3xl px-3 py-6 sm:px-5">
-      <h1 className="text-2xl font-bold tracking-tight">🏆 {locale === "fr" ? "Classements" : "Rankings"}</h1>
-      <p className="mb-5 text-sm text-[var(--color-ink-muted)]">{locale === "fr" ? "Les modèles les plus vus et appréciés." : "The most viewed and appreciated models."}</p>
-      {ranked.length === 0 ? <p className="py-16 text-center text-[var(--color-ink-muted)]">{locale === "fr" ? "Pas encore assez de données." : "Not enough data yet."}</p> : (
+      <h1 className="text-2xl font-bold tracking-tight">🏆 {copy.title}</h1>
+      <p className="mb-5 text-sm text-[var(--color-ink-muted)]">{copy.description}</p>
+      {ranked.length === 0 ? <p className="py-16 text-center text-[var(--color-ink-muted)]">{DISCOVERY_COPY[locale].emptyRankings}</p> : (
         <ol className="flex flex-col gap-2">
           {ranked.map((creator, index) => (
             <li key={creator.handle}>
-              <Link href={creatorCollectionPath(creator.handle, creator.urlVersion ?? 1, "overview", locale)} className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+              <Link href={creatorCollectionPath(creator.handle, creator.urlVersion ?? 1, "overview", isCreatorLocale(locale) ? locale : undefined)} className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
                 <span className="w-8 text-center text-lg font-black">{index + 1}</span>
                 <MediaImg src={creator.avatarUrl || ""} alt={creator.name} width={48} height={48} className="h-12 w-12 rounded-full object-cover" />
                 <div className="min-w-0 flex-1">
                   <p className="flex items-center gap-1 font-semibold"><span className="truncate">{creator.name}</span>{creator.verified ? <VerifiedBadge size={13} /> : null}</p>
                   <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[var(--color-surface-3)]"><div className="h-full bg-[var(--color-accent)]" style={{ width: `${Math.round((creator.score / maxScore) * 100)}%` }} /></div>
                 </div>
-                <div className="text-right"><p className="font-semibold">{formatCount(creator.views)}</p><p className="text-xs text-[var(--color-ink-faint)]">{locale === "fr" ? "vues" : "views"}</p></div>
+                <div className="text-right"><p className="font-semibold">{formatCount(creator.views)}</p><p className="text-xs text-[var(--color-ink-faint)]">{dictionary.creator.views}</p></div>
               </Link>
             </li>
           ))}
@@ -394,10 +402,11 @@ async function LocalizedRankings({ locale }: { locale: Locale }) {
 
 async function LocalizedInfluencers({ locale }: { locale: Locale }) {
   const models = (await getModels("views", 100)).filter((model) => model.totalViews > 0);
+  const copy = getDictionary(locale).pages.influencers.meta;
   return (
     <div className="px-3 py-6 sm:px-5">
-      <h1 className="text-2xl font-bold tracking-tight">{locale === "fr" ? "Créateurs en tendance" : "Trending creators"} 🔥</h1>
-      <p className="mb-5 text-sm text-[var(--color-ink-muted)]">{locale === "fr" ? "Les modèles dont le contenu grimpe le plus en ce moment." : "Models whose content is gaining the most views right now."}</p>
+      <h1 className="text-2xl font-bold tracking-tight">{copy.title} 🔥</h1>
+      <p className="mb-5 text-sm text-[var(--color-ink-muted)]">{copy.description}</p>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
         {models.map((creator) => <CreatorCard key={creator.handle} creator={creator} locale={locale} />)}
       </div>

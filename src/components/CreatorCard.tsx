@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { CreatorWithStats } from "@/lib/types";
 import { creatorHref } from "@/lib/types";
-import type { Locale } from "@/lib/i18n/config";
+import { isCreatorLocale, type Locale } from "@/lib/i18n/config";
+import { getDictionary } from "@/lib/i18n/dictionaries";
 import { creatorCollectionPath } from "@/lib/creator-collections";
 import { formatCount } from "@/lib/format";
 import { VerifiedBadge } from "./VerifiedBadge";
@@ -9,10 +10,11 @@ import { MediaImg } from "./MediaImg";
 
 export function CreatorCard({ creator, locale }: { creator: CreatorWithStats; locale?: Locale }) {
   const img = creator.avatarUrl || creator.coverUrl;
+  const copy = getDictionary(locale ?? "fr").creator;
 
   return (
     <Link
-      href={locale ? creatorCollectionPath(creator.handle, creator.urlVersion ?? 1, "overview", locale) : creatorHref(creator.handle, creator.urlVersion)}
+      href={isCreatorLocale(locale) ? creatorCollectionPath(creator.handle, creator.urlVersion ?? 1, "overview", locale) : creatorHref(creator.handle, creator.urlVersion)}
       prefetch={false}
       className="group block overflow-hidden rounded-2xl bg-[var(--color-surface)] ring-1 ring-[var(--color-border)] transition hover:ring-[var(--color-accent)]/60"
     >
@@ -37,10 +39,10 @@ export function CreatorCard({ creator, locale }: { creator: CreatorWithStats; lo
         <div className="absolute inset-x-0 bottom-0 p-3">
           <p className="flex items-center gap-1 font-semibold text-white drop-shadow">
             <span className="truncate">{creator.name}</span>
-            {creator.verified && <VerifiedBadge size={13} />}
+            {creator.verified && <VerifiedBadge size={13} label={copy.verified} />}
           </p>
           <p className="mt-0.5 text-[11px] text-white/80">
-            {creator.photoCount} médias · {formatCount(creator.followers)} abonnés
+            {creator.photoCount} {copy.media} · {formatCount(creator.followers)} {copy.followers}
           </p>
         </div>
       </div>

@@ -33,11 +33,14 @@ function scripts(tree: ReactNode): Schema[] {
   });
 }
 
-test("CreatorCard preserves an explicit locale and leaves legacy callers unprefixed", () => {
-  const { CreatorCard } = loadAppModule<{ CreatorCard: (props: { creator: CreatorWithStats; locale?: "en" | "fr" }) => ReactNode }>("src/components/CreatorCard.tsx", boundaries);
+test("CreatorCard preserves supported creator locales and uses canonical links for discovery-only locales", () => {
+  const { CreatorCard } = loadAppModule<{ CreatorCard: (props: { creator: CreatorWithStats; locale?: "en" | "fr" | "es" | "de" | "it" | "pt" | "nl" }) => ReactNode }>("src/components/CreatorCard.tsx", boundaries);
   assert.equal(nodes(CreatorCard({ creator }))[0].props.href, "/aria-lune-v3");
   assert.equal(nodes(CreatorCard({ creator, locale: "en" }))[0].props.href, "/en/aria-lune-v3");
   assert.equal(nodes(CreatorCard({ creator, locale: "fr" }))[0].props.href, "/fr/aria-lune-v3");
+  for (const locale of ["es", "de", "it", "pt", "nl"] as const) {
+    assert.equal(nodes(CreatorCard({ creator, locale }))[0].props.href, "/aria-lune-v3");
+  }
 });
 
 test("media pages link to overview without a creator-wide aggregate or localized canonical media URLs", async () => {
@@ -96,8 +99,9 @@ test("creator renderer uses the loaded page for structured data with one gallery
 });
 
 
-test("localized discovery surfaces keep creator links and model schema in the current language", async () => {
-  for (const locale of ["en", "fr"] as const) {
+test("localized discovery surfaces link only to translated or canonical creator pages", async () => {
+  for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"] as const) {
+    const creatorPath = locale === "en" || locale === "fr" ? `/${locale}/aria-lune-v3` : "/aria-lune-v3";
     const replacements: Record<string, unknown> = {
       ...boundaries,
       "./LocaleProvider": { useLocale: () => ({ locale, t: (key: string) => key }) },
@@ -119,13 +123,17 @@ test("localized discovery surfaces keep creator links and model schema in the cu
       const featured = nodes(tree).find((node) => typeof node.type === "function" && node.type.name === "FeaturedCreators");
       if (featured) {
         const featuredTree = await (featured.type as (props: unknown) => Promise<ReactNode>)(featured.props);
-        assert.ok(nodes(featuredTree).some((node) => node.props.href === `/${locale}/aria-lune-v3`));
+        assert.ok(nodes(featuredTree).some((node) => node.props.href === creatorPath));
       } else {
         const html = renderToStaticMarkup(tree);
-        assert.ok(html.includes(`href="/${locale}/aria-lune-v3"`), pathname);
+        assert.ok(html.includes(`href="${creatorPath}"`), pathname);
       }
       if (pathname === "/models") {
-        assert.equal(scripts(tree)[0].mainEntity.itemListElement[0].url, `https://leakfanhub.com/${locale}/aria-lune-v3`);
+        assert.equal(scripts(tree)[0].mainEntity.itemListElement[0].url, `https://leakfanhub.com${creatorPath}`);
+      }
+      if (pathname === "/classements") {
+        const expected = { en: "Creator rankings", fr: "Classement des créateurs", es: "Clasificación de creadores", de: "Creator-Ranglisten", it: "Classifiche dei creator", pt: "Classificações de criadores", nl: "Ranglijst van creators" };
+        assert.ok(renderToStaticMarkup(tree).includes(expected[locale]), `${locale} ranking heading`);
       }
     }
     const { FeaturedCreators } = loadAppModule<{ FeaturedCreators: (props?: unknown) => Promise<ReactNode> }>("src/components/FeaturedCreators.tsx", replacements);
@@ -155,5 +163,24 @@ test("media pages keep one bounded creator read regardless of collection eligibi
     assert.equal(hrefs.includes("/aria-lune-v3/photos"), false);
     assert.equal(hrefs.includes("/aria-lune-v3/videos"), false);
     assert.deepEqual(reads, ["media", "creator", "related"]);
+  }
+});
+
+test("guest account and feed controls use available functional routes from every discovery language", () => {
+  for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"] as const) {
+    const functionalLocale = locale === "fr" ? "fr" : "en";
+    const replacements = {
+      "./LocaleProvider": { useLocale: () => ({ locale, t: (key: string) => key }) },
+      "./Session": { useSession: () => ({ user: null, loading: false }) },
+      "next/navigation": { useRouter: () => ({}) },
+    };
+    const { AccountMenu } = loadAppModule<{ AccountMenu: () => ReactNode }>("src/components/AccountMenu.tsx", replacements);
+    const accountHtml = renderToStaticMarkup(createElement(AccountMenu));
+    assert.ok(accountHtml.includes(`href="/${functionalLocale}/connexion"`));
+    assert.ok(accountHtml.includes(`href="/${functionalLocale}/inscription"`));
+    const { HomeFilters } = loadAppModule<{ HomeFilters: (props: { tags: string[]; sort: "discover" }) => ReactNode }>("src/components/HomeFilters.tsx", replacements);
+    const filtersHtml = renderToStaticMarkup(createElement(HomeFilters, { tags: [], sort: "discover" }));
+    assert.ok(filtersHtml.includes(`href="/${functionalLocale}/feed"`));
+    assert.ok(filtersHtml.includes(`href="/${locale}?sort=trending"`));
   }
 });

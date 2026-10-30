@@ -20,7 +20,7 @@ import {
   type CreatorSearchParams,
 } from "@/lib/seo-policy";
 import { isRemovedContent } from "@/lib/public-content-policy";
-import type { Locale } from "@/lib/i18n/config";
+import type { CreatorLocale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { creatorCollectionAlternates } from "@/lib/i18n/metadata";
 import { InfiniteGallery } from "@/components/InfiniteGallery";
@@ -52,7 +52,7 @@ const COLLECTIONS: CreatorCollection[] = [
 
 export type CreatorCollectionPageProps = {
   /** Undefined denotes the unprefixed x-default route. */
-  locale?: Locale;
+  locale?: CreatorLocale;
   handleParam: string;
   collection: CreatorCollection;
   searchParams: CreatorSearchParams;

@@ -1,5 +1,5 @@
 import type { Creator, CreatorCollection, CreatorCollectionStats, Photo } from "./types";
-import type { Locale } from "./i18n/config";
+import type { CreatorLocale } from "./i18n/config";
 // @ts-expect-error Node's native type stripping requires explicit suffixes.
 import { creatorCollectionCopy, creatorCollectionPath } from "./creator-collections.ts";
 // @ts-expect-error Node's native type stripping requires explicit suffixes.
@@ -18,7 +18,7 @@ export type CreatorStructuredDataInput = {
   /** Only the public page that has already been loaded; no item fetches. */
   items: readonly Photo[];
   collection: CreatorCollection;
-  locale?: Locale;
+  locale?: CreatorLocale;
   page?: number;
 };
 

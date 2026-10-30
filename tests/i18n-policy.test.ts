@@ -6,13 +6,54 @@ async function loadConfig() {
   return import("../src/lib/i18n/config.ts");
 }
 
-test("supports only the two server-rendered locales", async () => {
-  const { DEFAULT_LOCALE, LOCALES, isLocale } = await loadConfig();
+test("supports seven discovery locales while creator routes stay English and French", async () => {
+  const {
+    CREATOR_LOCALES,
+    DEFAULT_LOCALE,
+    DISCOVERY_ROUTE_PATHS,
+    LOCALES,
+    isCreatorLocale,
+    isLocale,
+    resolveLocalizedPage,
+  } = await loadConfig();
 
-  assert.deepEqual(LOCALES, ["en", "fr"]);
+  assert.deepEqual(LOCALES, ["en", "fr", "es", "de", "it", "pt", "nl"]);
+  assert.deepEqual(CREATOR_LOCALES, ["en", "fr"]);
+  assert.deepEqual(DISCOVERY_ROUTE_PATHS, [
+    "/",
+    "/models",
+    "/trending-medias",
+    "/most-liked",
+    "/classements",
+    "/influenceuses-tendances",
+  ]);
   assert.equal(DEFAULT_LOCALE, "en");
   assert.equal(isLocale("fr"), true);
-  assert.equal(isLocale("es"), false);
+  assert.equal(isLocale("es"), true);
+  assert.equal(isLocale("pl"), false);
+  assert.equal(isCreatorLocale("fr"), true);
+  assert.equal(isCreatorLocale("es"), false);
+
+  for (const locale of LOCALES) {
+    for (const pathname of DISCOVERY_ROUTE_PATHS) {
+      assert.deepEqual(resolveLocalizedPage(locale, pathname), {
+        kind: "static",
+        pathname,
+      });
+    }
+  }
+
+  assert.deepEqual(resolveLocalizedPage("fr", "/about"), {
+    kind: "static",
+    pathname: "/about",
+  });
+  assert.equal(resolveLocalizedPage("es", "/about"), null);
+  assert.deepEqual(resolveLocalizedPage("en", "/aria-lune-v3"), {
+    kind: "creator",
+    handle: "aria-lune-v3",
+    collection: "overview",
+  });
+  assert.equal(resolveLocalizedPage("es", "/aria-lune-v3"), null);
 });
 
 test("prefix and strip helpers preserve one equivalent public path", async () => {
@@ -25,17 +66,26 @@ test("prefix and strip helpers preserve one equivalent public path", async () =>
     locale: "fr",
     pathname: "/trending-medias",
   });
+  assert.deepEqual(stripLocalePrefix("/nl/trending-medias"), {
+    locale: "nl",
+    pathname: "/trending-medias",
+  });
   assert.deepEqual(stripLocalePrefix("/models"), {
     locale: null,
     pathname: "/models",
   });
   assert.equal(switchLocalePath("/en/models", "fr"), "/fr/models");
+  assert.equal(switchLocalePath("/en/models", "de"), "/de/models");
+  assert.equal(switchLocalePath("/fr/about", "de"), "/en/about");
+  assert.equal(switchLocalePath("/fr/aria-lune-v3", "de"), "/en/aria-lune-v3");
   assert.equal(switchLocalePath("/fr", "en"), "/en");
   assert.equal(
     localizedHref("fr", "/connexion?next=/abonnements#form"),
     "/fr/connexion?next=/abonnements#form",
   );
   assert.equal(localizedHref("fr", "/creator-name"), "/creator-name");
+  assert.equal(localizedHref("es", "/models"), "/es/models");
+  assert.equal(localizedHref("es", "/about"), "/en/about");
 });
 
 test("locale alternates are reciprocal and expose a neutral selector URL", async () => {
@@ -44,7 +94,22 @@ test("locale alternates are reciprocal and expose a neutral selector URL", async
   assert.deepEqual(localeAlternates("/models"), {
     en: "/en/models",
     fr: "/fr/models",
+    es: "/es/models",
+    de: "/de/models",
+    it: "/it/models",
+    pt: "/pt/models",
+    nl: "/nl/models",
     "x-default": "/models",
+  });
+  assert.deepEqual(localeAlternates("/about"), {
+    en: "/en/about",
+    fr: "/fr/about",
+    "x-default": "/about",
+  });
+  assert.deepEqual(localeAlternates("/aria-lune-v3/photos"), {
+    en: "/en/aria-lune-v3/photos",
+    fr: "/fr/aria-lune-v3/photos",
+    "x-default": "/aria-lune-v3/photos",
   });
 });
 
@@ -52,10 +117,11 @@ test("the locale cookie wins, then Accept-Language quality values, then English"
   const { chooseLocale, defaultShellLocale } = await loadConfig();
 
   assert.equal(chooseLocale("en", "fr-FR,fr;q=0.9,en;q=0.8"), "en");
-  assert.equal(chooseLocale(null, "de;q=0.9,fr-FR;q=0.8,en;q=0.7"), "fr");
+  assert.equal(chooseLocale(null, "de;q=0.9,fr-FR;q=0.8,en;q=0.7"), "de");
   assert.equal(chooseLocale(null, "fr;q=0.4,en-GB;q=0.9"), "en");
-  assert.equal(chooseLocale("invalid", "es-MX,es;q=0.9"), "en");
+  assert.equal(chooseLocale("invalid", "es-MX,es;q=0.9"), "es");
   assert.equal(defaultShellLocale("fr"), "fr");
+  assert.equal(defaultShellLocale("nl"), "nl");
   assert.equal(defaultShellLocale("invalid"), "en");
 });
 

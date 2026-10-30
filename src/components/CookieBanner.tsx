@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { localePath } from "@/lib/i18n/config";
+import { localizedHref } from "@/lib/i18n/config";
 import { useLocale } from "./LocaleProvider";
 
 const KEY = "lfh:cookies:v1";
@@ -35,7 +35,7 @@ export function CookieBanner() {
       <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-2xl">
         <p className="text-sm text-[var(--color-ink-muted)]">
           {t("shell.cookies.body")} {" "}
-          <Link href={localePath(locale, "/confidentialite")} className="text-[var(--color-accent)] hover:underline">
+          <Link href={localizedHref(locale, "/confidentialite")} className="text-[var(--color-accent)] hover:underline">
             {t("shell.cookies.more")}
           </Link>
         </p>

@@ -1,0 +1,58 @@
+import type { Dictionary } from "./en";
+
+export const deDictionary = {
+  creator: {
+    collections: {
+      overview: { title: "Fotos und Videos von {name}", description: "Entdecke öffentliche Fotos und Videos von {name}." },
+      photos: { title: "Fotos von {name}", description: "Entdecke öffentliche Fotos, die {name} geteilt hat." },
+      videos: { title: "Videos von {name}", description: "Entdecke öffentliche Videos, die {name} geteilt hat." },
+      popular: { title: "Beliebte Medien von {name}", description: "Entdecke beliebte öffentliche Medien, die {name} geteilt hat." },
+    },
+    tabs: { overview: "Alle", photos: "Fotos", videos: "Videos", popular: "Beliebt" },
+    home: "Startseite", models: "Models", back: "Zurück", followers: "Follower", media: "Medien", views: "Aufrufe",
+    previousPage: "Vorherige Seite", nextPage: "Nächste Seite", page: "Seite", collectionsLabel: "Sammlungen", paginationLabel: "Seitennavigation", verified: "Verifiziert",
+    follow: { follow: "Folgen", following: "Gefolgt" },
+  },
+  shell: {
+    language: "Sprache", menu: "Menü", closeMenu: "Menü schließen", add: "Hinzufügen", search: "Suchen",
+    footerSafety: "Nur ab 18 Jahren. Nulltoleranz: Inhalte mit Minderjährigen sind verboten und müssen sofort gemeldet werden.", footerReport: "Melden",
+    navigation: { home: "Startseite", search: "Suchen", models: "Models", feed: "Feed", trending: "Trends", mostLiked: "Meistgeliked", random: "Zufällig", forYou: "Für dich", following: "Gefolgt", saved: "Gespeichert", add: "Hinzufügen", rankings: "Ranglisten", premium: "Premium", login: "Anmelden", signup: "Registrieren", help: "Hilfe", contact: "Kontakt", dmca: "DMCA", trust: "Vertrauen & Sicherheit", report: "Inhalt melden", terms: "Nutzungsbedingungen", privacy: "Datenschutz" },
+    searchInput: { placeholder: "Model oder Tag suchen…", label: "Suchen", clear: "Löschen", submit: "Suchen" },
+    account: { label: "Mein Konto", saved: "Meine gespeicherten Inhalte", following: "Meine Abonnements", logout: "Abmelden" },
+    ageGate: { title: "Nur für Erwachsene", body: "Diese Website enthält Inhalte für Erwachsene. Mit dem Betreten bestätigst du, dass du mindestens 18 Jahre alt bist oder das in deinem Land geltende Volljährigkeitsalter erreicht hast.", enter: "Ich bin mindestens 18 — Betreten", leave: "Verlassen" },
+    cookies: { body: "Wir verwenden nur minimalen lokalen Speicher für Einstellungen und Likes. Keine Werbetracker von Drittanbietern.", more: "Mehr erfahren" },
+  },
+  home: {
+    featured: "Ausgewählte Models", viewAll: "Alle ansehen",
+    filters: { label: "Entdeckungsfilter", discover: "Entdecken", trending: "Trends", recent: "Neu", photos: "Fotos", videos: "Videos", all: "Alle Filter", popularInterests: "Beliebte Interessen", active: "Aktive Filter", clear: "Alle löschen", title: "Alle Filter", description: "Wähle ein Interesse, um die Galerie zu personalisieren.", close: "Filter schließen", search: "Interesse suchen", searchPlaceholder: "Interesse suchen…", empty: "Kein Filter gefunden." },
+    gallery: { emptyTitle: "Keine Ergebnisse", emptyBody: "Versuche ein anderes Stichwort oder entferne Filter.", loading: "Wird geladen", loadError: "Weitere Inhalte konnten nicht geladen werden.", retry: "Erneut versuchen", loadMore: "Mehr laden", end: "Du hast alles gesehen", media: "Medienelemente" },
+  },
+  models: { title: "Models", countSuffix: "Creator auf LeakFanHub", followers: "Meiste Follower", views: "Meiste Aufrufe", added: "Creator hinzugefügt.", loadError: "Weitere Creator konnten nicht geladen werden.", retry: "Erneut versuchen", loadMore: "Mehr anzeigen", loading: "Wird geladen…" },
+  search: { title: "Suchen", creators: "Creator", followers: "Follower", result: "Ergebnis", results: "Ergebnisse", trendingNow: "Aktuelle Trends" },
+  searchForm: { placeholder: "Model, Tag oder Titel suchen…", label: "Suchen", clear: "Löschen", submit: "Suchen", advanced: "Erweitert", filterByTag: "Nach Tag filtern", searchFor: "Suchen" },
+  mediaTypes: { all: "Alle", photos: "Fotos", videos: "Videos", packs: "Pakete" },
+  aiFilters: { all: "Alle", real: "Echt", ai: "KI" },
+  addMedia: { title: "Medien hinzufügen", guestBody: "Melde dich an, um ein Foto oder Video zu veröffentlichen.", login: "Anmelden", intro: "Der Creator muss bereits in der Datenbank vorhanden sein (Autovervollständigung).", chooseFile: "Foto oder Video — zum Auswählen klicken", creator: "Creator", change: "Ändern", creatorPlaceholder: "Gib die ersten Buchstaben ein…", optionalTitle: "Titel (optional)", missingFields: "Wähle eine Datei und einen vorhandenen Creator.", uploadFailed: "Upload fehlgeschlagen", uploadSuccess: "Medium hochgeladen — wartet auf Moderation oder Veröffentlichung.", networkError: "Netzwerkfehler", sending: "Wird hochgeladen…", publish: "Veröffentlichen" },
+  auth: { loginTitle: "Anmelden", signupTitle: "Konto erstellen", loginIntro: "Schön, dich wiederzusehen.", signupIntro: "Werde in wenigen Sekunden Teil von LeakFanHub.", username: "Benutzername", usernamePlaceholder: "dein_benutzername", email: "E-Mail", emailPlaceholder: "du@beispiel.de", identifier: "E-Mail oder Benutzername", password: "Passwort", confirmPassword: "Passwort bestätigen", show: "Anzeigen", hide: "Ausblenden", mismatch: "Die Passwörter stimmen nicht überein.", genericError: "Etwas ist schiefgelaufen. Bitte versuche es erneut.", networkError: "Verbindung nicht möglich. Prüfe deine Verbindung und versuche es erneut.", busy: "Einen Moment…", submitLogin: "Anmelden", submitSignup: "Mein Konto erstellen", already: "Du hast bereits ein Konto?", needAccount: "Noch kein Konto?", anonymousPrompt: "Möchtest du lieber anonym bleiben?", anonymousLink: "Identität ohne E-Mail verwenden" },
+  premium: { loading: "Wird geladen…", activeTitle: "Du bist Premium", activeBody: "Deine Zahlung mit Telegram Stars wurde bestätigt und Premium ist auf deinem Konto aktiv.", back: "Zurück zur Galerie", guestBody: "Erstelle ein Konto oder melde dich an, um Premium für dein Profil zu aktivieren.", createAccount: "Konto erstellen", login: "Anmelden", badge: "Premium · Telegram Stars", choosePlan: "Wähle deinen Tarif", intro: "Bezahle sicher in Telegram und aktiviere Premium automatisch für", popular: "Beliebt", payTitle: "Mit Telegram Stars bezahlen", createInvoice: "Rechnung wird erstellt…", continueTelegram: "In Telegram fortfahren", invoiceSent: "Rechnung gesendet. Schließe die Zahlung in Telegram ab; diese Seite bestätigt sie automatisch.", reopen: "Telegram erneut öffnen", expired: "Diese Anfrage ist nicht mehr gültig. Starte eine neue Zahlung, um eine neue Rechnung zu erhalten.", noAds: "Keine Werbung", everyDevice: "Premium ist auf jedem Gerät mit deinem Konto verknüpft", orderError: "Die Zahlung kann gerade nicht erstellt werden. Bitte versuche es gleich noch einmal.", paymentDescription: "Telegram öffnet den Zahlungsbot mit einer genauen Rechnung über", termsIntro: "Wenn du fortfährst, akzeptierst du die", terms: "Nutzungsbedingungen", supportIntro: "Bei Fragen zur Zahlung wende dich an den", support: "Support" },
+  contactForm: {
+    submit: "Senden", reason: "Grund", message: "Nachricht", messagePlaceholder: "Beschreibe deine Anfrage ausführlich…", sending: "Wird gesendet…", sentTitle: "Nachricht gesendet", sentBody: "Vielen Dank — wir melden uns so schnell wie möglich.", another: "Weitere Nachricht senden", privacy: "Mit dem Absenden dieses Formulars stimmst du zu, dass deine Anfrage gemäß unserer Datenschutzrichtlinie verarbeitet wird. Es werden keine Daten an Dritte weitergegeben.",
+    errors: { invalid_email: "Die E-Mail-Adresse scheint ungültig zu sein.", empty_message: "Die Nachricht ist zu kurz.", rate_limited: "Zu viele Versuche. Probiere es in einigen Minuten erneut.", not_configured: "Der Versand ist noch nicht aktiv. Nutze die auf der Seite angegebene E-Mail-Adresse.", send_failed: "Senden fehlgeschlagen. Versuche es erneut oder nutze die auf der Seite angegebene E-Mail-Adresse.", bad_request: "Ungültige Anfrage.", network: "Verbindung nicht möglich. Prüfe deine Verbindung und versuche es erneut." },
+  },
+  pages: {
+    home: { meta: { title: "Neueste Fotos und Videos von Creatorn", description: "Entdecke Fotos und Videos von Creatorn, beliebte Models und täglich neue Medien. Nur für Erwachsene." } },
+    models: { meta: { title: "Models & Creator", description: "Durchsuche alle Creator auf LeakFanHub, sortiert nach Followern oder Aufrufen." } },
+    trending: { meta: { title: "Medien im Trend", description: "Fotos und Videos im Trend, nach Interaktionen sortiert und laufend aktualisiert." } },
+    mostLiked: { meta: { title: "Meistgeliked", description: "Die am häufigsten gelikten Fotos und Videos auf LeakFanHub." } },
+    rankings: { meta: { title: "Creator-Ranglisten", description: "Die meistgesehenen und beliebtesten Creator auf LeakFanHub." } },
+    influencers: { meta: { title: "Creator im Trend", description: "Creator, deren Medien gerade besonders viele Aufrufe gewinnen." } },
+    about: { meta: { title: "Über LeakFanHub", description: "Erfahre, wie Entdecken, Creator-Profile und Datenschutz bei LeakFanHub funktionieren." } },
+    dmca: { meta: { title: "DMCA-Inhaltsentfernung", description: "Reiche eine vollständige Urheberrechtsbeschwerde bei LeakFanHub ein." } },
+    trust: { meta: { title: "Vertrauen & Sicherheit", description: "Moderationsrichtlinie von LeakFanHub und Nulltoleranz gegenüber illegalen Inhalten." } },
+    contact: { meta: { title: "Kontakt", description: "Kontaktiere die Support-, Sicherheits-, Partnerschafts- oder Presseteams von LeakFanHub." } },
+    terms: { meta: { title: "Nutzungsbedingungen", description: "Bedingungen für den Zugriff auf und die Nutzung von LeakFanHub." } },
+    privacy: { meta: { title: "Datenschutzrichtlinie", description: "Wie LeakFanHub Einstellungen, Kontoinformationen und Anfragen speichert." } },
+    legal: { meta: { title: "Impressum", description: "Rechtliche Informationen und Hostingangaben zu LeakFanHub." } },
+    whatIs: { meta: { title: "Was ist LeakFanHub?", description: "So entdeckst du Inhalte, folgst Creatorn und speicherst Medien auf LeakFanHub." } },
+  },
+} satisfies Dictionary;

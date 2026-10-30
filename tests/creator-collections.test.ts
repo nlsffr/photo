@@ -31,7 +31,7 @@ test("parses collection routes safely, including localized and versioned handles
   assert.deepEqual(parseCreatorCollectionPath("/en/alice"), { handle: "alice", collection: "overview" });
   assert.deepEqual(parseCreatorCollectionPath("/fr/alice-v3"), { handle: "alice-v3", collection: "overview" });
   for (const handle of [
-    "contact", "models", "sitemaps", "en", "fr", "photos", "videos", "popular",
+    "contact", "models", "sitemaps", "en", "fr", "es", "de", "it", "pt", "nl", "photos", "videos", "popular",
     "api", "creator", "photo", "media", "_next", "saved", "liked", "search",
     "random", "tag",
   ]) {

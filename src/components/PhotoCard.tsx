@@ -9,6 +9,7 @@ import { VerifiedBadge } from "./VerifiedBadge";
 import { useInteractions } from "./Interactions";
 import { MediaImg } from "./MediaImg";
 import { useLocale } from "./LocaleProvider";
+import { DISCOVERY_COPY } from "@/features/i18n/discovery-copy";
 
 const SIZES =
   "(max-width: 640px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 20vw";
@@ -26,7 +27,8 @@ export function PhotoCard({
   replace?: boolean;
 }) {
   const { isLiked, isSaved, toggleLike, toggleSave, ready } = useInteractions();
-  const { locale } = useLocale();
+  const { locale, dictionary } = useLocale();
+  const copy = DISCOVERY_COPY[locale];
   const liked = ready && isLiked(photo.id);
   const saved = ready && isSaved(photo.id);
   const likeCount = photo.likes + (liked ? 1 : 0);
@@ -142,7 +144,7 @@ export function PhotoCard({
         />
         <span className="flex min-w-0 items-center gap-1 text-xs font-semibold text-white drop-shadow">
           <span className="truncate">{photo.creator.name}</span>
-          {photo.creator.verified && <VerifiedBadge size={11} />}
+          {photo.creator.verified && <VerifiedBadge size={11} label={dictionary.creator.verified} />}
         </span>
       </Link>
 
@@ -151,7 +153,7 @@ export function PhotoCard({
           type="button"
           onClick={() => toggleLike(photo.id)}
           aria-pressed={liked}
-          aria-label={locale === "fr" ? "J’aime" : "Like"}
+          aria-label={copy.like}
           className="pointer-events-auto flex items-center gap-1 text-xs font-semibold text-white active:scale-90"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill={liked ? "var(--color-accent)" : "none"} stroke={liked ? "var(--color-accent)" : "currentColor"} strokeWidth="2" aria-hidden>
@@ -172,7 +174,7 @@ export function PhotoCard({
           type="button"
           onClick={() => toggleSave(photo.id)}
           aria-pressed={saved}
-          aria-label={locale === "fr" ? "Enregistrer" : "Save"}
+          aria-label={copy.save}
           className="pointer-events-auto ml-auto text-white active:scale-90"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill={saved ? "var(--color-accent)" : "none"} stroke={saved ? "var(--color-accent)" : "currentColor"} strokeWidth="2" aria-hidden>

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { creatorHref } from "@/lib/types";
-import { localePath } from "@/lib/i18n/config";
+import { localizedHref } from "@/lib/i18n/config";
 import { useLocale } from "./LocaleProvider";
 
 type Hit = {
@@ -62,7 +62,7 @@ export function SearchBar() {
     e.preventDefault();
     const q = value.trim();
     setOpen(false);
-    const searchPath = localePath(locale, "/recherche");
+    const searchPath = localizedHref(locale, "/recherche");
     router.push(q ? `${searchPath}?q=${encodeURIComponent(q)}` : searchPath);
   }
 
@@ -142,7 +142,7 @@ export function SearchBar() {
               onClick={() => {
                 const q = value.trim();
                 setOpen(false);
-                const searchPath = localePath(locale, "/recherche");
+                const searchPath = localizedHref(locale, "/recherche");
                 router.push(q ? `${searchPath}?q=${encodeURIComponent(q)}` : searchPath);
               }}
               className="w-full px-3 py-2 text-left text-xs font-semibold text-[var(--color-accent)] hover:bg-[var(--color-surface-2)]"

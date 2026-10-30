@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getModels } from "@/lib/photos";
 import { creatorHref } from "@/lib/types";
-import type { Locale } from "@/lib/i18n/config";
+import { isCreatorLocale, type Locale } from "@/lib/i18n/config";
 import { creatorCollectionPath } from "@/lib/creator-collections";
 import { MediaImg } from "./MediaImg";
 
@@ -43,7 +43,7 @@ export async function FeaturedCreators({
           return (
             <Link
               key={c.handle}
-              href={locale ? creatorCollectionPath(c.handle, c.urlVersion ?? 1, "overview", locale) : creatorHref(c.handle, c.urlVersion)}
+              href={isCreatorLocale(locale) ? creatorCollectionPath(c.handle, c.urlVersion ?? 1, "overview", locale) : creatorHref(c.handle, c.urlVersion)}
               prefetch={false}
               className="flex w-[4.1rem] shrink-0 flex-col items-center gap-1.5 sm:w-[4.5rem]"
             >

@@ -1,5 +1,5 @@
 // @ts-expect-error Node's native type stripping requires the explicit .ts suffix.
-import { localePath, type Locale } from "./config.ts";
+import { localeAlternates, localePath, localesForPath } from "./config.ts";
 
 export const LOCALIZED_INDEXABLE_ENTRIES = [
   { path: "/", changeFrequency: "hourly", priority: 1 },
@@ -18,8 +18,6 @@ export const LOCALIZED_INDEXABLE_ENTRIES = [
   { path: "/qu-est-ce-que-lumengallery", changeFrequency: "monthly", priority: 0.3 },
 ] as const;
 
-const INDEXED_LOCALES = ["en", "fr"] as const satisfies readonly Locale[];
-
 function siteBase(site: string): string {
   return site.replace(/\/$/, "");
 }
@@ -30,16 +28,14 @@ function absoluteUrl(site: string, pathname: string): string {
 }
 
 function absoluteAlternates(site: string, pathname: string) {
-  return {
-    en: absoluteUrl(site, localePath("en", pathname)),
-    fr: absoluteUrl(site, localePath("fr", pathname)),
-    "x-default": absoluteUrl(site, pathname),
-  };
+  return Object.fromEntries(Object.entries(localeAlternates(pathname)).map(
+    ([locale, path]) => [locale, absoluteUrl(site, path)],
+  ));
 }
 
 export function buildLocalizedSitemapEntries(site: string) {
   return LOCALIZED_INDEXABLE_ENTRIES.flatMap((entry) =>
-    INDEXED_LOCALES.map((locale) => ({
+    localesForPath(entry.path).map((locale) => ({
       url: absoluteUrl(site, localePath(locale, entry.path)),
       changeFrequency: entry.changeFrequency,
       priority: entry.priority,

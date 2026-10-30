@@ -6,7 +6,7 @@ import type { MediaType, SortKey } from "@/lib/types";
 import { buildHomeHref } from "@/lib/home-filter-links";
 import { TagChips } from "./TagChips";
 import { useLocale } from "./LocaleProvider";
-import { localePath } from "@/lib/i18n/config";
+import { localizedHref } from "@/lib/i18n/config";
 
 type Props = {
   tags: string[];
@@ -24,7 +24,7 @@ const idleChip =
 
 export function HomeFilters({ tags, sort, type, tag }: Props) {
   const { locale, t } = useLocale();
-  const homePath = localePath(locale, "/");
+  const homePath = localizedHref(locale, "/");
   const dialogRef = useRef<HTMLDialogElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const dialogId = useId();
@@ -108,11 +108,11 @@ export function HomeFilters({ tags, sort, type, tag }: Props) {
           {t("home.filters.all")}{activeCount > 0 ? ` · ${activeCount}` : ""}
         </button>
         <Link
-          href={localePath(locale, "/feed")}
+          href={localizedHref(locale, "/feed")}
           prefetch={false}
           className={`${chip} ml-auto ${idleChip}`}
         >
-          Feed ↗
+          {t("shell.navigation.feed")} ↗
         </Link>
       </div>
 

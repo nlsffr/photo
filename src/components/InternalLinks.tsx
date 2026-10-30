@@ -1,34 +1,22 @@
 import Link from "next/link";
 import { localizedHref, type Locale } from "@/lib/i18n/config";
-
-const COPY = {
-  en: {
-    label: "Popular galleries",
-    title: "Trending and popular galleries",
-    links: ["Trending galleries", "Top creators", "Most liked media"],
-  },
-  fr: {
-    label: "Galeries populaires",
-    title: "Tendances et galeries populaires",
-    links: ["Galeries tendance", "Créateurs populaires", "Médias les plus aimés"],
-  },
-} as const;
+import { DISCOVERY_COPY } from "@/features/i18n/discovery-copy";
 
 const TARGETS = ["/trending-medias", "/models", "/most-liked"] as const;
 
 export default function InternalLinks({ locale }: { locale: Locale }) {
-  const copy = COPY[locale];
+  const copy = DISCOVERY_COPY[locale];
   const popularTags = TARGETS.map((slug, index) => ({
-    name: copy.links[index],
+    name: copy.galleriesLinks[index],
     slug,
   }));
 
   return (
     <nav
       className="my-8 rounded-lg border border-gray-800 bg-gray-900 p-6"
-      aria-label={copy.label}
+      aria-label={copy.popularGalleries}
     >
-      <h3 className="mb-4 text-lg font-semibold text-white">🔥 {copy.title}</h3>
+      <h3 className="mb-4 text-lg font-semibold text-white">🔥 {copy.galleriesTitle}</h3>
       <ul className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {popularTags.map((tag) => (
           <li key={tag.slug}>

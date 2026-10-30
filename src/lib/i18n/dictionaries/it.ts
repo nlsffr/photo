@@ -1,0 +1,58 @@
+import type { Dictionary } from "./en";
+
+export const itDictionary = {
+  creator: {
+    collections: {
+      overview: { title: "Foto e video di {name}", description: "Sfoglia le foto e i video pubblici di {name}." },
+      photos: { title: "Foto di {name}", description: "Sfoglia le foto pubbliche condivise da {name}." },
+      videos: { title: "Video di {name}", description: "Sfoglia i video pubblici condivisi da {name}." },
+      popular: { title: "Contenuti popolari di {name}", description: "Sfoglia i contenuti pubblici più popolari condivisi da {name}." },
+    },
+    tabs: { overview: "Tutto", photos: "Foto", videos: "Video", popular: "Popolari" },
+    home: "Home", models: "Modelle", back: "Indietro", followers: "follower", media: "contenuti", views: "visualizzazioni",
+    previousPage: "Pagina precedente", nextPage: "Pagina successiva", page: "Pagina", collectionsLabel: "Raccolte", paginationLabel: "Paginazione", verified: "Verificato",
+    follow: { follow: "Segui", following: "Seguito" },
+  },
+  shell: {
+    language: "Lingua", menu: "Menu", closeMenu: "Chiudi menu", add: "Aggiungi", search: "Cerca",
+    footerSafety: "Solo per maggiorenni. Tolleranza zero: i contenuti che coinvolgono minori sono vietati e devono essere segnalati immediatamente.", footerReport: "Segnala",
+    navigation: { home: "Home", search: "Cerca", models: "Modelle", feed: "Feed", trending: "Tendenze", mostLiked: "Più apprezzati", random: "Casuale", forYou: "Per te", following: "Seguiti", saved: "Salvati", add: "Aggiungi", rankings: "Classifiche", premium: "Premium", login: "Accedi", signup: "Registrati", help: "Aiuto", contact: "Contatti", dmca: "DMCA", trust: "Affidabilità e sicurezza", report: "Segnala contenuto", terms: "Termini", privacy: "Privacy" },
+    searchInput: { placeholder: "Cerca una modella o un tag…", label: "Cerca", clear: "Cancella", submit: "Cerca" },
+    account: { label: "Il mio account", saved: "I miei elementi salvati", following: "I miei abbonamenti", logout: "Esci" },
+    ageGate: { title: "Solo per adulti", body: "Questo sito contiene contenuti per adulti. Entrando, confermi di avere almeno 18 anni o l'età della maggiore età prevista nel tuo Paese.", enter: "Ho almeno 18 anni — Entra", leave: "Esci" },
+    cookies: { body: "Utilizziamo uno spazio locale minimo per preferenze e Mi piace. Nessun tracker pubblicitario di terze parti.", more: "Scopri di più" },
+  },
+  home: {
+    featured: "Modelle in evidenza", viewAll: "Vedi tutto",
+    filters: { label: "Filtri di scoperta", discover: "Scopri", trending: "Tendenze", recent: "Recenti", photos: "Foto", videos: "Video", all: "Tutti i filtri", popularInterests: "Interessi popolari", active: "Filtri attivi", clear: "Cancella tutto", title: "Tutti i filtri", description: "Scegli un interesse per personalizzare la galleria.", close: "Chiudi filtri", search: "Cerca un interesse", searchPlaceholder: "Cerca un interesse…", empty: "Nessun filtro trovato." },
+    gallery: { emptyTitle: "Nessun risultato", emptyBody: "Prova un'altra parola chiave o rimuovi i filtri.", loading: "Caricamento", loadError: "Impossibile caricare altri elementi.", retry: "Riprova", loadMore: "Carica altro", end: "Hai visto tutto", media: "contenuti multimediali" },
+  },
+  models: { title: "Modelle", countSuffix: "creator su LeakFanHub", followers: "Più seguiti", views: "Più visti", added: "creator aggiunti.", loadError: "Impossibile caricare altri creator.", retry: "Riprova", loadMore: "Vedi altro", loading: "Caricamento…" },
+  search: { title: "Cerca", creators: "Creator", followers: "follower", result: "risultato", results: "risultati", trendingNow: "Di tendenza ora" },
+  searchForm: { placeholder: "Cerca una modella, un tag o un titolo…", label: "Cerca", clear: "Cancella", submit: "Cerca", advanced: "Avanzata", filterByTag: "Filtra per tag", searchFor: "Cerca" },
+  mediaTypes: { all: "Tutto", photos: "Foto", videos: "Video", packs: "Pacchetti" },
+  aiFilters: { all: "Tutto", real: "Reale", ai: "IA" },
+  addMedia: { title: "Aggiungi contenuto", guestBody: "Accedi per pubblicare una foto o un video.", login: "Accedi", intro: "Il creator deve essere già presente nel database (completamento automatico).", chooseFile: "Foto o video — fai clic per scegliere", creator: "Creator", change: "Cambia", creatorPlaceholder: "Digita le prime lettere…", optionalTitle: "Titolo (facoltativo)", missingFields: "Scegli un file e un creator esistente.", uploadFailed: "Caricamento non riuscito", uploadSuccess: "Contenuto caricato — in attesa di moderazione o pubblicazione.", networkError: "Errore di rete", sending: "Caricamento…", publish: "Pubblica" },
+  auth: { loginTitle: "Accedi", signupTitle: "Crea un account", loginIntro: "È bello rivederti.", signupIntro: "Unisciti a LeakFanHub in pochi secondi.", username: "Nome utente", usernamePlaceholder: "il_tuo_nome", email: "Email", emailPlaceholder: "tu@esempio.it", identifier: "Email o nome utente", password: "Password", confirmPassword: "Conferma password", show: "Mostra", hide: "Nascondi", mismatch: "Le password non coincidono.", genericError: "Qualcosa è andato storto. Riprova.", networkError: "Impossibile connettersi. Controlla la connessione e riprova.", busy: "Un momento…", submitLogin: "Accedi", submitSignup: "Crea il mio account", already: "Hai già un account?", needAccount: "Non hai ancora un account?", anonymousPrompt: "Preferisci rimanere anonimo?", anonymousLink: "Usa un'identità senza email" },
+  premium: { loading: "Caricamento…", activeTitle: "Sei Premium", activeBody: "Il pagamento con Telegram Stars è stato confermato e Premium è attivo sul tuo account.", back: "Torna alla galleria", guestBody: "Crea un account o accedi per attivare Premium sul tuo profilo.", createAccount: "Crea un account", login: "Accedi", badge: "Premium · Telegram Stars", choosePlan: "Scegli il tuo piano", intro: "Paga in modo sicuro su Telegram e attiva automaticamente Premium per", popular: "Popolare", payTitle: "Paga con Telegram Stars", createInvoice: "Creazione della fattura…", continueTelegram: "Continua su Telegram", invoiceSent: "Fattura inviata. Completa il pagamento su Telegram; questa pagina lo confermerà automaticamente.", reopen: "Riapri Telegram", expired: "Questa richiesta non è più valida. Avvia un nuovo pagamento per ricevere una nuova fattura.", noAds: "Nessuna pubblicità", everyDevice: "Premium collegato al tuo account su ogni dispositivo", orderError: "Impossibile creare il pagamento in questo momento. Riprova tra poco.", paymentDescription: "Telegram aprirà il bot di pagamento con una fattura esatta per", termsIntro: "Continuando, accetti i", terms: "termini", supportIntro: "Per domande sui pagamenti, contatta il", support: "supporto" },
+  contactForm: {
+    submit: "Invia", reason: "Motivo", message: "Messaggio", messagePlaceholder: "Descrivi la tua richiesta nei dettagli…", sending: "Invio…", sentTitle: "Messaggio inviato", sentBody: "Grazie — ti risponderemo il prima possibile.", another: "Invia un altro messaggio", privacy: "Inviando questo modulo, accetti che la tua richiesta venga trattata secondo la nostra informativa sulla privacy. Nessun dato viene condiviso con terze parti.",
+    errors: { invalid_email: "L'indirizzo email non sembra valido.", empty_message: "Il messaggio è troppo breve.", rate_limited: "Troppi tentativi. Riprova tra qualche minuto.", not_configured: "L'invio non è ancora attivo. Usa l'indirizzo email indicato nella pagina.", send_failed: "Invio non riuscito. Riprova o usa l'indirizzo email indicato nella pagina.", bad_request: "Richiesta non valida.", network: "Impossibile connettersi. Controlla la connessione e riprova." },
+  },
+  pages: {
+    home: { meta: { title: "Foto e video recenti dei creator", description: "Scopri foto e video dei creator, modelle popolari e nuovi contenuti aggiornati ogni giorno. Solo per adulti." } },
+    models: { meta: { title: "Modelle e creator", description: "Sfoglia tutti i creator su LeakFanHub, ordinati per follower o visualizzazioni." } },
+    trending: { meta: { title: "Contenuti di tendenza", description: "Foto e video di tendenza classificati per interazioni e aggiornati continuamente." } },
+    mostLiked: { meta: { title: "Più apprezzati", description: "Le foto e i video con più Mi piace su LeakFanHub." } },
+    rankings: { meta: { title: "Classifiche dei creator", description: "I creator più visti e apprezzati su LeakFanHub." } },
+    influencers: { meta: { title: "Creator di tendenza", description: "Creator i cui contenuti stanno ottenendo più visualizzazioni in questo momento." } },
+    about: { meta: { title: "Informazioni su LeakFanHub", description: "Scopri come funzionano l'esplorazione, i profili dei creator e la privacy su LeakFanHub." } },
+    dmca: { meta: { title: "Rimozione di contenuti DMCA", description: "Invia a LeakFanHub una richiesta completa di rimozione per violazione del copyright." } },
+    trust: { meta: { title: "Affidabilità e sicurezza", description: "Politica di moderazione di LeakFanHub e tolleranza zero per i contenuti illegali." } },
+    contact: { meta: { title: "Contatti", description: "Contatta i team di supporto, sicurezza, partnership o stampa di LeakFanHub." } },
+    terms: { meta: { title: "Termini di utilizzo", description: "Termini che regolano l'accesso e l'utilizzo di LeakFanHub." } },
+    privacy: { meta: { title: "Informativa sulla privacy", description: "Come LeakFanHub archivia preferenze, informazioni dell'account e richieste." } },
+    legal: { meta: { title: "Note legali", description: "Informazioni legali e di hosting di LeakFanHub." } },
+    whatIs: { meta: { title: "Che cos'è LeakFanHub?", description: "Come esplorare, seguire i creator e salvare contenuti su LeakFanHub." } },
+  },
+} satisfies Dictionary;

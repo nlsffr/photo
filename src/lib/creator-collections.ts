@@ -1,4 +1,5 @@
 import type { Photo } from "./types";
+import type { CreatorLocale } from "./i18n/config";
 // @ts-expect-error Node’s native type stripping requires the explicit .ts suffix.
 import { getDictionary } from "./i18n/dictionaries.ts";
 // @ts-expect-error Node’s native type stripping requires the explicit .ts suffix.
@@ -89,7 +90,7 @@ export function parseCreatorPage(raw: string | string[] | null | undefined): { p
   return { page, valid: true };
 }
 
-export function creatorCollectionPath(handle: string, urlVersion: number, collection: CreatorCollection, locale?: "en" | "fr", page?: number): string {
+export function creatorCollectionPath(handle: string, urlVersion: number, collection: CreatorCollection, locale?: CreatorLocale, page?: number): string {
   const safeHandle = handle.trim();
   if (!isRoutableCreatorHandle(safeHandle)) throw new TypeError("Invalid creator handle");
   if (!COLLECTIONS.has(collection)) throw new TypeError("Invalid collection");
@@ -102,11 +103,11 @@ export function creatorCollectionPath(handle: string, urlVersion: number, collec
   return `${prefix}${collectionPath}${suffix}`;
 }
 
-export function creatorCollectionCopy(locale: "en" | "fr", collection: CreatorCollection, name: string) {
+export function creatorCollectionCopy(locale: CreatorLocale, collection: CreatorCollection, name: string) {
   const copy = getDictionary(locale).creator.collections[collection];
   return { title: copy.title.replace("{name}", () => name), description: copy.description.replace("{name}", () => name) };
 }
-export function creatorCollectionMetadata(handle: string, collection: CreatorCollection, locale: "en" | "fr" = "en") {
+export function creatorCollectionMetadata(handle: string, collection: CreatorCollection, locale: CreatorLocale = "en") {
   const copy = creatorCollectionCopy(locale, collection, handle);
   return { title: copy.title, description: copy.description };
 }

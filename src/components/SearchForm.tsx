@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useLocale } from "@/components/LocaleProvider";
-import { localePath } from "@/lib/i18n/config";
+import { localizedHref } from "@/lib/i18n/config";
 import { creatorHref } from "@/lib/types";
 
 type Hit = {
@@ -19,7 +19,7 @@ export function SearchForm({ tags }: { tags: string[] }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { locale, t } = useLocale();
-  const searchPath = localePath(locale, "/recherche");
+  const searchPath = localizedHref(locale, "/recherche");
   const [value, setValue] = useState("");
   const [advanced, setAdvanced] = useState(false);
   const [hits, setHits] = useState<Hit[]>([]);

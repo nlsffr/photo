@@ -27,12 +27,43 @@ test("localized metadata self-canonicalizes with reciprocal hreflang and x-defau
   assert.deepEqual(english.alternates?.languages, {
     en: "/en/models",
     fr: "/fr/models",
+    es: "/es/models",
+    de: "/de/models",
+    it: "/it/models",
+    pt: "/pt/models",
+    nl: "/nl/models",
     "x-default": "/models",
   });
   assert.equal(french.alternates?.canonical, "/fr/models");
   assert.deepEqual(french.alternates?.languages, english.alternates?.languages);
   assert.equal(english.openGraph?.locale, "en_US");
   assert.equal(french.openGraph?.locale, "fr_FR");
+});
+
+test("new discovery metadata uses seven reciprocal languages without expanding editorial pages", async () => {
+  const { buildLocalizedMetadata } = await loadMetadata();
+  const { getDictionary } = await loadDictionaries();
+  const pages = [
+    ["/", "home"], ["/models", "models"], ["/trending-medias", "trending"],
+    ["/most-liked", "mostLiked"], ["/classements", "rankings"],
+    ["/influenceuses-tendances", "influencers"],
+  ] as const;
+  const ogLocales = { es: "es_ES", de: "de_DE", it: "it_IT", pt: "pt_PT", nl: "nl_NL" };
+  for (const locale of ["es", "de", "it", "pt", "nl"] as const) {
+    for (const [path, key] of pages) {
+      const copy = getDictionary(locale).pages[key].meta;
+      const metadata = buildLocalizedMetadata(locale, path, copy);
+      assert.equal(metadata.alternates?.canonical, `/${locale}${path === "/" ? "" : path}`);
+      assert.equal(Object.keys(metadata.alternates?.languages || {}).length, 8);
+      assert.equal(metadata.openGraph?.locale, ogLocales[locale]);
+      assert.equal(metadata.openGraph?.alternateLocale?.length, 6);
+      assert.notEqual(copy.description, getDictionary("en").pages[key].meta.description);
+    }
+  }
+  const editorial = buildLocalizedMetadata("fr", "/about", getDictionary("fr").pages.about.meta);
+  assert.deepEqual(editorial.alternates?.languages, {
+    en: "/en/about", fr: "/fr/about", "x-default": "/about",
+  });
 });
 
 test("the two server dictionaries translate primary UI and indexable metadata", async () => {

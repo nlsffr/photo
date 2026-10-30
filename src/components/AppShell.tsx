@@ -9,9 +9,9 @@ import { BrandLogo } from "./BrandLogo";
 import { LanguageSwitcher, useLocale } from "./LocaleProvider";
 import {
   localizedHref,
-  localePath,
   stripLocalePrefix,
 } from "@/lib/i18n/config";
+import { DISCOVERY_COPY } from "@/features/i18n/discovery-copy";
 
 type NavItem = {
   href: string;
@@ -245,7 +245,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </svg>
         </button>
 
-        <BrandLogo href={localePath(locale, "/")} />
+        <BrandLogo href={localizedHref(locale, "/")} />
 
         <div className="ml-auto hidden min-w-0 max-w-xs flex-1 sm:block md:max-w-sm">
           <Suspense fallback={<div className="h-9 w-full rounded-full border border-[var(--color-border)] bg-[var(--color-surface)]" />}>
@@ -255,14 +255,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <div className="ml-auto flex shrink-0 items-center gap-1 sm:ml-0 sm:gap-1.5">
           <Link
-            href={localePath(locale, "/premium")}
+            href={localizedHref(locale, "/premium")}
             prefetch={false}
             className="hidden rounded-full bg-amber-400/15 px-3 py-1.5 text-xs font-bold text-amber-400 hover:bg-amber-400/25 sm:inline"
           >
             Premium
           </Link>
           <Link
-            href={localePath(locale, "/add")}
+            href={localizedHref(locale, "/add")}
             prefetch={false}
             aria-label={t("shell.add")}
             className="hidden h-9 w-9 place-items-center rounded-lg bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-600)] sm:grid"
@@ -272,7 +272,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </svg>
           </Link>
           <Link
-            href={localePath(locale, "/recherche")}
+            href={localizedHref(locale, "/recherche")}
             prefetch={false}
             aria-label={t("shell.search")}
             className="grid h-9 w-9 place-items-center rounded-lg text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-2)] sm:hidden"
@@ -310,7 +310,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <button type="button" className="absolute inset-0 bg-black/50" aria-label={t("shell.closeMenu")} onClick={() => setOpenPath(null)} />
           <div className="absolute inset-y-0 left-0 flex w-[min(20rem,88vw)] flex-col bg-[var(--color-bg)] shadow-2xl">
             <div className="flex items-center justify-between gap-2 border-b border-[var(--color-border)] p-3 pb-2">
-              <BrandLogo href={localePath(locale, "/")} />
+              <BrandLogo href={localizedHref(locale, "/")} />
               <button onClick={() => setOpenPath(null)} aria-label={t("shell.closeMenu")} className="grid h-8 w-8 place-items-center rounded-lg text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-2)]">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
                   <path d="M18 6 6 18M6 6l12 12" />
@@ -333,20 +333,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {!isFeed && (
         <footer className="mt-auto border-t border-[var(--color-border)] bg-[var(--color-surface)] pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0">
           <div className="mx-auto flex max-w-[1600px] flex-col items-center gap-5 px-4 py-8 text-center sm:px-6">
-            <BrandLogo href={localePath(locale, "/")} size="md" />
+            <BrandLogo href={localizedHref(locale, "/")} size="md" />
             <p className="max-w-xl text-xs text-[var(--color-ink-muted)]">
               {t("shell.footerSafety")}
             </p>
             <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm text-[var(--color-ink-muted)]">
-              <Link href={localePath(locale, "/conditions")} prefetch={false} className="hover:text-[var(--color-ink)]">{t("shell.navigation.terms")}</Link>
-              <Link href={localePath(locale, "/confidentialite")} prefetch={false} className="hover:text-[var(--color-ink)]">{t("shell.navigation.privacy")}</Link>
-              <Link href={localePath(locale, "/trust-and-safety")} prefetch={false} className="hover:text-[var(--color-ink)]">{t("shell.navigation.trust")}</Link>
-              <Link href={localePath(locale, "/dmca")} prefetch={false} className="hover:text-[var(--color-ink)]">{t("shell.navigation.dmca")}</Link>
-              <Link href={localePath(locale, "/contact")} prefetch={false} className="hover:text-[var(--color-ink)]">{t("shell.navigation.contact")}</Link>
-              <Link href={localePath(locale, "/contact/signalement")} prefetch={false} className="font-semibold text-[var(--color-accent)] hover:underline">{t("shell.footerReport")}</Link>
+              <Link href={localizedHref(locale, "/conditions")} prefetch={false} className="hover:text-[var(--color-ink)]">{t("shell.navigation.terms")}</Link>
+              <Link href={localizedHref(locale, "/confidentialite")} prefetch={false} className="hover:text-[var(--color-ink)]">{t("shell.navigation.privacy")}</Link>
+              <Link href={localizedHref(locale, "/trust-and-safety")} prefetch={false} className="hover:text-[var(--color-ink)]">{t("shell.navigation.trust")}</Link>
+              <Link href={localizedHref(locale, "/dmca")} prefetch={false} className="hover:text-[var(--color-ink)]">{t("shell.navigation.dmca")}</Link>
+              <Link href={localizedHref(locale, "/contact")} prefetch={false} className="hover:text-[var(--color-ink)]">{t("shell.navigation.contact")}</Link>
+              <Link href={localizedHref(locale, "/contact/signalement")} prefetch={false} className="font-semibold text-[var(--color-accent)] hover:underline">{t("shell.footerReport")}</Link>
             </nav>
             <p className="text-xs text-[var(--color-ink-faint)]">
-              © 2026 LeakFanHub · {locale === "fr" ? "18+ uniquement" : "18+ only"}
+              © 2026 LeakFanHub · {DISCOVERY_COPY[locale].adultsOnly}
             </p>
           </div>
         </footer>

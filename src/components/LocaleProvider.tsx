@@ -11,8 +11,8 @@ import {
 } from "@/lib/i18n/config";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 
-const FLAGS: Record<Locale, string> = { en: "🇬🇧", fr: "🇫🇷" };
-const NAMES: Record<Locale, string> = { en: "English", fr: "Français" };
+const FLAGS: Record<Locale, string> = { en: "🇬🇧", fr: "🇫🇷", es: "🇪🇸", de: "🇩🇪", it: "🇮🇹", pt: "🇵🇹", nl: "🇳🇱" };
+const NAMES: Record<Locale, string> = { en: "English", fr: "Français", es: "Español", de: "Deutsch", it: "Italiano", pt: "Português", nl: "Nederlands" };
 
 interface LocaleCtx {
   locale: Locale;

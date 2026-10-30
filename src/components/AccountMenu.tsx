@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useSession } from "./Session";
 import { useLocale } from "./LocaleProvider";
-import { localePath } from "@/lib/i18n/config";
+import { localizedHref } from "@/lib/i18n/config";
 
 export function AccountMenu() {
   const { user, loading, logout } = useSession();
@@ -35,13 +35,13 @@ export function AccountMenu() {
     return (
       <>
         <Link
-          href={localePath(locale, "/inscription")}
+          href={localizedHref(locale, "/inscription")}
           className="hidden items-center gap-1.5 rounded-lg bg-[var(--color-accent)] px-3.5 py-2 text-sm font-bold text-white hover:bg-[var(--color-accent-600)] sm:inline-flex"
         >
           {t("shell.navigation.signup")}
         </Link>
         <Link
-          href={localePath(locale, "/connexion")}
+          href={localizedHref(locale, "/connexion")}
           aria-label={t("shell.navigation.login")}
           className="grid h-9 w-9 place-items-center rounded-full bg-[var(--color-surface-2)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
         >
@@ -82,14 +82,14 @@ export function AccountMenu() {
           </div>
           <nav className="flex flex-col py-1 text-sm">
             <Link
-              href={localePath(locale, "/favoris")}
+              href={localizedHref(locale, "/favoris")}
               onClick={() => setOpen(false)}
               className="px-4 py-2 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink)]"
             >
               {t("shell.account.saved")}
             </Link>
             <Link
-              href={localePath(locale, "/abonnements")}
+              href={localizedHref(locale, "/abonnements")}
               onClick={() => setOpen(false)}
               className="px-4 py-2 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-ink)]"
             >
@@ -100,7 +100,7 @@ export function AccountMenu() {
               onClick={async () => {
                 setOpen(false);
                 await logout();
-                router.push(localePath(locale, "/"));
+                router.push(localizedHref(locale, "/"));
                 router.refresh();
               }}
               className="px-4 py-2 text-left text-red-400 hover:bg-[var(--color-surface-2)]"

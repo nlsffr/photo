@@ -1,24 +1,27 @@
 // @ts-expect-error Node’s native type stripping requires the explicit .ts suffix.
 import { parseCreatorCollectionPath } from "../creator-collections.ts";
 
-export const LOCALES = ["en", "fr"] as const;
+export const LOCALES = ["en", "fr", "es", "de", "it", "pt", "nl"] as const;
 export type Locale = (typeof LOCALES)[number];
+export const CREATOR_LOCALES = ["en", "fr"] as const;
+export type CreatorLocale = (typeof CREATOR_LOCALES)[number];
 
 export const DEFAULT_LOCALE: Locale = "en";
 export const LOCALE_COOKIE = "lfh_locale";
 
-/**
- * Routes whose shell and primary content are available in both languages.
- * Exact static routes only; creator collections are dispatched separately.
- * Media and tag pages stay unprefixed.
- */
-export const LOCALIZED_ROUTE_PATHS = [
+/** Only these six routes have full translations in all discovery languages. */
+export const DISCOVERY_ROUTE_PATHS = [
   "/",
   "/models",
   "/trending-medias",
   "/most-liked",
   "/classements",
   "/influenceuses-tendances",
+] as const;
+
+/** Exact static routes; the remaining routes and creators are English/French. */
+export const LOCALIZED_ROUTE_PATHS = [
+  ...DISCOVERY_ROUTE_PATHS,
   "/about",
   "/dmca",
   "/trust-and-safety",
@@ -44,13 +47,29 @@ export const LOCALIZED_ROUTE_PATHS = [
 ] as const;
 
 const LOCALIZED_ROUTES = new Set<string>(LOCALIZED_ROUTE_PATHS);
+const DISCOVERY_ROUTES = new Set<string>(DISCOVERY_ROUTE_PATHS);
+
+export function localesForPath(pathname: string): readonly Locale[] {
+  const { pathname: unprefixed } = stripLocalePrefix(pathname);
+  return DISCOVERY_ROUTES.has(unprefixed) ? LOCALES : CREATOR_LOCALES;
+}
+
+export function supportedLocaleForPath(locale: Locale, pathname: string): Locale {
+  return localesForPath(pathname).includes(locale) ? locale : DEFAULT_LOCALE;
+}
+
 /** Static routes always win, and localized media details are never dispatched. */
 export function resolveLocalizedPage(locale: Locale, pathname: string) {
   if (!isLocale(locale)) return null;
-  if (LOCALIZED_ROUTES.has(pathname)) return { kind: "static" as const, pathname };
+  if (LOCALIZED_ROUTES.has(pathname)) {
+    return localesForPath(pathname).includes(locale)
+      ? { kind: "static" as const, pathname }
+      : null;
+  }
+  if (!isCreatorLocale(locale)) return null;
   if (!/^\/[^/]+(?:\/(?:photos|videos|popular))?$/.test(pathname)) return null;
   // This input is already unprefixed; prevent a second locale from being parsed.
-  if (/^\/(?:en|fr)(?:\/|$)/.test(pathname)) return null;
+  if (stripLocalePrefix(pathname).locale) return null;
   const creator = parseCreatorCollectionPath(pathname);
   return creator ? { kind: "creator" as const, ...creator } : null;
 }
@@ -76,6 +95,10 @@ export function isLocale(value: unknown): value is Locale {
   return typeof value === "string" && LOCALES.includes(value as Locale);
 }
 
+export function isCreatorLocale(value: unknown): value is CreatorLocale {
+  return typeof value === "string" && CREATOR_LOCALES.includes(value as CreatorLocale);
+}
+
 function normalizePathname(pathname: string): string {
   const clean = (pathname.split(/[?#]/, 1)[0] || "/").trim();
   if (!clean || clean === "/") return "/";
@@ -88,7 +111,7 @@ export function stripLocalePrefix(pathname: string): {
   pathname: string;
 } {
   const normalized = normalizePathname(pathname);
-  const match = normalized.match(/^\/(en|fr)(?:\/|$)/);
+  const match = normalized.match(/^\/([^/]+)(?:\/|$)/);
   if (!match || !isLocale(match[1])) {
     return { locale: null, pathname: normalized };
   }
@@ -109,23 +132,24 @@ export function localizedHref(locale: Locale, href: string): string {
   const pathname = match?.[1] || href;
   const suffix = match?.[2] || "";
   return isLocalizedRoute(pathname)
-    ? `${localePath(locale, pathname)}${suffix}`
+    ? `${localePath(supportedLocaleForPath(locale, pathname), pathname)}${suffix}`
     : href;
 }
 
 export function switchLocalePath(pathname: string, locale: Locale): string {
   const current = stripLocalePrefix(pathname);
   if (current.locale || LOCALIZED_ROUTES.has(current.pathname)) {
-    return localePath(locale, current.pathname);
+    return localePath(supportedLocaleForPath(locale, current.pathname), current.pathname);
   }
   return current.pathname;
 }
 
-export function localeAlternates(pathname: string): Record<Locale | "x-default", string> {
+export function localeAlternates(pathname: string): Record<string, string> {
   const { pathname: unprefixed } = stripLocalePrefix(pathname);
   return {
-    en: localePath("en", unprefixed),
-    fr: localePath("fr", unprefixed),
+    ...Object.fromEntries(localesForPath(unprefixed).map((locale) => [
+      locale, localePath(locale, unprefixed),
+    ])),
     "x-default": unprefixed,
   };
 }
@@ -182,5 +206,6 @@ export function localeRedirectTarget(
   if (isSystemPath(normalized)) return null;
   const stripped = stripLocalePrefix(normalized);
   if (stripped.locale || !LOCALIZED_ROUTES.has(stripped.pathname)) return null;
-  return localePath(chooseLocale(cookieValue, acceptLanguage), stripped.pathname);
+  const locale = supportedLocaleForPath(chooseLocale(cookieValue, acceptLanguage), stripped.pathname);
+  return localePath(locale, stripped.pathname);
 }
