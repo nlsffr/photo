@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+// @ts-expect-error Node's native type stripping requires the explicit suffix.
+import { loadAppModule } from "./helpers/load-app-module.ts";
 
 async function loadPolicy() {
   try {
@@ -79,16 +81,24 @@ test("profile metadata, pages, redirects, and uploads reject removed creators", 
       "../src/features/creator/CreatorCollectionPage.tsx",
       "../src/app/(default)/creator/[handle]/page.tsx",
       "../src/app/(default)/[handle]/[id]/page.tsx",
-      "../src/app/api/media/upload/route.ts",
     ].map((path) => readFile(new URL(path, import.meta.url), "utf8")),
   );
 
-  const [proxy, profile, legacyProfile, media, upload] = files;
+  const [proxy, profile, legacyProfile, media] = files;
   assert.match(proxy, /creatorRouteDecision/);
   assert.match(profile, /isRemovedContent\(/);
   assert.match(legacyProfile, /isRemovedContent\(/);
   assert.match(media, /isRemovedContent\(/);
-  assert.match(upload, /isRemovedContent\(/);
+  const { POST } = loadAppModule<{ POST(request: Request): Promise<Response> }>(
+    "src/app/api/media/upload/route.ts",
+  );
+  const response = await POST(new Request("https://example.invalid/api/media/upload", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ creator: "fixture-removed-creator" }),
+  }));
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), { error: "upload_unavailable" });
 });
 
 test("comments, views, and interaction writes reject removed media", async () => {
