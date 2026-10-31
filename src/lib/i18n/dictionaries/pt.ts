@@ -3,7 +3,7 @@ import type { Dictionary } from "./en";
 export const ptDictionary = {
   creator: {
     collections: {
-      overview: { title: "Fotos e vídeos de {name}", description: "Explore as fotos e os vídeos públicos de {name}." },
+      overview: { title: "{name} Leaks OnlyFans - LeakFanHub", description: "Explore as fotos e vídeos OnlyFans vazados de {name}. Os mais recentes primeiro. Streaming gratuito no LeakFanHub." },
       photos: { title: "Fotos de {name}", description: "Explore as fotos públicas partilhadas por {name}." },
       videos: { title: "Vídeos de {name}", description: "Explore os vídeos públicos partilhados por {name}." },
       popular: { title: "Conteúdos populares de {name}", description: "Explore os conteúdos públicos populares partilhados por {name}." },
@@ -81,7 +81,7 @@ export const ptDictionary = {
     errors: { invalid_email: "O endereço de email parece inválido.", empty_message: "A mensagem é demasiado curta.", rate_limited: "Demasiadas tentativas. Tente novamente dentro de alguns minutos.", not_configured: "O envio ainda não está ativo. Utilize o endereço de email apresentado na página.", send_failed: "O envio falhou. Tente novamente ou utilize o endereço de email apresentado na página.", bad_request: "Pedido inválido.", network: "Não foi possível estabelecer ligação. Verifique a sua ligação e tente novamente." },
   },
   pages: {
-    home: { meta: { title: "Fotos e vídeos recentes de criadores", description: "Descubra fotos e vídeos de criadores, modelos populares e conteúdos novos atualizados diariamente. Apenas para adultos." } },
+    home: { meta: { title: "Últimos Leaks OnlyFans - LeakFanHub", description: "Mais de 18.000.000 de fotos e vídeos OnlyFans vazados no LeakFanHub, os mais recentes da última hora primeiro. Streaming gratuito, sem cadastro, novos posts a cada minuto." } },
     models: { meta: { title: "Modelos e criadores", description: "Explore todos os criadores no LeakFanHub, ordenados por seguidores ou visualizações." } },
     trending: { meta: { title: "Conteúdos em tendência", description: "Fotos e vídeos em tendência classificados por interação e atualizados continuamente." } },
     mostLiked: { meta: { title: "Mais apreciados", description: "As fotos e os vídeos com mais gostos no LeakFanHub." } },

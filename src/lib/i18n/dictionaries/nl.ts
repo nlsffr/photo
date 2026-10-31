@@ -4,8 +4,8 @@ export const nlDictionary = {
   creator: {
     collections: {
       overview: {
-        title: "Foto's en video's van {name}",
-        description: "Bekijk openbare foto's en video's van {name}."
+        title: "{name} OnlyFans Leaks - LeakFanHub",
+        description: "Bekijk gelekte OnlyFans foto's en video's van {name}. Nieuwste eerst. Gratis streaming op LeakFanHub."
       },
       photos: {
         title: "Foto's van {name}",
@@ -307,7 +307,7 @@ export const nlDictionary = {
     },
   },
   pages: {
-    home: { meta: { title: "Nieuwste foto's en video's van creators", description: "Ontdek foto's en video's van creators, populaire modellen en nieuwe media die dagelijks worden bijgewerkt. Alleen voor volwassenen." } },
+    home: { meta: { title: "Nieuwste OnlyFans Leaks - LeakFanHub", description: "Meer dan 18.000.000 gelekte OnlyFans foto's en video's op LeakFanHub, de nieuwste van het laatste uur eerst. Gratis streaming, geen aanmelding, nieuwe posts elke minuut." } },
     models: { meta: { title: "Modellen en creators", description: "Bekijk alle creators op LeakFanHub, gesorteerd op volgers of weergaven." } },
     trending: { meta: { title: "Populaire foto's en video's", description: "Trending foto's en video's, gerangschikt op interactie en voortdurend bijgewerkt." } },
     mostLiked: { meta: { title: "Meest geliket", description: "De meest gelikete foto's en video's op LeakFanHub." } },
