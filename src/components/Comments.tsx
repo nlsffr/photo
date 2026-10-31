@@ -9,9 +9,19 @@ type Item = {
   id: string;
   body: string;
   created_at: string;
-  username?: string;
-  email?: string;
+  username?: string | null;
 };
+
+async function loadComments(photoId: string, signal: AbortSignal): Promise<Item[]> {
+  const response = await fetch(
+    `/api/comments?photoId=${encodeURIComponent(photoId)}`,
+    { signal },
+  );
+  if (!response.ok) throw new Error("comments_unavailable");
+  const data = await response.json();
+  if (!Array.isArray(data.items)) throw new Error("invalid_comments_response");
+  return data.items;
+}
 
 export function Comments({ photoId }: { photoId: string }) {
   const { user } = useSession();
@@ -19,13 +29,30 @@ export function Comments({ photoId }: { photoId: string }) {
   const [items, setItems] = useState<Item[]>([]);
   const [text, setText] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [loadStatus, setLoadStatus] = useState<"loading" | "ready" | "error">(
+    "loading",
+  );
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
-    fetch(`/api/comments?photoId=${encodeURIComponent(photoId)}`)
-      .then((r) => r.json())
-      .then((d) => setItems(d.items || []))
-      .catch(() => undefined);
-  }, [photoId]);
+    const controller = new AbortController();
+    let current = true;
+    setLoadStatus("loading");
+    setItems([]);
+    loadComments(photoId, controller.signal)
+      .then((comments) => {
+        if (!current) return;
+        setItems(comments);
+        setLoadStatus("ready");
+      })
+      .catch(() => {
+        if (current) setLoadStatus("error");
+      });
+    return () => {
+      current = false;
+      controller.abort();
+    };
+  }, [photoId, reload]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -39,11 +66,8 @@ export function Comments({ photoId }: { photoId: string }) {
       });
       if (!res.ok) throw new Error("fail");
       setText("");
-      const d = await fetch(
-        `/api/comments?photoId=${encodeURIComponent(photoId)}`,
-      ).then((r) => r.json());
-      setItems(d.items || []);
       setStatus("idle");
+      setReload((value) => value + 1);
     } catch {
       setStatus("error");
     }
@@ -83,17 +107,40 @@ export function Comments({ photoId }: { photoId: string }) {
       {status === "error" && (
         <p className="mb-2 text-xs text-red-400">Échec de l’envoi.</p>
       )}
-      <ul className="space-y-3">
-        {items.length === 0 && (
-          <li className="text-sm text-[var(--color-ink-faint)]">Aucun commentaire.</li>
+      {loadStatus === "loading" && (
+        <p className="text-sm text-[var(--color-ink-faint)]">
+          Chargement des commentaires…
+        </p>
+      )}
+      <div aria-live="polite">
+        {loadStatus === "error" && (
+          <p className="text-sm text-[var(--color-ink-muted)]">
+            Impossible de charger les commentaires.{" "}
+            <button
+              type="button"
+              onClick={() => setReload((value) => value + 1)}
+              className="font-semibold text-[var(--color-accent)] underline"
+            >
+              Réessayer
+            </button>
+          </p>
         )}
-        {items.map((c) => (
-          <li key={c.id} className="text-sm">
-            <span className="font-semibold">{c.username || c.email || "User"}</span>
-            <span className="ml-2 text-[var(--color-ink-muted)]">{c.body}</span>
-          </li>
-        ))}
-      </ul>
+      </div>
+      {loadStatus === "ready" && (
+        <ul className="space-y-3">
+          {items.length === 0 && (
+            <li className="text-sm text-[var(--color-ink-faint)]">
+              Aucun commentaire.
+            </li>
+          )}
+          {items.map((c) => (
+            <li key={c.id} className="text-sm">
+              <span className="font-semibold">{c.username || "Utilisateur"}</span>
+              <span className="ml-2 text-[var(--color-ink-muted)]">{c.body}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

@@ -12,11 +12,13 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   const photoId = req.nextUrl.searchParams.get("photoId");
   if (!photoId) return NextResponse.json({ items: [] });
-  const db = getDbPool();
-  if (!db) return NextResponse.json({ items: [] });
   try {
+    const db = getDbPool();
+    if (!db) {
+      return NextResponse.json({ error: "comments_unavailable" }, { status: 503 });
+    }
     const [rows] = await db.execute<RowDataPacket[]>(
-      `SELECT cm.id, cm.body, cm.created_at, u.username, u.email
+      `SELECT cm.id, cm.body, cm.created_at, u.username
        FROM photos p
        JOIN creators owner ON owner.id = p.creator_id
        LEFT JOIN comments cm
@@ -30,9 +32,16 @@ export async function GET(req: NextRequest) {
     if (rows.length === 0) {
       return NextResponse.json({ error: "photo_not_found" }, { status: 404 });
     }
-    return NextResponse.json({ items: rows.filter((row) => row.id != null) });
+    return NextResponse.json({
+      items: rows.filter((row) => row.id != null).map((row) => ({
+        id: row.id,
+        body: row.body,
+        created_at: row.created_at,
+        username: row.username ?? null,
+      })),
+    });
   } catch {
-    return NextResponse.json({ items: [] });
+    return NextResponse.json({ error: "comments_unavailable" }, { status: 503 });
   }
 }
 
