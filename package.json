@@ -10,6 +10,7 @@
     "test:seo": "node --experimental-strip-types --test tests/seo-policy.test.ts"
   },
   "dependencies": {
+    "maxmind": "5.0.5",
     "mysql2": "^3.23.1",
     "next": "16.4.3",
     "react": "19.2.4",

@@ -11,12 +11,12 @@ RUN corepack enable && corepack prepare pnpm@10 --activate
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
-# Install only mysql2 and its locked transitive dependencies for operator
-# scripts. The Next standalone tracer does not include mysql2 for loose .mjs
+# Install the database and GeoIP readers for operator scripts.
+# The Next standalone tracer does not include dependencies for loose .mjs
 # files copied after the build.
 FROM deps AS ops-deps
 RUN mkdir -p /ops-runtime \
-  && pnpm --dir /ops-runtime add mysql2@3.23.1 --prod \
+  && pnpm --dir /ops-runtime add mysql2@3.23.1 maxmind@5.0.5 --prod \
   --config.auto-install-peers=false
 
 # ---------------------------------------------------------------------------
@@ -55,6 +55,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=ops-deps --chown=nextjs:nodejs /ops-runtime/node_modules ./node_modules
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/analytics-report.mjs ./scripts/analytics-report.mjs
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/analytics-country-*.mjs ./scripts/
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/update-country-db.mjs ./scripts/update-country-db.mjs
 COPY --from=builder --chown=nextjs:nodejs /app/ops/backfill-source-engagement.mjs ./ops/backfill-source-engagement.mjs
 
 USER nextjs

@@ -1,0 +1,11 @@
+[Unit]
+Description=Check for the monthly country database release
+
+[Timer]
+OnCalendar=*-*-* 04:20:00 UTC
+RandomizedDelaySec=600
+Persistent=true
+Unit=geoip-update.service
+
+[Install]
+WantedBy=timers.target

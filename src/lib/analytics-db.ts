@@ -12,6 +12,7 @@ export async function recordAnalyticsEvent(
   visitorHash: string,
   event: AnalyticsEvent,
   now = new Date(),
+  countryCode: string | null = null,
 ): Promise<boolean> {
   const pool = getDbPool();
   if (!pool) return false;
@@ -23,6 +24,7 @@ export async function recordAnalyticsEvent(
       path: event.path,
       referrerHost: event.referrerHost,
       source: event.source,
+      countryCode,
     },
     now,
   );

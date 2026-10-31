@@ -10,6 +10,7 @@ import {
   parseAnalyticsPayload,
 } from "@/lib/analytics-policy";
 import { rateLimitRequest, sweep } from "@/lib/ratelimit";
+import { analyticsCountry } from "@/lib/analytics-country";
 import {
   isAllowedAnalyticsOrigin,
   readBoundedJson,
@@ -91,7 +92,8 @@ export async function POST(request: NextRequest) {
   const newVisitorToken = visitorToken === existing ? undefined : visitorToken;
   try {
     const visitorHash = hashAnalyticsVisitorToken(visitorToken, secret);
-    await recordAnalyticsEvent(visitorHash, event);
+    const countryCode = event.kind === "page_view" ? await analyticsCountry(request.headers) : null;
+    await recordAnalyticsEvent(visitorHash, event, new Date(), countryCode);
     if (Math.random() < 0.01) {
       await pruneStaleAnalyticsPresence();
     }

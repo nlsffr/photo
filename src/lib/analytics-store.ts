@@ -6,6 +6,7 @@ export type AnalyticsStoreInput = {
   path: string;
   referrerHost: string | null;
   source: string | null;
+  countryCode?: string | null;
 };
 
 export interface AnalyticsConnection {
@@ -37,14 +38,16 @@ export async function recordAnalyticsEventWithPool(
       await connection.execute(
         `INSERT INTO analytics_daily_visitors
          (day, visitor_hash, page_views, first_seen_at, last_seen_at,
-          first_path, last_path, referrer_host, \`source\`)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          first_path, last_path, referrer_host, \`source\`, country_code, country_observed_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
            page_views = page_views + 1,
            last_seen_at = VALUES(last_seen_at),
            last_path = VALUES(last_path),
            referrer_host = COALESCE(referrer_host, VALUES(referrer_host)),
-           \`source\` = COALESCE(\`source\`, VALUES(\`source\`))`,
+           \`source\` = COALESCE(\`source\`, VALUES(\`source\`)),
+           country_observed_at = IF(country_code IS NULL, VALUES(country_observed_at), country_observed_at),
+           country_code = COALESCE(country_code, VALUES(country_code))`,
         [
           analyticsUtcDay(now),
           input.visitorHash,
@@ -55,6 +58,8 @@ export async function recordAnalyticsEventWithPool(
           input.path,
           input.referrerHost,
           input.source,
+          input.countryCode ?? null,
+          input.countryCode ? now : null,
         ],
       );
     }

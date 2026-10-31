@@ -1,0 +1,9 @@
+# Optional overlay on the actual deployment compose file. Initialize the local
+# database and apply migration 021 before recreating the app.
+services:
+  app:
+    environment:
+      ANALYTICS_COUNTRY_DB: /app/geoip/country.mmdb
+      ANALYTICS_TRUSTED_PROXY_CIDRS: ${ANALYTICS_TRUSTED_PROXY_CIDRS:?Set_verified_proxy_CIDRs}
+    volumes:
+      - ${ANALYTICS_GEOIP_DIR:-/opt/photo/geoip}:/app/geoip:ro
