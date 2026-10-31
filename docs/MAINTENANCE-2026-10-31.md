@@ -39,3 +39,17 @@ Dans le navigateur public isolé, les écrans /fr/add et /en/add affichent l'ind
 Le code part de eaa6023, version réellement déployée. La référence locale origin/main était ancienne ; la mise à jour distante a confirmé eaa6023 comme parent de main. Il n'y avait pas de rollback de GitHub. Les correctifs de code sont poussés dans le commit 0f22abba4b33f877bcc36b5ea30fa5506ddfbd6e ; les compléments de documentation sont publiés ensuite sans changement du code de l'image.
 
 Les autres défauts du rapport global restent ouverts, notamment feed, navigation, paiement Premium, traductions et mesures de charge. Ce lot ne certifie ni l'indexation intégrale, ni la lecture de tous les médias, ni la capacité sous forte concurrence.
+
+## Provenance pendant les redirections
+
+Le 31 octobre à 18 h 02 UTC, le proxy actif a reçu un correctif limité à Referrer-Policy. Les réponses applicatives 301/302/303/307/308 vers un chemin interne ou le domaine HTTPS canonique utilisent strict-origin : l'origine peut traverser la redirection, sans transmettre de chemin ni de paramètres de recherche. Les destinations externes, réponses finales et emplacement /media/ conservent leur politique précédente. Cela ne permet ni de récupérer les provenances historiques perdues, ni de certifier des visiteurs humains.
+
+Le fichier chargé est infra/nginx/default.conf. L'autre exemple infra/nginx/nginx.conf n'est pas utilisé par ce conteneur. La configuration chargée a été vérifiée sans add_header hérité ; proxy_hide_header empêche une politique en double. Aucun changement de l'application, de ses secrets, du stockage ou des workers n'est nécessaire.
+
+Validation : revue indépendante et quinze cas de correspondance des destinations ; nginx -t et six requêtes sur un proxy candidat isolé, puis sur le proxy actif et depuis l'URL publique. Les redirections de langue renvoient 307 strict-origin, celle du domaine www 308 strict-origin ; /en, /fr et /api/readyz restent 200 no-referrer. Les autres en-têtes contrôlés, dont Location, Vary, Cache-Control, les protections et le cookie de langue, sont conservés ; seul l'horodatage Expires du cookie est normalisé dans la comparaison.
+
+Une fixture navigateur locale à deux origines reproduit la perte du référent avec no-referrer sur le 307, puis sa conservation sous forme d'origine avec strict-origin. La page finale no-referrer ne transmet aucun référent en navigation sortante dans les deux cas. Ces essais n'ont envoyé aucun événement analytics au site.
+
+Le changement est activé par rechargement gracieux du même conteneur Nginx, sans redémarrage de l'application. Sauvegarde avant modification : /opt/photo/backups/referrer-policy-20261031/before.conf. Retour arrière : restaurer ce contenu dans le fichier monté existant, exécuter nginx -t, puis nginx -s reload ; ne pas remplacer l'inode du fichier monté individuellement.
+
+Références : [politique lors d'une redirection](https://www.w3.org/TR/referrer-policy/#set-requests-referrer-policy-on-redirect), [variables map Nginx](https://nginx.org/en/docs/http/ngx_http_map_module.html), [add_header et héritage](https://nginx.org/en/docs/http/ngx_http_headers_module.html#add_header).
