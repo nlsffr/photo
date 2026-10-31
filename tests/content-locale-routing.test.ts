@@ -13,6 +13,7 @@ test("all seven content locales dispatch creators, collections and media without
     assert.deepEqual(resolveLocalizedPage(locale, "/aria-lune-v3/photos"), { kind: "creator", handle: "aria-lune-v3", collection: "photos" });
     assert.deepEqual(resolveLocalizedPage(locale, "/aria-lune/123-v2"), { kind: "media", handle: "aria-lune", id: "123-v2" });
     assert.deepEqual(resolveLocalizedPage(locale, "/aria-lune/db-media-id"), { kind: "media", handle: "aria-lune", id: "db-media-id" });
+    assert.deepEqual(resolveLocalizedPage(locale, "/aria-lune-v999/123-v2"), { kind: "media", handle: "aria-lune-v999", id: "123-v2" });
     assert.deepEqual(localesForPath("/aria-lune/123-v2"), LOCALES);
   }
   for (const locale of ["es", "de", "it", "pt", "nl"] as const) {

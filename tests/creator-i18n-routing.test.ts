@@ -112,6 +112,11 @@ test("all seven localized media wrappers reuse media validation, reciprocal cano
     assert.ok(nodes(tree).some((node) => node.props.href === `/${locale}/aria-lune-v3`));
     await assert.rejects(render("/aria-lune/123-v1"), /NOT_FOUND/);
     await assert.rejects(route.generateMetadata(props("/aria-lune/123-v1")), /NOT_FOUND/);
+    // A profile version belongs to its profile URL, never to a media's owner segment.
+    for (const owner of ["aria-lune-v3", "aria-lune-v999", "aria-lune%2Dv999"]) {
+      await assert.rejects(render(`/${owner}/123-v2`), /NOT_FOUND/);
+      await assert.rejects(route.generateMetadata(props(`/${owner}/123-v2`)), /NOT_FOUND/);
+    }
     await assert.rejects(setup(locale, { removed: true }).render("/aria-lune/123-v2"), /NOT_FOUND/);
   }
 });

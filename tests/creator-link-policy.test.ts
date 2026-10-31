@@ -83,6 +83,9 @@ test("media pages link to overview without a creator-wide aggregate or localized
     const ld = scripts(tree);
     assert.equal(ld.find((item) => item["@type"] === (type === "video" ? "VideoObject" : "ImageObject"))!.author.url, "https://leakfanhub.com/aria-lune-v3");
     assert.equal((await route.generateMetadata(props)).alternates?.canonical, "/aria-lune/123-v2");
+    const wrongOwner = { params: Promise.resolve({ handle: "aria-lune-v999", id: "123-v2" }) };
+    await assert.rejects(route.default(wrongOwner), /NOT_FOUND/);
+    await assert.rejects(route.generateMetadata(wrongOwner), /NOT_FOUND/);
   }
 });
 
