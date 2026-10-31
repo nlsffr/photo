@@ -34,7 +34,7 @@ Deployment allowlist, observed 2026-10-31:
 `186.2.160.0/24,186.2.167.0/24,186.2.168.0/24,45.10.240.0/24,45.10.241.0/24`.
 These are the DDoS-Guard/IQWeb origin networks actually observed here, not a
 claim to list all provider ranges. PTRs for 160, 167, 240 and 241 identify
-ddos-guard.net; RIPE RDAP identifies 45.10.240.0–45.10.243.255 as
+ddos-guard.net; RDAP identifies 45.10.240.0–45.10.243.255 as
 RU-LLCDDOS-GUARD-20190425 and 186.2.168.0/24 as IQWEB-LLC-NET.
 A controlled GET with a forged XFF prefix confirmed the public proxy appends
 the actual client before Nginx appends its peer. The prefix is ignored.
@@ -43,7 +43,7 @@ authorized front proxies merely because their IP belongs to a CDN.
 
 Sources: [ispmanager DDoS-Guard integration](https://www.ispmanager.com/docs/ispmanager-5/integration-with-ddos-guard),
 [RIPE RDAP](https://rdap.db.ripe.net/ip/45.10.240.0),
-[LACNIC RDAP](https://rdap.lacnic.net/rdap/ip/186.2.168.0),
+[IP registry RDAP](https://rdap.org/ip/186.2.168.0),
 [DB-IP Country Lite](https://db-ip.com/db/download/ip-to-country-lite),
 [MaxMind reader](https://github.com/runk/node-maxmind).
 
@@ -99,3 +99,29 @@ URLs, credentials, and database rows outside analytics are outside this change.
   analytics rows were changed by this SQL test.
 - Local build and TypeScript pass; production dependency audit reports no
   known vulnerabilities. Final deployment evidence is appended after rollout.
+
+## Production activation
+
+Activated **2026-10-31 21:37 UTC (22:37 Paris)**. Image:
+`photo-app:countries-960e90c-20261031`; feature source commit `960e90c`.
+GitHub main also preserves the independently added metadata-tool commits via
+merge `0acf260`; those tools were neither deployed nor executed by this task.
+
+- Migration 021 applied successfully with INSTANT and bounded lock wait.
+- 288/288 tests pass; full lint, TypeScript and local/production builds pass.
+  The existing Next static Cache-Control advisory is unchanged.
+- Candidate HTTP-to-database checks passed: local lookup writes US for a known
+  test address, a forged prefix is ignored, an untrusted peer records unknown,
+  views count exactly, and a heartbeat creates no daily country row. All three
+  disposable fixture identifiers were removed from analytics after the test.
+- Public readiness and `/fr` return 200 after activation. Existing environment
+  entries were preserved. The GeoIP directory is mounted read-only in the app.
+- First organic country observation: `2026-10-31T21:37:48.366Z`.
+  The first report already contained six distinct countries. This tiny initial
+  sample is not representative of the preceding 24-hour audience.
+- `geoip-update.timer` is enabled. A real manual invocation of its service
+  succeeded (exit 0); it will retry monthly-release availability daily.
+- Rollback container: `photo-app-rollback-countries-20261031T213656Z`.
+  Protected configuration backup:
+  `/opt/photo/backups/countries-deploy-20261031T213656Z`.
+  Deployment state: `/opt/photo-analytics-countries-960e90c/deployment-state.json`.
