@@ -39,7 +39,7 @@ try {
             ), 0) AS engaged_count,
             MAX(p.created_at) AS last_content_at
      FROM photos p
-     WHERE p.removed_from_index_at IS NULL
+     WHERE p.removed_from_index_at IS NULL AND p.is_hidden = 0
      GROUP BY p.creator_id
      ORDER BY p.creator_id`,
   );
@@ -53,7 +53,7 @@ try {
             ), 0) AS popular
      FROM creators c
      LEFT JOIN creator_collection_stats stats ON stats.creator_id = c.id
-     WHERE c.removed_from_index_at IS NULL`,
+     WHERE c.removed_from_index_at IS NULL AND c.is_hidden = 0`,
   );
   const [bucketRows] = await connection.query(
     `SELECT MOD(CRC32(c.id), ?) AS bucket,
@@ -65,7 +65,7 @@ try {
             ), 0) AS popular
      FROM creators c
      LEFT JOIN creator_collection_stats stats ON stats.creator_id = c.id
-     WHERE c.removed_from_index_at IS NULL
+     WHERE c.removed_from_index_at IS NULL AND c.is_hidden = 0
      GROUP BY MOD(CRC32(c.id), ?)
      ORDER BY bucket`,
     [sitemapBuckets, sitemapBuckets],
