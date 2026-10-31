@@ -76,6 +76,24 @@ test("image entries omit invented lastmod values and removed media", async () =>
   assert.doesNotMatch(xml, /removed/);
 });
 
+test("sitemaps use a stored image preview and never an MP4 as an image or thumbnail", async () => {
+  const { renderMediaSitemap } = await loadXml();
+  const base = {
+    canonicalUrl: "https://leakfanhub.com/alice/42", type: "video" as const,
+    creatorHandle: "alice", publicId: "42", indexable: true,
+    imageUrl: "https://leakfanhub.com/media/clip.mp4?poster=cover.jpg",
+    videoUrl: "https://leakfanhub.com/media/clip.mp4",
+    createdAt: "2026-10-28T08:15:30.000Z",
+  };
+  const valid = renderMediaSitemap([{ ...base, previewUrl: "https://leakfanhub.com/media/preview.webp" }]);
+  assert.match(valid, /<image:loc>https:\/\/leakfanhub\.com\/media\/preview\.webp<\/image:loc>/);
+  assert.match(valid, /<video:thumbnail_loc>https:\/\/leakfanhub\.com\/media\/preview\.webp<\/video:thumbnail_loc>/);
+  assert.match(valid, /<video:content_loc>https:\/\/leakfanhub\.com\/media\/clip\.mp4<\/video:content_loc>/);
+  const missing = renderMediaSitemap([{ ...base, previewUrl: "https://leakfanhub.com/media/preview.webm" }]);
+  assert.match(missing, /<loc>https:\/\/leakfanhub\.com\/alice\/42<\/loc>/);
+  assert.doesNotMatch(missing, /<image:image>|<video:video>/);
+});
+
 test("canonical sitemap index renders only valid HTTP sitemap URLs", async () => {
   const { renderSitemapIndex } = await loadXml();
   const xml = renderSitemapIndex([
@@ -101,7 +119,7 @@ test("a full worst-case media partition stays below the 50 MiB XML limit", async
     MEDIA_SITEMAP_CHUNK_SIZE <= 2_000,
     "the bounded serializer budget supports at most 2,000 worst-case entries",
   );
-  const ampUrl = `https://cdn.example/media?${"a=1&".repeat(115)}x=1`;
+  const ampUrl = `https://cdn.example/poster.jpg?${"a=1&".repeat(115)}x=1`;
   const entries = Array.from({ length: MEDIA_SITEMAP_CHUNK_SIZE }, (_, index) => ({
     canonicalUrl: `https://leakfanhub.com/alice/${index}?${"a=1&".repeat(100)}x=1`,
     lastmod: "2026-10-28T09:00:00.000Z",
@@ -111,7 +129,7 @@ test("a full worst-case media partition stays below the 50 MiB XML limit", async
     creatorHandle: "alice",
     publicId: String(index),
     imageUrl: ampUrl,
-    videoUrl: ampUrl,
+    videoUrl: ampUrl.replace("/poster.jpg?", "/clip.mp4?"),
     createdAt: "2026-10-28T08:15:30.000Z",
     durationSec: 28_800,
     views: 999_999_999,

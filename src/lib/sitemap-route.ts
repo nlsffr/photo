@@ -9,8 +9,17 @@ export function toMediaSitemapEntry(
   site: string,
 ): MediaSitemapEntry {
   const base = `${site.replace(/\/$/, "")}/`;
-  const absolute = (value: string | undefined) =>
-    value ? new URL(value, base).toString() : undefined;
+  const absolute = (value: string | undefined) => {
+    if (!value?.trim()) return undefined;
+    try {
+      const url = new URL(value, base);
+      return url.protocol === "http:" || url.protocol === "https:"
+        ? url.toString()
+        : undefined;
+    } catch {
+      return undefined;
+    }
+  };
   return {
     canonicalUrl: new URL(mediaHref(photo), base).toString(),
     lastmod: photo.updatedAt,
@@ -20,6 +29,7 @@ export function toMediaSitemapEntry(
     creatorHandle: photo.creatorHandle,
     publicId: mediaPublicId(photo),
     imageUrl: absolute(photo.imageUrl),
+    previewUrl: absolute(photo.previewUrl),
     videoUrl: absolute(photo.videoUrl),
     createdAt: photo.createdAt,
     durationSec: photo.durationSec,

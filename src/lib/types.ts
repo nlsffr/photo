@@ -33,6 +33,8 @@ export interface Photo {
   /** Source-authored description used for page and rich-result metadata. */
   description?: string;
   imageUrl: string;
+  /** Stored preview asset; may be an image or a video and must be checked before use. */
+  previewUrl?: string;
   width: number;
   height: number;
   creatorHandle: string;

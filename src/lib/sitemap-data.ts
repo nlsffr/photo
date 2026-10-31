@@ -37,6 +37,7 @@ export type SitemapMedia = {
   title: string;
   description?: string;
   imageUrl: string;
+  previewUrl?: string;
   videoUrl?: string;
   type: MediaType;
   durationSec?: number;
@@ -53,6 +54,7 @@ type SitemapMediaRow = RowDataPacket & {
   title: string;
   description: string | null;
   image_url: string;
+  preview_url: string | null;
   video_url: string | null;
   type: MediaType;
   duration_sec: number | null;
@@ -89,6 +91,7 @@ function mapSitemapMedia(row: SitemapMediaRow): SitemapMedia {
     title: row.title,
     description: row.description ?? undefined,
     imageUrl: row.image_url,
+    previewUrl: row.preview_url ?? undefined,
     videoUrl: row.video_url ?? undefined,
     type: row.type,
     durationSec: row.duration_sec ?? undefined,

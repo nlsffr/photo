@@ -12,6 +12,7 @@ export const SITEMAP_MEDIA_SELECT = `
   p.title,
   p.description,
   p.image_url,
+  p.preview_url,
   p.video_url,
   p.type,
   p.duration_sec,

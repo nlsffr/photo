@@ -1,3 +1,6 @@
+// @ts-expect-error Node's native type stripping requires the explicit suffix.
+import { mediaThumbnailUrl } from "./media-sources.ts";
+
 export type MediaSitemapEntry = {
   canonicalUrl: string;
   lastmod?: string | null;
@@ -7,6 +10,7 @@ export type MediaSitemapEntry = {
   creatorHandle: string;
   publicId: string;
   imageUrl?: string | null;
+  previewUrl?: string | null;
   videoUrl?: string | null;
   createdAt?: string | null;
   durationSec?: number | null;
@@ -67,7 +71,7 @@ function renderMediaUrl(entry: MediaSitemapEntry): string | null {
   const canonicalUrl = httpUrl(entry.canonicalUrl);
   if (!canonicalUrl) return null;
   const lastmod = isoDate(entry.lastmod);
-  const imageUrl = httpUrl(entry.imageUrl);
+  const imageUrl = httpUrl(mediaThumbnailUrl(entry));
   const videoUrl = httpUrl(entry.videoUrl);
   const publicationDate = isoDate(entry.createdAt);
   const name = bounded(
