@@ -23,7 +23,7 @@ import { isCreatorLocale, localePath, localizedHref, resolveLocalizedPage, type 
 import { DISCOVERY_COPY } from "./discovery-copy";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { buildLocalizedMetadata } from "@/lib/i18n/metadata";
-import { buildModelsPagePayload, MODELS_PAGE_SIZE } from "@/lib/models-pagination";
+import { buildModelsPagePayload, modelsPagePath, MODELS_PAGE_SIZE, parseModelsSearch } from "@/lib/models-pagination";
 import { getAllTags, getModelCount, getModels, getPhotos, getRankings } from "@/lib/photos";
 import { type MediaType, type SortKey } from "@/lib/types";
 import { creatorCollectionPath } from "@/lib/creator-collections";
@@ -105,7 +105,7 @@ export async function localizedPageMetadata(
     });
   }
   const copy = metaCopy(locale, pathname);
-  if (copy) return buildLocalizedMetadata(locale, pathname, copy);
+  if (copy) return buildLocalizedMetadata(locale, pathname, copy, pathname === "/models" ? await searchParams : {});
   return {
     title: getFunctionalTitle(locale, pathname),
     robots: { index: false, follow: true },
@@ -265,9 +265,8 @@ async function LocalizedHome({ locale, searchParams }: { locale: Locale; searchP
 
 async function LocalizedModels({ locale, searchParams }: { locale: Locale; searchParams: SearchParams }) {
   const sp = await searchParams;
-  const sort = first(sp.sort) === "views" ? "views" : "followers";
-  const pageNumber = Math.max(1, Number.parseInt(first(sp.page) || "1", 10) || 1);
-  const start = (pageNumber - 1) * MODELS_PAGE_SIZE;
+  const search = parseModelsSearch(sp);
+  const { sort, offset: start } = search;
   const [rows, total] = await Promise.all([
     getModels(sort, MODELS_PAGE_SIZE + 1, start),
     getModelCount(),
@@ -281,7 +280,7 @@ async function LocalizedModels({ locale, searchParams }: { locale: Locale; searc
     "@type": "CollectionPage",
     name: copy.title,
     inLanguage: locale,
-    url: `${SITE}${base}`,
+    url: `${SITE}${modelsPagePath(base, search)}`,
     mainEntity: {
       "@type": "ItemList",
       numberOfItems: total,

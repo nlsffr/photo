@@ -4,6 +4,18 @@ import { localeAlternates, localePath, localesForPath, supportedLocaleForPath, t
 
 // @ts-expect-error Node's native type stripping requires the explicit .ts suffix.
 import { creatorCollectionPath, type CreatorCollection } from "../creator-collections.ts";
+// @ts-expect-error Node's native type stripping requires the explicit .ts suffix.
+import { modelsPagePath, parseModelsSearch, type ModelsSearchParams } from "../models-pagination.ts";
+
+export function modelsPageAlternates(searchParams: ModelsSearchParams, locale?: Locale) {
+  const search = parseModelsSearch(searchParams);
+  return {
+    canonical: modelsPagePath(locale ? localePath(locale, "/models") : "/models", search),
+    languages: Object.fromEntries(Object.entries(localeAlternates("/models")).map(
+      ([language, path]) => [language, modelsPagePath(path, search)],
+    )),
+  };
+}
 
 export function creatorCollectionAlternates(
   handle: string,
@@ -36,16 +48,16 @@ export function buildLocalizedMetadata(
   locale: Locale,
   pathname: string,
   copy: LocalizedMetadataCopy,
+  searchParams: ModelsSearchParams = {},
 ): Metadata {
   const renderedLocale = supportedLocaleForPath(locale, pathname);
-  const canonical = localePath(renderedLocale, pathname);
+  const alternates = pathname === "/models"
+    ? modelsPageAlternates(searchParams, renderedLocale)
+    : { canonical: localePath(renderedLocale, pathname), languages: localeAlternates(pathname) };
   return {
     title: copy.title,
     description: copy.description,
-    alternates: {
-      canonical,
-      languages: localeAlternates(pathname),
-    },
+    alternates,
     openGraph: {
       type: "website",
       locale: OPEN_GRAPH_LOCALES[renderedLocale],
@@ -54,7 +66,7 @@ export function buildLocalizedMetadata(
         .map((alternate) => OPEN_GRAPH_LOCALES[alternate]),
       title: copy.title,
       description: copy.description,
-      url: canonical,
+      url: alternates.canonical,
       siteName: "LeakFanHub",
     },
     robots: { index: true, follow: true, "max-image-preview": "large" },

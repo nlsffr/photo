@@ -3,8 +3,12 @@ import Link from "next/link";
 import { getModelCount, getModels } from "@/lib/photos";
 import {
   buildModelsPagePayload,
+  modelsPagePath,
   MODELS_PAGE_SIZE,
+  parseModelsSearch,
+  type ModelsSearchParams,
 } from "@/lib/models-pagination";
+import { modelsPageAlternates } from "@/lib/i18n/metadata";
 import { creatorHref } from "@/lib/types";
 import { ModelsGrid } from "@/components/ModelsGrid";
 import { JsonLd } from "@/components/JsonLd";
@@ -13,7 +17,7 @@ const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").repl
 
 export const revalidate = 120;
 
-export const metadata: Metadata = {
+const baseMetadata: Metadata = {
   title: "Models & creators",
   description:
     "Browse all creators on LeakFanHub. Sort by followers or views. Free photos and videos. 18+.",
@@ -27,19 +31,23 @@ export const metadata: Metadata = {
   },
 };
 
-function first(v?: string | string[]): string | undefined {
-  return Array.isArray(v) ? v[0] : v;
+type Props = { searchParams: Promise<ModelsSearchParams> };
+
+export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
+  const alternates = modelsPageAlternates(await searchParams);
+  return {
+    ...baseMetadata,
+    alternates,
+    openGraph: { ...baseMetadata.openGraph, url: `${SITE}${alternates.canonical}` },
+  };
 }
 
 export default async function ModelsPage({
   searchParams,
-}: {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-}) {
+}: Props) {
   const sp = await searchParams;
-  const sort = first(sp.sort) === "views" ? "views" : "followers";
-  const pageNum = Math.max(1, parseInt(first(sp.page) || "1", 10) || 1);
-  const start = (pageNum - 1) * MODELS_PAGE_SIZE;
+  const search = parseModelsSearch(sp);
+  const { sort, offset: start } = search;
   const [pageModels, total] = await Promise.all([
     getModels(sort, MODELS_PAGE_SIZE + 1, start),
     getModelCount(),
@@ -54,7 +62,7 @@ export default async function ModelsPage({
     "@context": "https://schema.org",
     "@type": "CollectionPage",
     name: "Models & creators",
-    url: `${SITE}/models`,
+    url: `${SITE}${modelsPagePath("/models", search)}`,
     mainEntity: {
       "@type": "ItemList",
       numberOfItems: total,

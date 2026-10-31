@@ -2,6 +2,35 @@ export const MODELS_PAGE_SIZE = 60;
 
 export type ModelsSort = "followers" | "views";
 
+export type ModelsSearchParams = Record<string, string | string[] | undefined>;
+
+export function parseModelsSearch(searchParams: ModelsSearchParams): {
+  sort: ModelsSort;
+  page: number;
+  offset: number;
+} {
+  const first = (value?: string | string[]) => Array.isArray(value) ? value[0] : value;
+  const sort = first(searchParams.sort) === "views" ? "views" : "followers";
+  const parsedPage = Number.parseInt(first(searchParams.page) || "1", 10);
+  // getModels bounds offsets at one million; larger pages would repeat that slice.
+  const maxPage = Math.floor(1_000_000 / MODELS_PAGE_SIZE) + 1;
+  const page = Number.isSafeInteger(parsedPage) && parsedPage >= 1 && parsedPage <= maxPage
+    ? parsedPage
+    : 1;
+  return { sort, page, offset: (page - 1) * MODELS_PAGE_SIZE };
+}
+
+export function modelsPagePath(
+  pathname: string,
+  search: { sort: ModelsSort; page: number },
+): string {
+  const query = new URLSearchParams();
+  if (search.sort === "views") query.set("sort", "views");
+  if (search.page > 1) query.set("page", String(search.page));
+  const suffix = query.toString();
+  return suffix ? `${pathname}?${suffix}` : pathname;
+}
+
 export type ModelsPageRequest = {
   sort: ModelsSort;
   offset: number;
