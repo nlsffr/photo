@@ -32,8 +32,10 @@ L'ancien endpoint annonçait un traitement sans conserver le fichier. Il refuse 
 
 ## Validation et déploiement
 
-281 tests TypeScript réussis, tests SQL réels sur un schéma isolé, ESLint et TypeScript sans erreur. Construction de production locale Webpack réussie ; la construction Docker et les contrôles de l'instance candidate sont à consigner dans le relevé de déploiement.
+281 tests TypeScript réussis, tests SQL réels sur un schéma isolé, ESLint et TypeScript sans erreur. Constructions de production locale Webpack et Docker Turbopack réussies. Instance candidate testée avant promotion, puis image photo-app:protective-0f22abb-20261031 déployée à 13 h 57 UTC. Le contrôle public readyz répond 200, ready:true et no-store ; conteneur healthy, zéro redémarrage au contrôle. L'environnement a été comparé et préservé à l'identique. Retour arrière conservé : photo-app-rollback-protective-20261031T135706Z. Le recalcul SQL protecteur est compatible avec l'ancienne image ; un rollback applicatif ne doit pas réintroduire les compteurs incluant les médias masqués.
 
-Le code part de eaa6023, version réellement déployée. Au début du lot, origin/main pointait vers son ancêtre 97b2235 ; aucun retour à cet état ancien n'est nécessaire pour appliquer ces corrections.
+Dans le navigateur public isolé, les écrans /fr/add et /en/add affichent l'indisponibilité et aucun champ de fichier. Une page média échantillonnée répond 200 ; le bloc commentaires montre la panne et son bouton de réessai produit une nouvelle requête, sans faux Aucun commentaire. Aucune erreur JavaScript observée pendant ces essais. Images/vidéos et enregistrement des statistiques neutralisés ; aucune écriture de compte ou de contenu réalisée.
+
+Le code part de eaa6023, version réellement déployée. La référence locale origin/main était ancienne ; la mise à jour distante a confirmé eaa6023 comme parent de main. Il n'y avait pas de rollback de GitHub. Les correctifs de code sont poussés dans le commit 0f22abba4b33f877bcc36b5ea30fa5506ddfbd6e ; les compléments de documentation sont publiés ensuite sans changement du code de l'image.
 
 Les autres défauts du rapport global restent ouverts, notamment feed, navigation, paiement Premium, traductions et mesures de charge. Ce lot ne certifie ni l'indexation intégrale, ni la lecture de tous les médias, ni la capacité sous forte concurrence.
