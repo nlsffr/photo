@@ -4,8 +4,8 @@ export const frDictionary = {
   creator: {
     collections: {
       overview: {
-        title: "Photos et vidéos de {name}",
-        description: "Parcourez les photos et vidéos publiques de {name}."
+        title: "{name} Leaks OnlyFans - LeakFanHub",
+        description: "Parcourez les photos et vidéos OnlyFans leakées de {name}. Les plus récentes en premier. Streaming gratuit sur LeakFanHub."
       },
       photos: {
         title: "Photos de {name}",
@@ -261,7 +261,7 @@ export const frDictionary = {
     },
   },
   pages: {
-    home: { meta: { title: "Dernières photos et vidéos de créateurs", description: "Découvre des photos et vidéos de créateurs, les modèles populaires et de nouveaux médias chaque jour. Réservé aux adultes." } },
+    home: { meta: { title: "Derniers Leaks OnlyFans - LeakFanHub", description: "18 000 000+ photos et vidéos OnlyFans leakées sur LeakFanHub, les plus récentes de la dernière heure en premier. Streaming gratuit, pas d'inscription, nouveaux posts chaque minute." } },
     models: { meta: { title: "Modèles et créateurs", description: "Parcours tous les créateurs LeakFanHub, classés par abonnés ou par vues." } },
     trending: { meta: { title: "Médias en tendance", description: "Photos et vidéos en tendance, classées par engagement et mises à jour en continu." } },
     mostLiked: { meta: { title: "Les plus aimés", description: "Les photos et vidéos les plus aimées sur LeakFanHub." } },
