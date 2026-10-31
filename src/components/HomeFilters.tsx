@@ -32,6 +32,11 @@ export function HomeFilters({ tags, sort, type, tag }: Props) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const state = { sort, type, tag };
+  const typeLabels: Record<MediaType, string> = {
+    photo: "mediaTypes.photos",
+    video: "mediaTypes.videos",
+    pack: "mediaTypes.packs",
+  };
   const priorityTags = tags.slice(0, 10);
   const activeCount = Number(sort !== "discover") + Number(Boolean(type)) + Number(Boolean(tag));
   const filteredTags = useMemo(() => {
@@ -122,6 +127,7 @@ export function HomeFilters({ tags, sort, type, tag }: Props) {
           activeTag={tag}
           hrefForTag={(nextTag) => buildHomeHref(state, { tag: nextTag ?? null }, homePath)}
           label={t("home.filters.popularInterests")}
+          allLabel={t("mediaTypes.all")}
         />
       ) : null}
 
@@ -129,8 +135,8 @@ export function HomeFilters({ tags, sort, type, tag }: Props) {
         <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-ink-muted)]">
           <span>
             {t("home.filters.active")} : {[
-              sort !== "discover" ? sort : null,
-              type,
+              sort !== "discover" ? t(`home.filters.${sort}`) : null,
+              type ? t(typeLabels[type]) : null,
               tag,
             ].filter(Boolean).join(" · ")}
           </span>

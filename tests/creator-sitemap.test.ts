@@ -20,7 +20,7 @@ const eligible = {
   lastContentAt: null,
 };
 
-test("creator sitemap publishes reciprocal English and French collection URLs with x-default", async () => {
+test("creator sitemap keeps two URL entries with reciprocal seven-language collection alternates", async () => {
   const { renderCreatorSitemap } = await loadCreatorSitemap();
   const xml = renderCreatorSitemap(SITE, "photos", [eligible]);
 
@@ -35,8 +35,11 @@ test("creator sitemap publishes reciprocal English and French collection URLs wi
   const blocks = xml.match(/<url>[\s\S]*?<\/url>/g) ?? [];
   assert.equal(blocks.length, 2);
   for (const block of blocks) {
-    assert.equal((block.match(/hreflang="en"/g) ?? []).length, 1);
-    assert.equal((block.match(/hreflang="fr"/g) ?? []).length, 1);
+    for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"]) {
+      assert.equal((block.match(new RegExp(`hreflang="${locale}"`, "g")) ?? []).length, 1);
+      assert.ok(block.includes(`hreflang="${locale}" href="${SITE}/${locale}/tina_kitsune-v3/photos"`));
+    }
+    assert.equal((block.match(/<xhtml:link/g) ?? []).length, 8);
     assert.equal((block.match(/hreflang="x-default"/g) ?? []).length, 1);
     assert.match(block, /href="https:\/\/leakfanhub\.com\/tina_kitsune-v3\/photos"/);
     assert.match(block, /<lastmod>2026-10-30T08:00:00\.000Z<\/lastmod>/);
@@ -72,7 +75,7 @@ test("creator sitemap skips unsafe rows and remains below the protocol URL limit
   const rows = Array.from({ length: CREATOR_SITEMAP_PROFILE_LIMIT + 5 }, (_, index) => ({
     ...eligible,
     handle: `creator_${index}`.padEnd(100, "a"),
-    urlVersion: 1,
+    urlVersion: 2_147_483_647,
   }));
   rows.unshift({ ...eligible, handle: "bad/handle" });
   assert.throws(
@@ -80,7 +83,7 @@ test("creator sitemap skips unsafe rows and remains below the protocol URL limit
     /creator_sitemap_partition_required/,
   );
   const bounded = rows.slice(0, CREATOR_SITEMAP_PROFILE_LIMIT + 1);
-  const xml = renderCreatorSitemap(SITE, "overview", bounded);
+  const xml = renderCreatorSitemap(SITE, "popular", bounded);
 
   assert.equal((xml.match(/<url>/g) ?? []).length, CREATOR_SITEMAP_PROFILE_LIMIT * 2);
   assert.ok((xml.match(/<url>/g) ?? []).length < 50_000);

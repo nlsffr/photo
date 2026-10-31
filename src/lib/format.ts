@@ -13,7 +13,20 @@ export function formatDuration(sec: number): string {
 }
 
 /** Relative age from a minutes offset, e.g. "il y a 3 h", "il y a 2 j". */
-export function formatAge(ageMinutes: number): string {
+export function formatAge(ageMinutes: number, locale?: string): string {
+  if (locale) {
+    const relative = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+    if (ageMinutes < 1) return relative.format(0, "second");
+    if (ageMinutes < 60) return relative.format(-Math.floor(ageMinutes), "minute");
+    const hours = Math.floor(ageMinutes / 60);
+    if (hours < 24) return relative.format(-hours, "hour");
+    const days = Math.floor(hours / 24);
+    if (days < 30) return relative.format(-days, "day");
+    const months = Math.floor(days / 30);
+    return months < 12
+      ? relative.format(-months, "month")
+      : relative.format(-Math.floor(months / 12), "year");
+  }
   if (ageMinutes < 1) return "à l’instant";
   if (ageMinutes < 60) return `il y a ${ageMinutes} min`;
   const hours = Math.floor(ageMinutes / 60);

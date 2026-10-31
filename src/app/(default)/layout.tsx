@@ -1,8 +1,7 @@
 import type { Metadata, Viewport } from "next";
-import { cookies } from "next/headers";
 import "../globals.css";
 import { SiteRootLayout } from "@/components/SiteRootLayout";
-import { defaultShellLocale, LOCALE_COOKIE } from "@/lib/i18n/config";
+import { defaultShellLocale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").replace(/\/$/, "");
@@ -75,8 +74,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const cookieStore = await cookies();
-  const locale = defaultShellLocale(cookieStore.get(LOCALE_COOKIE)?.value);
+  const locale = defaultShellLocale();
 
   return (
     <SiteRootLayout locale={locale} dictionary={getDictionary(locale)}>

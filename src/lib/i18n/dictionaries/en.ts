@@ -105,6 +105,10 @@ export const enDictionary = {
       discover: "Discover",
       trending: "Trending",
       recent: "Recent",
+      popular: "Popular",
+      liked: "Most liked",
+      longest: "Longest",
+      random: "Random",
       photos: "Photos",
       videos: "Videos",
       all: "All filters",
@@ -129,6 +133,47 @@ export const enDictionary = {
       media: "media items",
     },
   },
+  mediaDetails: {
+    views: "Views",
+    likes: "Likes",
+    score: "Score",
+    allMedia: "All @{handle} media →",
+    report: "Report / DMCA",
+    more: "More @{handle}",
+    viewProfile: "View profile",
+    saved: "Saved",
+    kinds: {
+      photo: "photo",
+      video: "video",
+      pack: "gallery"
+    },
+    fallbackName: "{handle} {kind} #{id}",
+    fallbackDescription: "{kind} by @{handle} on LeakFanHub{titleDetail} (media {id})."
+  },
+  comments: {
+    title: "Comments",
+    placeholder: "Write a comment…",
+    submit: "Send",
+    login: "Log in",
+    loginSuffix: "to comment.",
+    sendError: "Sending failed.",
+    loading: "Loading comments…",
+    loadError: "Unable to load comments.",
+    retry: "Try again",
+    empty: "No comments yet.",
+    user: "User"
+  },
+  video: {
+    errorTitle: "Unable to play the video",
+    errorBody: "Large file or slow network — try again.",
+    retry: "Try again",
+    loading: "Loading video…",
+    progress: "Progress",
+    speed: "Playback speed",
+    pictureInPicture: "Picture in picture",
+    fullscreen: "Fullscreen"
+  },
+  feed: { empty: "Empty feed", close: "Close feed", play: "Play", pause: "Pause", unmute: "Unmute", mute: "Mute" },
   models: {
     title: "Models",
     countSuffix: "creators on LeakFanHub",
@@ -161,6 +206,7 @@ export const enDictionary = {
     all: "All",
     photos: "Photos",
     videos: "Videos",
+    pack: "Pack",
     packs: "Packs",
   },
   aiFilters: {

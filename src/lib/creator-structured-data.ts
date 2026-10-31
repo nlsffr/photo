@@ -1,6 +1,8 @@
 import type { Creator, CreatorCollection, CreatorCollectionStats, Photo } from "./types";
 import type { CreatorLocale } from "./i18n/config";
 // @ts-expect-error Node's native type stripping requires explicit suffixes.
+import { localizedHref } from "./i18n/config.ts";
+// @ts-expect-error Node's native type stripping requires explicit suffixes.
 import { creatorCollectionCopy, creatorCollectionPath } from "./creator-collections.ts";
 // @ts-expect-error Node's native type stripping requires explicit suffixes.
 import { verifiedCreatorNames } from "./creator-names.ts";
@@ -53,12 +55,12 @@ export function buildCreatorStructuredData({
     },
   };
   const hasPart = items.filter((item) => !isRemovedContent(item)).slice(0, 12).map((item) => {
-    const seo = buildMediaSeo(item, site);
+    const seo = buildMediaSeo(item, site, locale);
     return {
       ...seo.structuredData,
-      "@type": item.type === "video" ? "VideoObject" : "ImageObject",
+      "@type": seo.structuredData?.["@type"] ?? "WebPage",
       name: seo.name,
-      url: absolute(mediaHref(item)),
+      url: absolute(locale ? localizedHref(locale, mediaHref(item)) : mediaHref(item)),
     };
   });
   const pageData = {

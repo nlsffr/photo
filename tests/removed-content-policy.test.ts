@@ -80,7 +80,7 @@ test("profile metadata, pages, redirects, and uploads reject removed creators", 
       "../src/proxy.ts",
       "../src/features/creator/CreatorCollectionPage.tsx",
       "../src/app/(default)/creator/[handle]/page.tsx",
-      "../src/app/(default)/[handle]/[id]/page.tsx",
+      "../src/features/media/MediaDetailPage.tsx",
     ].map((path) => readFile(new URL(path, import.meta.url), "utf8")),
   );
 

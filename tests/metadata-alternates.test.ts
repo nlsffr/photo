@@ -96,6 +96,6 @@ test("unprefixed creator metadata completes reciprocal alternates without droppi
     const path = `/aria-v3${collection === "overview" ? "" : `/${collection}`}${page > 1 ? `?page=${page}` : ""}`;
     const metadata = await renderer.creatorCollectionMetadata({ handleParam: "aria-v3", collection, searchParams: { page: String(page) } });
     assert.equal(metadata.alternates?.canonical, path);
-    assert.deepEqual(metadata.alternates?.languages, { en: `/en${path}`, fr: `/fr${path}`, "x-default": path });
+    assert.deepEqual(metadata.alternates?.languages, { en: `/en${path}`, fr: `/fr${path}`, es: `/es${path}`, de: `/de${path}`, it: `/it${path}`, pt: `/pt${path}`, nl: `/nl${path}`, "x-default": path });
   }
 });

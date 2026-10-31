@@ -8,6 +8,9 @@ import { creatorHref } from "@/lib/types";
 import { VerifiedBadge } from "./VerifiedBadge";
 import { FollowPill, useInteractions } from "./Interactions";
 import { MediaImg } from "./MediaImg";
+import { useLocale } from "./LocaleProvider";
+import { DISCOVERY_COPY } from "@/features/i18n/discovery-copy";
+import { mediaThumbnailUrl } from "@/lib/media-sources";
 
 function RailButton({
   icon,
@@ -55,6 +58,8 @@ function FeedSlide({
   const [progress, setProgress] = useState(0);
   const [paused, setPaused] = useState(false);
   const { isLiked, isSaved, toggleLike, toggleSave, ready } = useInteractions();
+  const { locale, dictionary } = useLocale();
+  const copy = DISCOVERY_COPY[locale];
 
   const liked = ready && isLiked(item.id);
   const saved = ready && isSaved(item.id);
@@ -98,7 +103,7 @@ function FeedSlide({
         <video
           ref={videoRef}
           src={item.videoUrl}
-          poster={item.imageUrl}
+          poster={mediaThumbnailUrl(item)}
           muted={muted}
           loop
           playsInline
@@ -123,7 +128,7 @@ function FeedSlide({
         <button
           type="button"
           onClick={togglePlay}
-          aria-label={paused ? "Lecture" : "Pause"}
+          aria-label={paused ? dictionary.feed.play : dictionary.feed.pause}
           className="absolute inset-0 z-[5]"
         >
           {paused && (
@@ -153,10 +158,10 @@ function FeedSlide({
               />
               <span className="flex items-center gap-1 font-bold text-white drop-shadow">
                 {item.creator.name}
-                {item.creator.verified && <VerifiedBadge size={14} />}
+                {item.creator.verified && <VerifiedBadge size={14} label={dictionary.creator.verified} />}
               </span>
             </Link>
-            <FollowPill handle={item.creatorHandle} />
+            <FollowPill handle={item.creatorHandle} labels={dictionary.creator.follow} />
           </div>
           <p className="mt-2 line-clamp-2 text-sm text-white/90 drop-shadow">{item.title}</p>
         </div>
@@ -164,7 +169,7 @@ function FeedSlide({
         <div className="flex shrink-0 flex-col items-center gap-3 pb-1 pointer-events-auto">
           <div className="flex flex-col items-center gap-1">
             <RailButton
-              label="J’aime"
+              label={copy.like}
               pressed={liked}
               active={liked}
               onClick={() => toggleLike(item.id)}
@@ -178,7 +183,7 @@ function FeedSlide({
           </div>
           <div className="flex flex-col items-center gap-1">
             <RailButton
-              label="Enregistrer"
+              label={copy.save}
               pressed={saved}
               active={saved}
               onClick={() => toggleSave(item.id)}
@@ -189,7 +194,7 @@ function FeedSlide({
               }
             />
           </div>
-          <span className="text-xs font-medium text-white/70">{formatCount(item.views)} vues</span>
+          <span className="text-xs font-medium text-white/70">{formatCount(item.views)} {dictionary.creator.views}</span>
         </div>
       </div>
 
@@ -209,6 +214,7 @@ export function FeedViewer({
   initial: PhotoView[];
   preferVideo?: boolean;
 }) {
+  const { dictionary } = useLocale();
   const [muted, setMuted] = useState(true);
   const [items, setItems] = useState<PhotoView[]>(initial);
   const [active, setActive] = useState(0);
@@ -303,9 +309,9 @@ export function FeedViewer({
   if (items.length === 0) {
     return (
       <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 top-[calc(3.5rem+env(safe-area-inset-top))] z-30 flex flex-col items-center justify-center gap-3 bg-black px-6 text-center lg:bottom-0 lg:left-60 lg:top-14">
-        <p className="text-lg font-semibold text-white">Feed vide</p>
+        <p className="text-lg font-semibold text-white">{dictionary.feed.empty}</p>
         <Link href="/" className="mt-2 rounded-full bg-[var(--color-accent)] px-6 py-2.5 text-sm font-semibold text-white">
-          Accueil
+          {dictionary.shell.navigation.home}
         </Link>
       </div>
     );
@@ -316,7 +322,7 @@ export function FeedViewer({
       <Link
         href="/"
         className="absolute left-3 top-3 z-30 grid h-10 w-10 place-items-center rounded-full bg-black/50 text-white backdrop-blur-sm"
-        aria-label="Fermer le feed"
+        aria-label={dictionary.feed.close}
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
           <path d="M18 6 6 18M6 6l12 12" />
@@ -326,7 +332,7 @@ export function FeedViewer({
       <button
         type="button"
         onClick={() => setMuted((m) => !m)}
-        aria-label={muted ? "Activer le son" : "Couper le son"}
+        aria-label={muted ? dictionary.feed.unmute : dictionary.feed.mute}
         className="absolute right-3 top-3 z-30 grid h-10 w-10 place-items-center rounded-full bg-black/50 text-white backdrop-blur-sm"
       >
         {muted ? (

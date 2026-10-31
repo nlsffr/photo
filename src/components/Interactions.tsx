@@ -258,7 +258,13 @@ export function FollowButton({
   );
 }
 
-export function FollowPill({ handle }: { handle: string }) {
+export function FollowPill({
+  handle,
+  labels = { follow: "Suivre", following: "Suivi·e" },
+}: {
+  handle: string;
+  labels?: { follow: string; following: string };
+}) {
   const { isFollowing, toggleFollow, ready } = useInteractions();
   const following = ready && isFollowing(handle);
   return (
@@ -272,7 +278,7 @@ export function FollowPill({ handle }: { handle: string }) {
           : "bg-[var(--color-accent)] text-white"
       }`}
     >
-      {following ? "Suivi·e" : "Suivre"}
+      {following ? labels.following : labels.follow}
     </button>
   );
 }
@@ -280,9 +286,11 @@ export function FollowPill({ handle }: { handle: string }) {
 export function PostActions({
   id,
   baseLikes,
+  labels = { like: "J’aime", save: "Enregistrer", saved: "Enregistré" },
 }: {
   id: string;
   baseLikes: number;
+  labels?: { like: string; save: string; saved: string };
 }) {
   const { isLiked, isSaved, toggleLike, toggleSave, ready } = useInteractions();
   const liked = ready && isLiked(id);
@@ -294,6 +302,7 @@ export function PostActions({
       <button
         type="button"
         onClick={() => toggleLike(id)}
+        aria-label={labels.like}
         aria-pressed={liked}
         className={`flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition-colors ${
           liked
@@ -309,6 +318,7 @@ export function PostActions({
       <button
         type="button"
         onClick={() => toggleSave(id)}
+        aria-label={saved ? labels.saved : labels.save}
         aria-pressed={saved}
         className={`flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition-colors ${
           saved
@@ -319,7 +329,7 @@ export function PostActions({
         <svg width="18" height="18" viewBox="0 0 24 24" fill={saved ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" aria-hidden>
           <path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16l-7-4-7 4Z" />
         </svg>
-        {saved ? "Enregistré" : "Enregistrer"}
+        {saved ? labels.saved : labels.save}
       </button>
     </div>
   );

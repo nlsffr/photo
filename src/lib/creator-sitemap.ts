@@ -1,8 +1,11 @@
 // @ts-expect-error Node's native type stripping requires the explicit suffix.
 import { creatorCollectionPath } from "./creator-collections.ts";
 import type { CreatorCollection } from "./creator-collections.ts";
+// @ts-expect-error Node's native type stripping requires the explicit suffix.
+import { LOCALES, type Locale } from "./i18n/config.ts";
 
-export const CREATOR_SITEMAP_PROFILE_LIMIT = 24_000;
+// Two URL entries with eight alternate links fit below 50 MiB even at max handle/version length.
+export const CREATOR_SITEMAP_PROFILE_LIMIT = 12_000;
 export const CREATOR_SITEMAP_QUERY_LIMIT = 50_000;
 
 export type CreatorSitemapProfile = {
@@ -20,10 +23,12 @@ export function assertCreatorSitemapCapacity(
   }
 }
 
+type CreatorSitemapAlternates = Record<Locale | "x-default", string>;
+
 type CreatorSitemapEntry = {
   url: string;
   lastmod?: string;
-  alternates: { en: string; fr: string; "x-default": string };
+  alternates: CreatorSitemapAlternates;
 };
 
 function xmlEscape(value: string): string {
@@ -66,13 +71,12 @@ export function buildCreatorSitemapEntries(
   let acceptedProfiles = 0;
 
   for (const profile of profiles) {
-    let paths: { en: string; fr: string; "x-default": string };
+    let paths: CreatorSitemapAlternates;
     try {
-      paths = {
-        en: creatorCollectionPath(profile.handle, profile.urlVersion, collection, "en"),
-        fr: creatorCollectionPath(profile.handle, profile.urlVersion, collection, "fr"),
-        "x-default": creatorCollectionPath(profile.handle, profile.urlVersion, collection),
-      };
+      paths = Object.fromEntries([
+        ...LOCALES.map((locale) => [locale, creatorCollectionPath(profile.handle, profile.urlVersion, collection, locale)]),
+        ["x-default", creatorCollectionPath(profile.handle, profile.urlVersion, collection)],
+      ]) as CreatorSitemapAlternates;
     } catch {
       // A malformed database handle must not make the whole sitemap unavailable.
       continue;
@@ -81,11 +85,9 @@ export function buildCreatorSitemapEntries(
     if (acceptedProfiles > CREATOR_SITEMAP_PROFILE_LIMIT) {
       throw new Error("creator_sitemap_partition_required");
     }
-    const alternates = {
-      en: `${base}${paths.en}`,
-      fr: `${base}${paths.fr}`,
-      "x-default": `${base}${paths["x-default"]}`,
-    };
+    const alternates = Object.fromEntries(
+      Object.entries(paths).map(([language, path]) => [language, `${base}${path}`]),
+    ) as CreatorSitemapAlternates;
     const lastmod = latestIso(profile.updatedAt, profile.lastContentAt);
     for (const language of ["en", "fr"] as const) {
       entries.push({ url: alternates[language], lastmod, alternates });

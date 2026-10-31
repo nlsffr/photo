@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "./Session";
+import { useLocale } from "./LocaleProvider";
+import { localizedHref } from "@/lib/i18n/config";
 
 type Item = {
   id: string;
@@ -25,6 +27,8 @@ async function loadComments(photoId: string, signal: AbortSignal): Promise<Item[
 
 export function Comments({ photoId }: { photoId: string }) {
   const { user } = useSession();
+  const { locale, dictionary } = useLocale();
+  const copy = dictionary.comments;
   const pathname = usePathname();
   const [items, setItems] = useState<Item[]>([]);
   const [text, setText] = useState("");
@@ -75,13 +79,14 @@ export function Comments({ photoId }: { photoId: string }) {
 
   return (
     <section className="mt-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
-      <h3 className="mb-3 font-bold">Commentaires</h3>
+      <h3 className="mb-3 font-bold">{copy.title}</h3>
       {user ? (
         <form onSubmit={submit} className="mb-4 flex gap-2">
           <input
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Écrire un commentaire…"
+            placeholder={copy.placeholder}
+            aria-label={copy.placeholder}
             className="flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm"
             maxLength={1000}
           />
@@ -90,38 +95,38 @@ export function Comments({ photoId }: { photoId: string }) {
             disabled={status === "loading" || text.trim().length < 2}
             className="rounded-lg bg-[var(--color-accent)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
           >
-            Envoyer
+            {copy.submit}
           </button>
         </form>
       ) : (
         <p className="mb-4 text-sm text-[var(--color-ink-muted)]">
           <Link
-            href={`/connexion?next=${encodeURIComponent(pathname || "/")}`}
+            href={`${localizedHref(locale, "/connexion")}?next=${encodeURIComponent(pathname || "/")}`}
             className="font-semibold text-[var(--color-accent)] underline"
           >
-            Connecte-toi
+            {copy.login}
           </Link>{" "}
-          pour commenter.
+          {copy.loginSuffix}
         </p>
       )}
       {status === "error" && (
-        <p className="mb-2 text-xs text-red-400">Échec de l’envoi.</p>
+        <p className="mb-2 text-xs text-red-400">{copy.sendError}</p>
       )}
       {loadStatus === "loading" && (
         <p className="text-sm text-[var(--color-ink-faint)]">
-          Chargement des commentaires…
+          {copy.loading}
         </p>
       )}
       <div aria-live="polite">
         {loadStatus === "error" && (
           <p className="text-sm text-[var(--color-ink-muted)]">
-            Impossible de charger les commentaires.{" "}
+            {copy.loadError}{" "}
             <button
               type="button"
               onClick={() => setReload((value) => value + 1)}
               className="font-semibold text-[var(--color-accent)] underline"
             >
-              Réessayer
+              {copy.retry}
             </button>
           </p>
         )}
@@ -130,12 +135,12 @@ export function Comments({ photoId }: { photoId: string }) {
         <ul className="space-y-3">
           {items.length === 0 && (
             <li className="text-sm text-[var(--color-ink-faint)]">
-              Aucun commentaire.
+              {copy.empty}
             </li>
           )}
           {items.map((c) => (
             <li key={c.id} className="text-sm">
-              <span className="font-semibold">{c.username || "Utilisateur"}</span>
+              <span className="font-semibold">{c.username || copy.user}</span>
               <span className="ml-2 text-[var(--color-ink-muted)]">{c.body}</span>
             </li>
           ))}

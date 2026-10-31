@@ -5,11 +5,13 @@ export function TagChips({
   activeTag,
   hrefForTag,
   label = "Filtres par intérêt",
+  allLabel = "Tout",
 }: {
   tags: string[];
   activeTag?: string;
   hrefForTag?: (tag?: string) => string;
   label?: string;
+  allLabel?: string;
 }) {
   const chip =
     "shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-medium capitalize transition-colors";
@@ -28,7 +30,7 @@ export function TagChips({
         prefetch={false}
         className={`${chip} ${!activeTag ? on : off}`}
       >
-        Tout
+        {allLabel}
       </Link>
       {tags.map((tag) => (
         <Link

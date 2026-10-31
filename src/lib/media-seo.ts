@@ -1,4 +1,11 @@
 import type { MediaType } from "./types";
+// @ts-expect-error Node's native type stripping requires the explicit suffix.
+import { mediaThumbnailUrl } from "./media-sources.ts";
+import type { Locale } from "./i18n/config";
+// @ts-expect-error Node's native type stripping requires the explicit suffix.
+import { getDictionary } from "./i18n/dictionaries.ts";
+// @ts-expect-error Node's native type stripping requires the explicit suffix.
+import { openGraphLocale, openGraphAlternateLocales } from "./i18n/metadata.ts";
 
 const MAX_VIDEO_DESCRIPTION = 2_048;
 const MAX_MEDIA_NAME = 160;
@@ -10,6 +17,7 @@ export type MediaSeoInput = {
   title?: string | null;
   description?: string | null;
   imageUrl?: string | null;
+  previewUrl?: string | null;
   videoUrl?: string | null;
   type: MediaType;
   createdAt?: string | null;
@@ -63,6 +71,7 @@ export type MediaPageContext = {
   creatorName?: string | null;
   creatorPath?: string | null;
   creatorAvatarUrl?: string | null;
+  locale?: Locale;
 };
 
 export type MediaPageMetadata = {
@@ -77,6 +86,8 @@ export type MediaPageMetadata = {
   };
   openGraph: {
     type: "video.other" | "article";
+    locale: string;
+    alternateLocale: string[];
     title: string;
     description: string;
     url: string;
@@ -110,10 +121,8 @@ function bounded(value: string, max: number): string {
   return `${cut}…`;
 }
 
-function mediaKind(type: MediaType): string {
-  if (type === "video") return "video";
-  if (type === "pack") return "gallery";
-  return "photo";
+function fillTemplate(template: string, values: Record<string, string>): string {
+  return template.replace(/\{(handle|kind|id|titleDetail)\}/g, (token, key: string) => values[key] ?? token);
 }
 
 function isIdentifierDescription(
@@ -166,14 +175,21 @@ export function durationIso(seconds: number | null | undefined): string | undefi
   return `PT${hoursPart}${minutesPart}${secondsPart}`;
 }
 
-export function buildMediaSeo(media: MediaSeoInput, site: string): MediaSeo {
+export function buildMediaSeo(media: MediaSeoInput, site: string, locale: Locale = "en"): MediaSeo {
+  const copy = getDictionary(locale).mediaDetails;
   const publicId = media.sourceId?.trim() || media.id;
-  const fallback = `${media.creatorHandle} ${mediaKind(media.type)} #${publicId}`;
+  const kind = copy.kinds[media.type];
+  const values = { handle: media.creatorHandle, kind, id: publicId };
+  const fallback = fillTemplate(copy.fallbackName, values);
   const sourceTitle = plainText(media.title);
   const name = bounded(sourceTitle || fallback, MAX_MEDIA_NAME);
   const sourceDescription = plainText(media.description);
   const titleDetail = sourceTitle ? `: ${bounded(sourceTitle, MAX_MEDIA_NAME)}` : "";
-  const fallbackDescription = `${mediaKind(media.type)[0]?.toUpperCase()}${mediaKind(media.type).slice(1)} by @${media.creatorHandle} on LeakFanHub${titleDetail} (media ${publicId}).`;
+  const fallbackDescription = fillTemplate(copy.fallbackDescription, {
+    ...values,
+    kind: `${kind[0]?.toUpperCase()}${kind.slice(1)}`,
+    titleDetail,
+  });
   const hasInformativeDescription = sourceDescription
     && !isIdentifierDescription(sourceDescription, [publicId, media.id]);
   const description = bounded(
@@ -181,9 +197,9 @@ export function buildMediaSeo(media: MediaSeoInput, site: string): MediaSeo {
     MAX_VIDEO_DESCRIPTION,
   );
   const uploadDate = validIsoDate(media.createdAt);
-  const thumbnailUrl = absoluteHttpUrl(media.imageUrl, site);
+  const thumbnailUrl = absoluteHttpUrl(mediaThumbnailUrl(media), site);
   const contentUrl = absoluteHttpUrl(
-    media.type === "video" ? media.videoUrl : media.imageUrl,
+    media.type === "video" ? media.videoUrl : thumbnailUrl,
     site,
   );
 
@@ -240,7 +256,7 @@ export function buildMediaPagePresentation(
   media: MediaSeoInput,
   context: MediaPageContext,
 ): MediaPagePresentation {
-  const seo = buildMediaSeo(media, context.site);
+  const seo = buildMediaSeo(media, context.site, context.locale);
   const canonicalUrl = absoluteHttpUrl(context.canonicalPath, context.site);
   if (!canonicalUrl) {
     throw new Error("A media page requires an HTTP(S) canonical URL");
@@ -280,6 +296,8 @@ export function buildMediaPagePresentation(
       },
       openGraph: {
         type: media.type === "video" ? "video.other" : "article",
+        locale: openGraphLocale(context.locale),
+        alternateLocale: openGraphAlternateLocales(context.locale),
         title: seo.pageTitle,
         description: seo.description,
         url: canonicalUrl,

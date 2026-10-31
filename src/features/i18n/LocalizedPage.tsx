@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { CreatorCollectionPage, creatorCollectionMetadata } from "@/features/creator/CreatorCollectionPage";
+import { MediaDetailPage, mediaDetailMetadata } from "@/features/media/MediaDetailPage";
 import { randomInt } from "node:crypto";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -95,6 +96,9 @@ export async function localizedPageMetadata(
 ): Promise<Metadata> {
   const route = resolveLocalizedPage(locale, pathname);
   if (!route) notFound();
+  if (route.kind === "media") {
+    return mediaDetailMetadata({ locale, handleParam: route.handle, idParam: route.id });
+  }
   if (route.kind === "creator") {
     if (!isCreatorLocale(locale)) notFound();
     return creatorCollectionMetadata({
@@ -209,6 +213,9 @@ export async function LocalizedPage({ locale, pathname, searchParams }: Localize
       return locale === "fr" ? <FrenchPressPage /> : <EnglishContactFormPage kind="press" />;
     default: {
       const route = resolveLocalizedPage(locale, pathname);
+      if (route?.kind === "media") {
+        return <MediaDetailPage locale={locale} handleParam={route.handle} idParam={route.id} />;
+      }
       if (!route || route.kind !== "creator" || !isCreatorLocale(locale)) notFound();
       return <CreatorCollectionPage locale={locale} handleParam={route.handle} collection={route.collection} searchParams={await searchParams} />;
     }
@@ -386,7 +393,7 @@ async function LocalizedRankings({ locale }: { locale: Locale }) {
                 <span className="w-8 text-center text-lg font-black">{index + 1}</span>
                 <MediaImg src={creator.avatarUrl || ""} alt={creator.name} width={48} height={48} className="h-12 w-12 rounded-full object-cover" />
                 <div className="min-w-0 flex-1">
-                  <p className="flex items-center gap-1 font-semibold"><span className="truncate">{creator.name}</span>{creator.verified ? <VerifiedBadge size={13} /> : null}</p>
+                  <p className="flex items-center gap-1 font-semibold"><span className="truncate">{creator.name}</span>{creator.verified ? <VerifiedBadge size={13} label={dictionary.creator.verified} /> : null}</p>
                   <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[var(--color-surface-3)]"><div className="h-full bg-[var(--color-accent)]" style={{ width: `${Math.round((creator.score / maxScore) * 100)}%` }} /></div>
                 </div>
                 <div className="text-right"><p className="font-semibold">{formatCount(creator.views)}</p><p className="text-xs text-[var(--color-ink-faint)]">{dictionary.creator.views}</p></div>

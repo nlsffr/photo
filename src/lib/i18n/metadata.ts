@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 // @ts-expect-error Node's native type stripping requires the explicit .ts suffix.
-import { localeAlternates, localePath, localesForPath, supportedLocaleForPath, type Locale, type CreatorLocale } from "./config.ts";
+import { LOCALES, localeAlternates, localePath, localesForPath, stripLocalePrefix, supportedLocaleForPath, type Locale, type CreatorLocale } from "./config.ts";
 
 // @ts-expect-error Node's native type stripping requires the explicit .ts suffix.
 import { creatorCollectionPath, type CreatorCollection } from "../creator-collections.ts";
@@ -27,8 +27,9 @@ export function creatorCollectionAlternates(
   return {
     canonical: creatorCollectionPath(handle, version, collection, locale, page),
     languages: {
-      en: creatorCollectionPath(handle, version, collection, "en", page),
-      fr: creatorCollectionPath(handle, version, collection, "fr", page),
+      ...Object.fromEntries(LOCALES.map((language) => [language,
+        creatorCollectionPath(handle, version, collection, language, page),
+      ])),
       "x-default": creatorCollectionPath(handle, version, collection, undefined, page),
     },
   };
@@ -43,6 +44,23 @@ const OPEN_GRAPH_LOCALES: Record<Locale, string> = {
   en: "en_US", fr: "fr_FR", es: "es_ES", de: "de_DE",
   it: "it_IT", pt: "pt_PT", nl: "nl_NL",
 };
+
+export function openGraphLocale(locale?: Locale): string {
+  return OPEN_GRAPH_LOCALES[locale ?? "en"];
+}
+
+export function openGraphAlternateLocales(locale?: Locale): string[] {
+  return LOCALES.filter((language) => language !== (locale ?? "en"))
+    .map((language) => OPEN_GRAPH_LOCALES[language]);
+}
+
+export function mediaPageAlternates(bareCanonicalPath: string, locale?: Locale) {
+  const { pathname } = stripLocalePrefix(bareCanonicalPath);
+  return {
+    canonical: locale ? localePath(locale, pathname) : pathname,
+    languages: localeAlternates(pathname),
+  };
+}
 
 export function buildLocalizedMetadata(
   locale: Locale,

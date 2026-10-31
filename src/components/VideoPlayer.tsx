@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatCount, formatDuration } from "@/lib/format";
+import { mediaThumbnailUrl } from "@/lib/media-sources";
+import { useLocale } from "./LocaleProvider";
 
 interface Props {
   src: string;
@@ -38,6 +40,8 @@ export function VideoPlayer({
   muted: mutedProp = false,
   className = "",
 }: Props) {
+  const { dictionary } = useLocale();
+  const copy = dictionary.video;
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const shellRef = useRef<HTMLDivElement | null>(null);
   const [playing, setPlaying] = useState(autoPlay);
@@ -183,7 +187,7 @@ export function VideoPlayer({
       <video
         ref={videoRef}
         src={src}
-        poster={poster}
+        poster={mediaThumbnailUrl({ imageUrl: poster })}
         playsInline
         loop
         preload="metadata"
@@ -218,14 +222,14 @@ export function VideoPlayer({
 
       {error && (
         <div className="absolute inset-0 z-[8] flex flex-col items-center justify-center gap-3 bg-black/80 px-4 text-center">
-          <p className="text-sm font-medium text-white">Impossible de lire la vidéo</p>
-          <p className="text-xs text-white/70">Fichier lourd ou réseau lent — réessaie.</p>
+          <p className="text-sm font-medium text-white">{copy.errorTitle}</p>
+          <p className="text-xs text-white/70">{copy.errorBody}</p>
           <button
             type="button"
             onClick={retry}
             className="rounded-full bg-[var(--color-accent)] px-5 py-2 text-sm font-semibold text-white"
           >
-            Réessayer
+            {copy.retry}
           </button>
         </div>
       )}
@@ -234,7 +238,7 @@ export function VideoPlayer({
         <div className="pointer-events-none absolute inset-0 z-[6] grid place-items-center bg-black/35">
           <div className="flex flex-col items-center gap-2">
             <span className="h-10 w-10 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-            <span className="text-xs font-medium text-white/90">Chargement de la vidéo…</span>
+            <span className="text-xs font-medium text-white/90">{copy.loading}</span>
           </div>
         </div>
       )}
@@ -244,7 +248,7 @@ export function VideoPlayer({
           type="button"
           onClick={togglePlay}
           className="absolute inset-0 z-[5] grid place-items-center"
-          aria-label="Lecture"
+          aria-label={dictionary.feed.play}
         >
           <span className="grid h-16 w-16 place-items-center rounded-full bg-black/50 ring-1 ring-white/40 backdrop-blur-sm">
             <Icon d="M8 5v14l11-7z" size={28} />
@@ -261,14 +265,14 @@ export function VideoPlayer({
           value={progress}
           onChange={seek}
           className="pointer-events-auto mb-2 h-1.5 w-full cursor-pointer appearance-none rounded-full bg-white/25 accent-[var(--color-accent)]"
-          aria-label="Progression"
+          aria-label={copy.progress}
         />
         <div className="pointer-events-auto flex flex-wrap items-center gap-1.5 text-white">
           <button
             type="button"
             onClick={togglePlay}
             className="grid h-9 w-9 place-items-center rounded-full bg-white/15 hover:bg-white/25"
-            aria-label={playing ? "Pause" : "Play"}
+            aria-label={playing ? dictionary.feed.pause : dictionary.feed.play}
           >
             {playing ? (
               <Icon d="M6 5h4v14H6zM14 5h4v14h-4z" size={16} />
@@ -280,7 +284,7 @@ export function VideoPlayer({
             type="button"
             onClick={toggleMute}
             className="grid h-9 w-9 place-items-center rounded-full bg-white/15 hover:bg-white/25"
-            aria-label={muted ? "Son" : "Muet"}
+            aria-label={muted ? dictionary.feed.unmute : dictionary.feed.mute}
           >
             {muted ? (
               <Icon d="M11 5 6 9H2v6h4l5 4V5zm10 4-6 6m0-6 6 6" size={16} />
@@ -291,6 +295,7 @@ export function VideoPlayer({
           <button
             type="button"
             onClick={cycleSpeed}
+            aria-label={`${copy.speed}: ${speed}x`}
             className="h-9 min-w-[2.5rem] rounded-full bg-white/15 px-2 text-xs font-bold hover:bg-white/25"
           >
             {speed}x
@@ -298,6 +303,8 @@ export function VideoPlayer({
           <button
             type="button"
             onClick={enterPiP}
+            aria-label={copy.pictureInPicture}
+            title={copy.pictureInPicture}
             className="hidden h-9 rounded-full bg-white/15 px-2.5 text-xs font-semibold hover:bg-white/25 sm:inline"
           >
             PiP
@@ -306,7 +313,7 @@ export function VideoPlayer({
             type="button"
             onClick={enterFs}
             className="grid h-9 w-9 place-items-center rounded-full bg-white/15 hover:bg-white/25"
-            aria-label="Plein écran"
+            aria-label={copy.fullscreen}
           >
             <Icon d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" size={16} />
           </button>
@@ -318,7 +325,7 @@ export function VideoPlayer({
           <div className="mt-1.5 flex items-center gap-2 text-[11px] text-white/85">
             {title ? <span className="truncate font-medium">{title}</span> : null}
             <span className="ml-auto shrink-0">
-              {formatCount(views)} vues · {formatCount(likes)} likes
+              {formatCount(views)} {dictionary.mediaDetails.views} · {formatCount(likes)} {dictionary.mediaDetails.likes}
             </span>
           </div>
         )}

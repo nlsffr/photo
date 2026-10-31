@@ -12,6 +12,8 @@ type Route = {
 };
 const creator = { handle: "aria-lune", name: "Aria $& Lune", bio: "Ma bio / My bio", avatarUrl: "", followers: 100, verified: true, urlVersion: 3, removedFromIndexAt: null };
 const stats = { mediaCount: 100, photoCount: 70, videoCount: 30, engagedCount: 10, totalViews: 800, totalLikes: 20 };
+const locales = ["en", "fr", "es", "de", "it", "pt", "nl"] as const;
+const media = { id: "db-media", sourceId: "123", creatorHandle: "aria-lune", title: "Original source title", description: "Original source description", imageUrl: "/fixture.jpg", type: "photo", width: 100, height: 100, tags: [], views: 1, likes: 0, ageMinutes: 0, trending: 0, urlVersion: 2, createdAt: "2026-10-01T00:00:00Z" };
 function setup(locale: "en" | "fr" | "es" | "de" | "it" | "pt" | "nl", options: { removed?: boolean; empty?: boolean } = {}) {
   const queries: Record<string, unknown>[] = [];
   const FollowButton = () => null;
@@ -20,6 +22,10 @@ function setup(locale: "en" | "fr" | "es" | "de" | "it" | "pt" | "nl", options: 
     "@/lib/photos": {
       getCreatorCollectionContext: async () => ({ creator: { ...creator, removedFromIndexAt: options.removed ? "2026-10-29" : null }, stats: options.empty ? { ...stats, mediaCount: 0 } : stats }),
       getPhotos: async (query: Record<string, unknown>) => { queries.push(query); return { items: [], nextCursor: 60 }; },
+      getPhotoByIdForPage: async () => media,
+      getCreator: async () => ({ ...creator, removedFromIndexAt: options.removed ? "2026-10-29" : null }),
+      getRelatedPhotos: async () => [],
+      withCreator: (photo: typeof media) => ({ ...photo, creator }),
     },
     "next/navigation": {
       notFound: () => { throw new Error("NOT_FOUND"); },
@@ -62,7 +68,11 @@ test("every exact static route wins before creator parsing, including contact su
 });
 
 test("localized overview and exactly the three collection paths reuse the renderer and locale", async () => {
-  for (const locale of ["en", "fr"] as const) {
+  const intro = { en: "Browse", fr: "Parcourez", es: "Explora", de: "Entdecke", it: "Sfoglia", pt: "Explore", nl: "Bekijk" };
+  const previous = { en: "Previous page", fr: "Page précédente", es: "Página anterior", de: "Vorherige Seite", it: "Pagina precedente", pt: "Página anterior", nl: "Vorige pagina" };
+  const follow = { en: { follow: "Follow", following: "Following" }, fr: { follow: "Suivre", following: "Suivi·e" }, es: { follow: "Seguir", following: "Siguiendo" }, de: { follow: "Folgen", following: "Gefolgt" }, it: { follow: "Segui", following: "Seguito" }, pt: { follow: "Seguir", following: "A seguir" }, nl: { follow: "Volgen", following: "Volgend" } };
+  const verified = { en: "Verified", fr: "Vérifié", es: "Verificado", de: "Verifiziert", it: "Verificato", pt: "Verificado", nl: "Geverifieerd" };
+  for (const locale of locales) {
     const { route, props, render, queries, FollowButton, VerifiedBadge } = setup(locale);
     for (const collection of ["overview", "photos", "videos", "popular"]) {
       const path = `/aria-lune-v3${collection === "overview" ? "" : `/${collection}`}`;
@@ -74,17 +84,39 @@ test("localized overview and exactly the three collection paths reuse the render
       assert.equal(queries.at(-1)?.sort, collection === "popular" ? "popular" : "recent");
       assert.ok(text(tree).includes(creator.name));
       assert.ok(text(tree).includes(creator.bio));
-      assert.ok(text(tree).includes(locale === "fr" ? "Parcourez" : "Browse"));
-      assert.ok(text(tree).includes(locale === "fr" ? "Page précédente" : "Previous page"));
+      assert.ok(text(tree).includes(intro[locale]));
+      assert.ok(text(tree).includes(previous[locale]));
       const links = nodes(tree).filter((node) => node.props.href);
       assert.ok(links.some((node) => node.props.href === `/${locale}/aria-lune-v3/photos`));
-      assert.deepEqual(nodes(tree).find((node) => node.type === FollowButton)?.props.labels, locale === "fr" ? { follow: "Suivre", following: "Suivi·e" } : { follow: "Follow", following: "Following" });
-      assert.equal(nodes(tree).find((node) => node.type === VerifiedBadge)?.props.label, locale === "fr" ? "Vérifié" : "Verified");
+      assert.deepEqual(nodes(tree).find((node) => node.type === FollowButton)?.props.labels, follow[locale]);
+      assert.equal(nodes(tree).find((node) => node.type === VerifiedBadge)?.props.label, verified[locale]);
     }
   }
 });
 
-test("localized metadata is reciprocal for EN, FR and x-default on every collection and page", async () => {
+test("all seven localized media wrappers reuse media validation, reciprocal canonicals and source-authored text", async () => {
+  const ogLocales = { en: "en_US", fr: "fr_FR", es: "es_ES", de: "de_DE", it: "it_IT", pt: "pt_PT", nl: "nl_NL" };
+  for (const locale of locales) {
+    const { route, props, render } = setup(locale);
+    const tree = await render("/aria-lune/123-v2");
+    const metadata = await route.generateMetadata(props("/aria-lune/123-v2"));
+    assert.equal(metadata.alternates?.canonical, `/${locale}/aria-lune/123-v2`);
+    assert.deepEqual(metadata.alternates?.languages, {
+      en: "/en/aria-lune/123-v2", fr: "/fr/aria-lune/123-v2", es: "/es/aria-lune/123-v2",
+      de: "/de/aria-lune/123-v2", it: "/it/aria-lune/123-v2", pt: "/pt/aria-lune/123-v2",
+      nl: "/nl/aria-lune/123-v2", "x-default": "/aria-lune/123-v2",
+    });
+    assert.equal(metadata.openGraph?.locale, ogLocales[locale]);
+    assert.equal(metadata.description, "Original source description");
+    assert.ok(text(tree).includes("Original source title"));
+    assert.ok(nodes(tree).some((node) => node.props.href === `/${locale}/aria-lune-v3`));
+    await assert.rejects(render("/aria-lune/123-v1"), /NOT_FOUND/);
+    await assert.rejects(route.generateMetadata(props("/aria-lune/123-v1")), /NOT_FOUND/);
+    await assert.rejects(setup(locale, { removed: true }).render("/aria-lune/123-v2"), /NOT_FOUND/);
+  }
+});
+
+test("localized metadata is reciprocal for seven languages and x-default on every collection and page", async () => {
   const en = setup("en");
   const fr = setup("fr");
   for (const collection of ["overview", "photos", "videos", "popular"]) for (const page of [1, 2, 3]) {
@@ -92,7 +124,7 @@ test("localized metadata is reciprocal for EN, FR and x-default on every collect
     const suffix = page === 1 ? "" : `?page=${page}`;
     const english = await en.route.generateMetadata(en.props(path, { page: String(page) }));
     const french = await fr.route.generateMetadata(fr.props(path, { page: String(page) }));
-    const languages = { en: `/en${path}${suffix}`, fr: `/fr${path}${suffix}`, "x-default": `${path}${suffix}` };
+    const languages = { en: `/en${path}${suffix}`, fr: `/fr${path}${suffix}`, es: `/es${path}${suffix}`, de: `/de${path}${suffix}`, it: `/it${path}${suffix}`, pt: `/pt${path}${suffix}`, nl: `/nl${path}${suffix}`, "x-default": `${path}${suffix}` };
     assert.deepEqual(english.alternates?.languages, languages);
     assert.deepEqual(french.alternates?.languages, languages);
     assert.equal(french.alternates?.canonical, languages.fr);
@@ -101,10 +133,10 @@ test("localized metadata is reciprocal for EN, FR and x-default on every collect
   }
 });
 
-test("localized media, extra segments and non-EN/FR prefixes never dispatch as creators", async () => {
+test("malformed content paths, extra segments and nested locale prefixes never dispatch", async () => {
   // @ts-expect-error Native Node requires explicit suffixes.
   const { resolveLocalizedPage } = await import("../src/lib/i18n/config.ts");
-  for (const path of ["/aria-lune-v3/media-id", "/aria-lune-v3/photo-123-v2", "/aria-lune-v3/photos/extra", "/es/aria-lune-v3", "/en/aria-lune-v3", "/fr/aria-lune-v3", "/aria-lune-v3/overview", "/aria-lune-v3//photos", "/%E0%A4%A", "/aria%2Flune/photos"]) {
+  for (const path of ["/aria-lune-v3/photos/extra", "/es/aria-lune-v3", "/en/aria-lune-v3", "/fr/aria-lune-v3", "/aria-lune-v3//photos", "/%E0%A4%A", "/aria%2Flune/photos"]) {
     assert.equal(resolveLocalizedPage("en", path), null, path);
     for (const locale of ["en", "fr"] as const) {
       const { route, props, render } = setup(locale);
@@ -112,13 +144,12 @@ test("localized media, extra segments and non-EN/FR prefixes never dispatch as c
       await assert.rejects(route.generateMetadata(props(path)), /NOT_FOUND/, path);
     }
   }
-  assert.equal(resolveLocalizedPage("es" as "en", "/aria-lune-v3"), null);
 });
 
-test("discovery-only locale wrappers reject untranslated editorial and creator pages", async () => {
+test("expanded content locale wrappers still reject untranslated editorial pages", async () => {
   for (const locale of ["es", "de", "it", "pt", "nl"] as const) {
     const { route, props, render, queries } = setup(locale);
-    for (const path of ["/about", "/contact/support", "/aria-lune-v3", "/aria-lune-v3/photos"]) {
+    for (const path of ["/about", "/contact/support"]) {
       await assert.rejects(render(path), /NOT_FOUND/, `${locale}${path}`);
       await assert.rejects(route.generateMetadata(props(path)), /NOT_FOUND/, `${locale}${path}`);
     }
@@ -127,7 +158,7 @@ test("discovery-only locale wrappers reject untranslated editorial and creator p
 });
 
 test("localized routes preserve renderer version, removal, query and redirect policy", async () => {
-  for (const locale of ["en", "fr"] as const) {
+  for (const locale of locales) {
     const { route, props, render } = setup(locale);
     await assert.rejects(render("/aria-lune-v2/photos"), /NOT_FOUND/);
     await assert.rejects(route.generateMetadata(props("/aria-lune-v2/photos")), /NOT_FOUND/);

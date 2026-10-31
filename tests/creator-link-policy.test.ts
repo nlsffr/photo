@@ -33,13 +33,27 @@ function scripts(tree: ReactNode): Schema[] {
   });
 }
 
-test("CreatorCard preserves supported creator locales and uses canonical links for discovery-only locales", () => {
+test("CreatorCard preserves all seven creator locales and the bare neutral route", () => {
   const { CreatorCard } = loadAppModule<{ CreatorCard: (props: { creator: CreatorWithStats; locale?: "en" | "fr" | "es" | "de" | "it" | "pt" | "nl" }) => ReactNode }>("src/components/CreatorCard.tsx", boundaries);
   assert.equal(nodes(CreatorCard({ creator }))[0].props.href, "/aria-lune-v3");
   assert.equal(nodes(CreatorCard({ creator, locale: "en" }))[0].props.href, "/en/aria-lune-v3");
   assert.equal(nodes(CreatorCard({ creator, locale: "fr" }))[0].props.href, "/fr/aria-lune-v3");
   for (const locale of ["es", "de", "it", "pt", "nl"] as const) {
-    assert.equal(nodes(CreatorCard({ creator, locale }))[0].props.href, "/aria-lune-v3");
+    assert.equal(nodes(CreatorCard({ creator, locale }))[0].props.href, `/${locale}/aria-lune-v3`);
+  }
+});
+
+test("media cards keep the selected content locale on both media and creator links", () => {
+  for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"] as const) {
+    const { getDictionary } = loadAppModule<{ getDictionary: (locale: string) => unknown }>("src/lib/i18n/dictionaries.ts");
+    const { PhotoCard } = loadAppModule<{ PhotoCard: (props: { photo: PhotoView }) => ReactNode }>("src/components/PhotoCard.tsx", {
+      "./LocaleProvider": { useLocale: () => ({ locale, dictionary: getDictionary(locale) }) },
+      "./Interactions": { useInteractions: () => ({ ready: false, isLiked: () => false, isSaved: () => false, toggleLike() {}, toggleSave() {} }) },
+      "./MediaImg": { MediaImg: () => null },
+    });
+    const html = renderToStaticMarkup(createElement(PhotoCard, { photo: { ...photo, creator } }));
+    assert.ok(html.includes(`href="/${locale}/aria-lune/123-v2"`), `${locale}: media detail`);
+    assert.ok(html.includes(`href="/${locale}/aria-lune-v3"`), `${locale}: creator`);
   }
 });
 
@@ -88,7 +102,7 @@ test("creator renderer uses the loaded page for structured data with one gallery
   const props = { handleParam: "aria-lune-v3", collection: "photos", locale: "fr", searchParams: { page: "2" } };
   const data = scripts(await renderer.CreatorCollectionPage(props));
   assert.equal(data.find((item) => item["@type"] === "CollectionPage")!.url, "https://leakfanhub.com/fr/aria-lune-v3/photos?page=2");
-  assert.equal(data.find((item) => item["@type"] === "ItemList")!.itemListElement[0].item.url, "https://leakfanhub.com/aria-lune/123-v2");
+  assert.equal(data.find((item) => item["@type"] === "ItemList")!.itemListElement[0].item.url, "https://leakfanhub.com/fr/aria-lune/123-v2");
   assert.deepEqual(queries, [{ creator: "aria-lune", type: "photo", sort: "recent", cursor: 30, limit: 30 }]);
   assert.equal(contextReads, 1);
   items[0].removedFromIndexAt = "2026-10-29";
@@ -101,7 +115,7 @@ test("creator renderer uses the loaded page for structured data with one gallery
 
 test("localized discovery surfaces link only to translated or canonical creator pages", async () => {
   for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"] as const) {
-    const creatorPath = locale === "en" || locale === "fr" ? `/${locale}/aria-lune-v3` : "/aria-lune-v3";
+    const creatorPath = `/${locale}/aria-lune-v3`;
     const replacements: Record<string, unknown> = {
       ...boundaries,
       "./LocaleProvider": { useLocale: () => ({ locale, t: (key: string) => key }) },

@@ -22,7 +22,7 @@ import {
 import { isRemovedContent } from "@/lib/public-content-policy";
 import type { CreatorLocale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionaries";
-import { creatorCollectionAlternates } from "@/lib/i18n/metadata";
+import { creatorCollectionAlternates, openGraphLocale, openGraphAlternateLocales } from "@/lib/i18n/metadata";
 import { InfiniteGallery } from "@/components/InfiniteGallery";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { FollowButton } from "@/components/Interactions";
@@ -149,8 +149,8 @@ export async function creatorCollectionMetadata(
     },
     openGraph: {
       type: "profile",
-      locale: props.locale === "fr" ? "fr_FR" : "en_US",
-      alternateLocale: props.locale === "fr" ? ["en_US"] : ["fr_FR"],
+      locale: openGraphLocale(props.locale),
+      alternateLocale: openGraphAlternateLocales(props.locale),
       title,
       description: copy.description,
       url: `${SITE}${path}`,

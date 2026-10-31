@@ -1,5 +1,6 @@
 import type { Photo } from "./types";
-import type { CreatorLocale } from "./i18n/config";
+// @ts-expect-error Node's native type stripping requires the explicit .ts suffix.
+import { isCreatorLocale, type CreatorLocale } from "./i18n/config.ts";
 // @ts-expect-error Node’s native type stripping requires the explicit .ts suffix.
 import { getDictionary } from "./i18n/dictionaries.ts";
 // @ts-expect-error Node’s native type stripping requires the explicit .ts suffix.
@@ -66,7 +67,7 @@ export function summarizeCreatorCollectionStats(media: readonly Pick<Photo, "typ
 export function parseCreatorCollectionPath(pathname: string): { handle: string; collection: CreatorCollection } | null {
   if (typeof pathname !== "string" || pathname.includes("?")) return null;
   const rawSegments = pathname.split("/").filter(Boolean);
-  if (rawSegments[0] === "en" || rawSegments[0] === "fr") rawSegments.shift();
+  if (isCreatorLocale(rawSegments[0])) rawSegments.shift();
   if (rawSegments.length !== 1 && rawSegments.length !== 2) return null;
   let handle: string;
   let segment: string;
@@ -97,7 +98,7 @@ export function creatorCollectionPath(handle: string, urlVersion: number, collec
   const version = Number.isInteger(urlVersion) && urlVersion > 1 ? urlVersion : 1;
   const encodedHandle = encodeURIComponent(safeHandle);
   const versionedHandle = version > 1 ? `${encodedHandle}-v${version}` : encodedHandle;
-  const prefix = locale === "en" || locale === "fr" ? `/${locale}` : "";
+  const prefix = isCreatorLocale(locale) ? `/${locale}` : "";
   const suffix = Number.isInteger(page) && (page as number) >= 2 ? `?page=${page}` : "";
   const collectionPath = collection === "overview" ? `/${versionedHandle}` : `/${versionedHandle}/${collection}`;
   return `${prefix}${collectionPath}${suffix}`;

@@ -40,7 +40,7 @@ test("overview has ProfilePage and a verified Person at the exact versioned loca
   assert.deepEqual(person.alternateName, ["aria-lune", "Aria Lune"]);
   assert.equal(person.image, "https://example.test/avatar.jpg");
   assert.equal(person.interactionStatistic.userInteractionCount, 45);
-  assert.equal(profile.hasPart[0].url, "https://example.test/aria-lune/101-v2");
+  assert.equal(profile.hasPart[0].url, "https://example.test/fr/aria-lune/101-v2");
   assert.equal(profile.hasPart[0]["@type"], "ImageObject");
 });
 
@@ -58,7 +58,7 @@ test("all collections list at most twelve loaded public entries in order with po
     assert.equal(list.numberOfItems, 12);
     assert.deepEqual(list.itemListElement.map((entry) => entry.position), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
     assert.deepEqual(list.itemListElement.map((entry) => entry.item.url), [
-      "https://example.test/aria-lune/102-v2", "https://example.test/aria-lune/103-v2", "https://example.test/aria-lune/104-v2", "https://example.test/aria-lune/105-v2", "https://example.test/aria-lune/106-v2", "https://example.test/aria-lune/107-v2", "https://example.test/aria-lune/108-v2", "https://example.test/aria-lune/109-v2", "https://example.test/aria-lune/110-v2", "https://example.test/aria-lune/111-v2", "https://example.test/aria-lune/112-v2", "https://example.test/aria-lune/113-v2",
+      "https://example.test/en/aria-lune/102-v2", "https://example.test/en/aria-lune/103-v2", "https://example.test/en/aria-lune/104-v2", "https://example.test/en/aria-lune/105-v2", "https://example.test/en/aria-lune/106-v2", "https://example.test/en/aria-lune/107-v2", "https://example.test/en/aria-lune/108-v2", "https://example.test/en/aria-lune/109-v2", "https://example.test/en/aria-lune/110-v2", "https://example.test/en/aria-lune/111-v2", "https://example.test/en/aria-lune/112-v2", "https://example.test/en/aria-lune/113-v2",
     ]);
     assert.deepEqual(page.hasPart, list.itemListElement.map((entry) => entry.item));
     assert.equal(page.hasPart[0]["@type"], "VideoObject");
@@ -74,6 +74,15 @@ test("removed loaded items disappear on the next build and inputs are not mutate
   items[0].removedFromIndexAt = "2026-10-29";
   assert.deepEqual(build({ items })[0].hasPart.map((item: Schema) => item.url), ["https://example.test/aria-lune/102-v2"]);
   assert.deepEqual(build({ creator: { ...creator, removedFromIndexAt: "2026-10-29" }, items }), []);
+});
+
+test("video without a real image thumbnail remains a page link instead of an incomplete VideoObject", () => {
+  const item = { ...media("1", "video"), imageUrl: "/video.mp4" };
+  const page = build({ items: [item] })[0];
+  assert.equal(page.hasPart[0]["@type"], "WebPage");
+  assert.equal(page.hasPart[0].url, "https://example.test/aria-lune/101-v2");
+  assert.equal("thumbnailUrl" in page.hasPart[0], false);
+  assert.equal("contentUrl" in page.hasPart[0], false);
 });
 
 test("phase-one aliases contain only handle and display name and hostile text survives safe JsonLd serialization", () => {

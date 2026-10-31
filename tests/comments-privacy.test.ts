@@ -3,6 +3,9 @@ import test from "node:test";
 import { NextRequest } from "next/server.js";
 import { createElement, isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import type { Locale } from "../src/lib/i18n/config";
+// @ts-expect-error Native Node requires explicit suffixes.
+import { getDictionary } from "../src/lib/i18n/dictionaries.ts";
 // @ts-expect-error Native Node requires explicit suffixes.
 import { loadAppModule } from "./helpers/load-app-module.ts";
 
@@ -128,7 +131,7 @@ test("authenticated POST keeps the media exclusions and rejects an absent insert
 type View = ReactElement<{ children?: ReactNode; onClick?: () => void }>;
 
 // Drive the real component's hooks and effect cleanup without a browser or network.
-function commentsView() {
+function commentsView(locale: Locale = "fr", authenticated = false) {
   const state: unknown[] = [];
   const effects: { dependencies?: unknown[]; cleanup?: () => void }[] = [];
   let stateCursor = 0;
@@ -157,8 +160,9 @@ function commentsView() {
         },
       },
       "next/link": { __esModule: true, default: "a" },
-      "next/navigation": { usePathname: () => "/fr/photo/fixture-photo" },
-      "./Session": { useSession: () => ({ user: null }) },
+      "next/navigation": { usePathname: () => `/${locale}/photo/fixture-photo` },
+      "./Session": { useSession: () => ({ user: authenticated ? { id: "fixture-user" } : null }) },
+      "./LocaleProvider": { useLocale: () => ({ locale, dictionary: getDictionary(locale) }) },
     },
   );
   return {
@@ -255,4 +259,25 @@ test("a late response for the previous photo cannot replace the current comments
   const html = markup(view.render("current"));
   assert.match(html, /Current photo comment/);
   assert.doesNotMatch(html, /Stale photo comment/);
+});
+
+test("comment loading, empty and signed-in form labels follow all seven active locales", async (t) => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => Response.json({ items: [] });
+  t.after(() => { globalThis.fetch = originalFetch; });
+  for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"] as const) {
+    const copy = getDictionary(locale).comments;
+    const view = commentsView(locale);
+    t.after(() => view.cleanup());
+    const loading = markup(view.render());
+    assert.ok(loading.includes(copy.title), `${locale}: comment heading`);
+    assert.ok(loading.includes(copy.loading), `${locale}: loading state`);
+    await settle();
+    assert.ok(markup(view.render()).includes(copy.empty), `${locale}: empty state`);
+    const signedIn = commentsView(locale, true);
+    t.after(() => signedIn.cleanup());
+    const form = signedIn.render();
+    assert.ok(findButton(form, copy.submit), `${locale}: submit control`);
+    assert.ok(markup(form).includes(`placeholder="${copy.placeholder}"`), `${locale}: input placeholder`);
+  }
 });

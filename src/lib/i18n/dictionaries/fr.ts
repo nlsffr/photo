@@ -107,6 +107,10 @@ export const frDictionary = {
       discover: "Découvrir",
       trending: "Tendances",
       recent: "Récents",
+      popular: "Populaires",
+      liked: "Les plus aimés",
+      longest: "Les plus longs",
+      random: "Aléatoire",
       photos: "Photos",
       videos: "Vidéos",
       all: "Tous les filtres",
@@ -131,6 +135,47 @@ export const frDictionary = {
       media: "médias",
     },
   },
+  mediaDetails: {
+    views: "Vues",
+    likes: "J’aime",
+    score: "Score",
+    allMedia: "Tous les médias de @{handle} →",
+    report: "Signaler / DMCA",
+    more: "Plus de médias de @{handle}",
+    viewProfile: "Voir le profil",
+    saved: "Enregistré",
+    kinds: {
+      photo: "photo",
+      video: "vidéo",
+      pack: "galerie"
+    },
+    fallbackName: "{handle} {kind} #{id}",
+    fallbackDescription: "{kind} de @{handle} sur LeakFanHub{titleDetail} (média {id})."
+  },
+  comments: {
+    title: "Commentaires",
+    placeholder: "Écrire un commentaire…",
+    submit: "Envoyer",
+    login: "Connecte-toi",
+    loginSuffix: "pour commenter.",
+    sendError: "Échec de l’envoi.",
+    loading: "Chargement des commentaires…",
+    loadError: "Impossible de charger les commentaires.",
+    retry: "Réessayer",
+    empty: "Aucun commentaire.",
+    user: "Utilisateur"
+  },
+  video: {
+    errorTitle: "Impossible de lire la vidéo",
+    errorBody: "Fichier lourd ou réseau lent — réessaie.",
+    retry: "Réessayer",
+    loading: "Chargement de la vidéo…",
+    progress: "Progression",
+    speed: "Vitesse de lecture",
+    pictureInPicture: "Image dans l’image",
+    fullscreen: "Plein écran"
+  },
+  feed: { empty: "Feed vide", close: "Fermer le feed", play: "Lecture", pause: "Pause", unmute: "Activer le son", mute: "Couper le son" },
   models: {
     title: "Modèles",
     countSuffix: "créateurs sur LeakFanHub",
@@ -163,6 +208,7 @@ export const frDictionary = {
     all: "Tout",
     photos: "Photos",
     videos: "Vidéos",
+    pack: "Pack",
     packs: "Packs",
   },
   aiFilters: {

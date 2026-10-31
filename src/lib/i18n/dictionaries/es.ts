@@ -32,14 +32,59 @@ export const esDictionary = {
   home: {
     featured: "Modelos destacados", viewAll: "Ver todo",
     filters: {
-      label: "Filtros de descubrimiento", discover: "Descubrir", trending: "Tendencias", recent: "Reciente", photos: "Fotos", videos: "Vídeos", all: "Todos los filtros", popularInterests: "Intereses populares", active: "Filtros activos", clear: "Borrar todo", title: "Todos los filtros", description: "Elige un interés para personalizar la galería.", close: "Cerrar filtros", search: "Buscar un interés", searchPlaceholder: "Buscar un interés…", empty: "No se encontró ningún filtro.",
+      label: "Filtros de descubrimiento", discover: "Descubrir", trending: "Tendencias", recent: "Reciente",
+      popular: "Populares",
+      liked: "Más valorados",
+      longest: "Más largos",
+      random: "Aleatorio", photos: "Fotos", videos: "Vídeos", all: "Todos los filtros", popularInterests: "Intereses populares", active: "Filtros activos", clear: "Borrar todo", title: "Todos los filtros", description: "Elige un interés para personalizar la galería.", close: "Cerrar filtros", search: "Buscar un interés", searchPlaceholder: "Buscar un interés…", empty: "No se encontró ningún filtro.",
     },
     gallery: { emptyTitle: "Sin resultados", emptyBody: "Prueba otra palabra o elimina filtros.", loading: "Cargando", loadError: "No se pueden cargar más elementos.", retry: "Intentar de nuevo", loadMore: "Cargar más", end: "Ya lo has visto todo", media: "elementos multimedia" },
   },
+  mediaDetails: {
+    views: "Visualizaciones",
+    likes: "Me gusta",
+    score: "Puntuación",
+    allMedia: "Todo el contenido de @{handle} →",
+    report: "Denunciar / DMCA",
+    more: "Más contenido de @{handle}",
+    viewProfile: "Ver perfil",
+    saved: "Guardado",
+    kinds: {
+      photo: "foto",
+      video: "vídeo",
+      pack: "galería"
+    },
+    fallbackName: "{handle} {kind} #{id}",
+    fallbackDescription: "{kind} de @{handle} en LeakFanHub{titleDetail} (contenido {id})."
+  },
+  comments: {
+    title: "Comentarios",
+    placeholder: "Escribe un comentario…",
+    submit: "Enviar",
+    login: "Inicia sesión",
+    loginSuffix: "para comentar.",
+    sendError: "No se pudo enviar.",
+    loading: "Cargando comentarios…",
+    loadError: "No se pueden cargar los comentarios.",
+    retry: "Intentar de nuevo",
+    empty: "Aún no hay comentarios.",
+    user: "Usuario"
+  },
+  video: {
+    errorTitle: "No se puede reproducir el vídeo",
+    errorBody: "Archivo grande o conexión lenta; inténtalo de nuevo.",
+    retry: "Intentar de nuevo",
+    loading: "Cargando vídeo…",
+    progress: "Progreso",
+    speed: "Velocidad de reproducción",
+    pictureInPicture: "Imagen en imagen",
+    fullscreen: "Pantalla completa"
+  },
+  feed: { empty: "No hay contenido", close: "Cerrar contenido", play: "Reproducir", pause: "Pausar", unmute: "Activar sonido", mute: "Silenciar" },
   models: { title: "Modelos", countSuffix: "creadores en LeakFanHub", followers: "Con más seguidores", views: "Más vistos", added: "creadores añadidos.", loadError: "No se pueden cargar más creadores.", retry: "Intentar de nuevo", loadMore: "Ver más", loading: "Cargando…" },
   search: { title: "Buscar", creators: "Creadores", followers: "seguidores", result: "resultado", results: "resultados", trendingNow: "Tendencias actuales" },
   searchForm: { placeholder: "Buscar un modelo, etiqueta o título…", label: "Buscar", clear: "Borrar", submit: "Buscar", advanced: "Avanzado", filterByTag: "Filtrar por etiqueta", searchFor: "Buscar" },
-  mediaTypes: { all: "Todo", photos: "Fotos", videos: "Vídeos", packs: "Paquetes" },
+  mediaTypes: { all: "Todo", photos: "Fotos", videos: "Vídeos", pack: "Paquete", packs: "Paquetes" },
   aiFilters: { all: "Todo", real: "Real", ai: "IA" },
   addMedia: {
     title: "Añadir contenido", guestBody: "Inicia sesión para publicar una foto o un vídeo.", login: "Iniciar sesión", intro: "El creador ya debe existir en la base de datos (autocompletado).", chooseFile: "Foto o vídeo — haz clic para elegir", creator: "Creador", change: "Cambiar", creatorPlaceholder: "Escribe las primeras letras…", optionalTitle: "Título (opcional)", missingFields: "Elige un archivo y un creador existente.", uploadFailed: "Error al subir", uploadSuccess: "Contenido subido — pendiente de moderación o publicación.", networkError: "Error de red", sending: "Subiendo…", publish: "Publicar",

@@ -47,6 +47,34 @@ test("empty or markup-only titles receive a stable factual fallback", async () =
   );
 });
 
+test("media fallback templates and Open Graph use every supported locale without translating source text", async () => {
+  const { buildMediaPagePresentation } = await loadMediaSeo();
+  const expected = {
+    en: "Video by @alice on LeakFanHub",
+    fr: "Vidéo de @alice sur LeakFanHub",
+    es: "Vídeo de @alice en LeakFanHub",
+    de: "Video von @alice auf LeakFanHub",
+    it: "Video di @alice su LeakFanHub",
+    pt: "Vídeo de @alice no LeakFanHub",
+    nl: "Video van @alice op LeakFanHub",
+  };
+  for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"] as const) {
+    const context = { site: "https://leakfanhub.com", canonicalPath: `/${locale}/alice/98123`, locale };
+    const fallback = buildMediaPagePresentation({ ...baseMedia, title: "", description: "" }, context);
+    assert.ok(fallback.description.startsWith(expected[locale]), locale);
+    assert.ok(fallback.name.includes("alice") && fallback.name.endsWith("#98123"), locale);
+    assert.equal(fallback.metadata.openGraph.locale?.slice(0, 2), locale);
+    assert.equal(fallback.metadata.openGraph.alternateLocale?.length, 6);
+    const authored = buildMediaPagePresentation(baseMedia, context);
+    assert.equal(authored.h1, "A real launch title", locale);
+    assert.equal(authored.description, "Behind the scenes from the launch.", locale);
+    assert.equal(authored.metadata.title.absolute, "A real launch title — LeakFanHub", locale);
+    const literalTitle = "Original {id} $& title";
+    const literal = buildMediaPagePresentation({ ...baseMedia, title: literalTitle, description: "" }, context);
+    assert.ok(literal.description.includes(literalTitle), "template tokens in source text must remain literal");
+  }
+});
+
 test("description is plain factual text and remains within Google video limits", async () => {
   const { buildMediaSeo } = await loadMediaSeo();
   const seo = buildMediaSeo(
@@ -113,6 +141,45 @@ test("video structured data includes a valid upload date and direct content URL"
     },
   );
   assert.equal("embedUrl" in (seo.structuredData ?? {}), false);
+});
+
+test("video metadata uses an existing image preview instead of an MP4 image_url", async () => {
+  const { buildMediaPagePresentation } = await loadMediaSeo();
+  const presentation = buildMediaPagePresentation({
+    ...baseMedia,
+    imageUrl: "/media/creators/alice/clip.MP4?download=1#t=0",
+    previewUrl: "/media/creators/alice/preview.webp",
+  }, { site: "https://leakfanhub.com", canonicalPath: "/alice/98123" });
+
+  assert.equal(presentation.thumbnailUrl, "https://leakfanhub.com/media/creators/alice/preview.webp");
+  assert.equal(presentation.mediaLd?.thumbnailUrl, presentation.thumbnailUrl);
+  assert.deepEqual(presentation.metadata.openGraph.images, [{ url: presentation.thumbnailUrl }]);
+  assert.deepEqual(presentation.metadata.twitter.images, [presentation.thumbnailUrl]);
+  assert.equal(presentation.contentUrl, "https://leakfanhub.com/media/creators/alice/clip.mp4");
+});
+
+test("a video without an image thumbnail keeps its page but omits invalid rich media", async () => {
+  const { buildMediaPagePresentation } = await loadMediaSeo();
+  const presentation = buildMediaPagePresentation({
+    ...baseMedia,
+    imageUrl: baseMedia.videoUrl,
+    previewUrl: "/media/creators/alice/preview.webm?poster=cover.jpg",
+  }, { site: "https://leakfanhub.com", canonicalPath: "/alice/98123" });
+
+  assert.equal(presentation.thumbnailUrl, undefined);
+  assert.equal(presentation.mediaLd, undefined);
+  assert.deepEqual(presentation.metadata.openGraph.images, []);
+  assert.equal(presentation.metadata.twitter.images, undefined);
+  assert.equal(presentation.metadata.robots.index, true);
+  assert.equal(presentation.h1, "A real launch title");
+  assert.equal(presentation.description, "Behind the scenes from the launch.");
+});
+
+test("mislabelled photo assets never produce an ImageObject pointing to a video", async () => {
+  const { buildMediaSeo } = await loadMediaSeo();
+  const seo = buildMediaSeo({ ...baseMedia, type: "photo", imageUrl: baseMedia.videoUrl }, "https://leakfanhub.com");
+  assert.equal(seo.contentUrl, undefined);
+  assert.equal(seo.structuredData, undefined);
 });
 
 test("unsafe asset URLs never become structured-data content URLs", async () => {

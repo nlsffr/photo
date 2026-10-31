@@ -29,6 +29,7 @@ function routes() {
       getModelCount: async () => 240,
     },
     "@/features/creator/CreatorCollectionPage": {},
+    "@/features/media/MediaDetailPage": {},
   };
   for (const name of ["AdSlot", "AuthForm", "ContactForm", "CreatorCard", "FeaturedCreators", "FollowingFeed", "ForYouGallery", "HomeFilters", "InfiniteGallery", "JsonLd", "LegalPage", "MediaImg", "ModelsGrid", "SavedGallery", "VerifiedBadge"]) {
     replacements[`@/components/${name}`] = { [name]: () => null };

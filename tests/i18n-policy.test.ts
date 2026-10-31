@@ -6,7 +6,7 @@ async function loadConfig() {
   return import("../src/lib/i18n/config.ts");
 }
 
-test("supports seven discovery locales while creator routes stay English and French", async () => {
+test("supports seven discovery and content locales while editorial routes stay English and French", async () => {
   const {
     CREATOR_LOCALES,
     DEFAULT_LOCALE,
@@ -18,7 +18,7 @@ test("supports seven discovery locales while creator routes stay English and Fre
   } = await loadConfig();
 
   assert.deepEqual(LOCALES, ["en", "fr", "es", "de", "it", "pt", "nl"]);
-  assert.deepEqual(CREATOR_LOCALES, ["en", "fr"]);
+  assert.deepEqual(CREATOR_LOCALES, ["en", "fr", "es", "de", "it", "pt", "nl"]);
   assert.deepEqual(DISCOVERY_ROUTE_PATHS, [
     "/",
     "/models",
@@ -32,7 +32,7 @@ test("supports seven discovery locales while creator routes stay English and Fre
   assert.equal(isLocale("es"), true);
   assert.equal(isLocale("pl"), false);
   assert.equal(isCreatorLocale("fr"), true);
-  assert.equal(isCreatorLocale("es"), false);
+  assert.equal(isCreatorLocale("es"), true);
 
   for (const locale of LOCALES) {
     for (const pathname of DISCOVERY_ROUTE_PATHS) {
@@ -53,7 +53,9 @@ test("supports seven discovery locales while creator routes stay English and Fre
     handle: "aria-lune-v3",
     collection: "overview",
   });
-  assert.equal(resolveLocalizedPage("es", "/aria-lune-v3"), null);
+  assert.deepEqual(resolveLocalizedPage("es", "/aria-lune-v3"), {
+    kind: "creator", handle: "aria-lune-v3", collection: "overview",
+  });
 });
 
 test("prefix and strip helpers preserve one equivalent public path", async () => {
@@ -77,13 +79,13 @@ test("prefix and strip helpers preserve one equivalent public path", async () =>
   assert.equal(switchLocalePath("/en/models", "fr"), "/fr/models");
   assert.equal(switchLocalePath("/en/models", "de"), "/de/models");
   assert.equal(switchLocalePath("/fr/about", "de"), "/en/about");
-  assert.equal(switchLocalePath("/fr/aria-lune-v3", "de"), "/en/aria-lune-v3");
+  assert.equal(switchLocalePath("/fr/aria-lune-v3", "de"), "/de/aria-lune-v3");
   assert.equal(switchLocalePath("/fr", "en"), "/en");
   assert.equal(
     localizedHref("fr", "/connexion?next=/abonnements#form"),
     "/fr/connexion?next=/abonnements#form",
   );
-  assert.equal(localizedHref("fr", "/creator-name"), "/creator-name");
+  assert.equal(localizedHref("fr", "/creator-name"), "/fr/creator-name");
   assert.equal(localizedHref("es", "/models"), "/es/models");
   assert.equal(localizedHref("es", "/about"), "/en/about");
 });
@@ -109,6 +111,11 @@ test("locale alternates are reciprocal and expose a neutral selector URL", async
   assert.deepEqual(localeAlternates("/aria-lune-v3/photos"), {
     en: "/en/aria-lune-v3/photos",
     fr: "/fr/aria-lune-v3/photos",
+    es: "/es/aria-lune-v3/photos",
+    de: "/de/aria-lune-v3/photos",
+    it: "/it/aria-lune-v3/photos",
+    pt: "/pt/aria-lune-v3/photos",
+    nl: "/nl/aria-lune-v3/photos",
     "x-default": "/aria-lune-v3/photos",
   });
 });

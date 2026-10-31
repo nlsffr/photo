@@ -4,12 +4,14 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 import type { PhotoView } from "@/lib/types";
 import { creatorHref, mediaHref } from "@/lib/types";
+import { localizedHref } from "@/lib/i18n/config";
 import { formatCount, formatDuration } from "@/lib/format";
 import { VerifiedBadge } from "./VerifiedBadge";
 import { useInteractions } from "./Interactions";
 import { MediaImg } from "./MediaImg";
 import { useLocale } from "./LocaleProvider";
 import { DISCOVERY_COPY } from "@/features/i18n/discovery-copy";
+import { mediaThumbnailUrl } from "@/lib/media-sources";
 
 const SIZES =
   "(max-width: 640px) 50vw, (max-width: 1024px) 33vw, (max-width: 1280px) 25vw, 20vw";
@@ -33,11 +35,12 @@ export function PhotoCard({
   const saved = ready && isSaved(photo.id);
   const likeCount = photo.likes + (liked ? 1 : 0);
 
-  const href = mediaHref(photo);
+  const href = localizedHref(locale, mediaHref(photo));
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [hovering, setHovering] = useState(false);
   const isVideo = photo.type === "video" && !!photo.videoUrl;
+  const thumbnail = mediaThumbnailUrl(photo);
 
   const onEnter = () => {
     if (!isVideo) return;
@@ -78,7 +81,8 @@ export function PhotoCard({
         aria-label={photo.title}
       >
         <MediaImg
-          src={photo.imageUrl}
+          src={thumbnail || ""}
+          fallbackSrc={mediaThumbnailUrl({ imageUrl: photo.previewUrl })}
           alt={photo.title}
           fill
           sizes={SIZES}
@@ -103,7 +107,7 @@ export function PhotoCard({
 
         {photo.isAi && (
           <span className="absolute bottom-12 left-2 z-[5] rounded bg-purple-600/90 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">
-            IA
+            {dictionary.aiFilters.ai}
           </span>
         )}
 
@@ -124,19 +128,19 @@ export function PhotoCard({
 
         {photo.type === "pack" && (
           <span className="absolute right-2 top-2 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-medium text-white">
-            Pack{photo.itemCount ? ` · ${photo.itemCount}` : ""}
+            {dictionary.mediaTypes.pack}{photo.itemCount ? ` · ${photo.itemCount}` : ""}
           </span>
         )}
       </Link>
 
       <Link
-        href={creatorHref(photo.creator.handle, photo.creator.urlVersion)}
+        href={localizedHref(locale, creatorHref(photo.creator.handle, photo.creator.urlVersion))}
         prefetch={false}
         className="absolute left-2 top-2 z-10 flex max-w-[calc(100%-0.75rem)] items-center gap-1.5"
       >
         <MediaImg
-          src={photo.creator.avatarUrl || photo.imageUrl}
-          fallbackSrc={photo.imageUrl}
+          src={mediaThumbnailUrl({ imageUrl: photo.creator.avatarUrl }) || thumbnail || ""}
+          fallbackSrc={thumbnail}
           alt={photo.creator.name}
           width={24}
           height={24}

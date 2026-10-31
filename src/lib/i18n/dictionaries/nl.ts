@@ -107,6 +107,10 @@ export const nlDictionary = {
       discover: "Ontdekken",
       trending: "Trending",
       recent: "Recent",
+      popular: "Populair",
+      liked: "Meest geliked",
+      longest: "Langste",
+      random: "Willekeurig",
       photos: "Foto's",
       videos: "Video's",
       all: "Alle filters",
@@ -131,6 +135,47 @@ export const nlDictionary = {
       media: "media-items",
     },
   },
+  mediaDetails: {
+    views: "Weergaven",
+    likes: "Likes",
+    score: "Score",
+    allMedia: "Alle media van @{handle} →",
+    report: "Melden / DMCA",
+    more: "Meer media van @{handle}",
+    viewProfile: "Profiel bekijken",
+    saved: "Opgeslagen",
+    kinds: {
+      photo: "foto",
+      video: "video",
+      pack: "galerij"
+    },
+    fallbackName: "{handle} {kind} #{id}",
+    fallbackDescription: "{kind} van @{handle} op LeakFanHub{titleDetail} (media {id})."
+  },
+  comments: {
+    title: "Reacties",
+    placeholder: "Schrijf een reactie…",
+    submit: "Versturen",
+    login: "Log in",
+    loginSuffix: "om te reageren.",
+    sendError: "Versturen mislukt.",
+    loading: "Reacties laden…",
+    loadError: "Reacties kunnen niet worden geladen.",
+    retry: "Opnieuw proberen",
+    empty: "Nog geen reacties.",
+    user: "Gebruiker"
+  },
+  video: {
+    errorTitle: "Video kan niet worden afgespeeld",
+    errorBody: "Groot bestand of trage verbinding — probeer het opnieuw.",
+    retry: "Opnieuw proberen",
+    loading: "Video laden…",
+    progress: "Voortgang",
+    speed: "Afspeelsnelheid",
+    pictureInPicture: "Beeld in beeld",
+    fullscreen: "Volledig scherm"
+  },
+  feed: { empty: "Geen inhoud", close: "Feed sluiten", play: "Afspelen", pause: "Pauzeren", unmute: "Geluid aan", mute: "Dempen" },
   models: {
     title: "Modellen",
     countSuffix: "creators op LeakFanHub",
@@ -163,6 +208,7 @@ export const nlDictionary = {
     all: "Alles",
     photos: "Foto's",
     videos: "Video's",
+    pack: "Pakket",
     packs: "Pakketten",
   },
   aiFilters: {
