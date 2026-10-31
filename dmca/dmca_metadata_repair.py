@@ -25,7 +25,12 @@ DEFAULT_ENV = Path("/opt/photo/.env.prod")
 
 
 def normalize_handle(handle: object) -> str:
-    return re.sub(r"[^a-z0-9._-]+", "", str(handle or "").strip().lower())
+    if not isinstance(handle, str):
+        raise ValueError("creator handle must be a string")
+    value = handle.strip().lower()
+    if not re.fullmatch(r"[a-z0-9._-]{1,100}", value):
+        raise ValueError("creator handle contains invalid characters or length")
+    return value
 
 
 def parse_public_id(source_id: object) -> tuple[str, int | None] | None:
@@ -37,7 +42,7 @@ def parse_public_id(source_id: object) -> tuple[str, int | None] | None:
 
 
 def collect_targets(
-    data: dict[str, Any],
+    data: object,
 ) -> tuple[
     set[str],
     set[tuple[str, str, int | None]],
@@ -45,39 +50,47 @@ def collect_targets(
 ]:
     """Return full-profile handles and explicitly requested numeric IDs.
 
-    The legacy manifest distinguishes a missing creator with no IDs (all of
-    its tracked media) from a partial creator (only the listed IDs).
+    A missing creator must explicitly supply photo_ids=[] to select all its
+    tracked media. Malformed or omitted lists must never expand that scope.
     """
+    sections = {"creators_manquantes", "medias_manquants_sur_creatrices_existantes"}
+    if not isinstance(data, dict) or not sections.intersection(data):
+        raise ValueError("manifest must be an object with a recognized target section")
+    for section in sections:
+        if section in data and not isinstance(data[section], dict):
+            raise ValueError(f"{section} must be an object")
     full_handles: set[str] = set()
     requested_versions: dict[tuple[str, str], set[int | None]] = {}
 
     def add_explicit(handle: str, raw_id: object) -> None:
+        if type(raw_id) not in (str, int):
+            raise ValueError("media ID must be a string or integer")
         public_id = parse_public_id(raw_id)
-        if not public_id:
-            return
+        if not public_id or not 0 < int(public_id[0]) < 2**63:
+            raise ValueError("media ID must contain a positive BIGINT source ID")
         source_id, version = public_id
+        if version is not None and version >= 2**31:
+            raise ValueError("media URL version exceeds the INT range")
         requested_versions.setdefault((handle, source_id), set()).add(version)
 
     missing = data.get("creators_manquantes", {})
-    if isinstance(missing, dict):
-        for raw_handle, details in missing.items():
-            handle = normalize_handle(raw_handle)
-            if not handle:
-                continue
-            photo_ids = details.get("photo_ids", []) if isinstance(details, dict) else []
-            if not photo_ids:
-                full_handles.add(handle)
-            for raw_id in photo_ids or []:
-                add_explicit(handle, raw_id)
+    for raw_handle, details in missing.items():
+        handle = normalize_handle(raw_handle)
+        if not isinstance(details, dict) or not isinstance(details.get("photo_ids"), list):
+            raise ValueError("missing creator must provide a photo_ids list")
+        photo_ids = details["photo_ids"]
+        if not photo_ids:
+            full_handles.add(handle)
+        for raw_id in photo_ids:
+            add_explicit(handle, raw_id)
 
     partial = data.get("medias_manquants_sur_creatrices_existantes", {})
-    if isinstance(partial, dict):
-        for raw_handle, photo_ids in partial.items():
-            handle = normalize_handle(raw_handle)
-            if not handle:
-                continue
-            for raw_id in photo_ids or []:
-                add_explicit(handle, raw_id)
+    for raw_handle, photo_ids in partial.items():
+        handle = normalize_handle(raw_handle)
+        if not isinstance(photo_ids, list):
+            raise ValueError("partial creator must provide a media ID list")
+        for raw_id in photo_ids:
+            add_explicit(handle, raw_id)
 
     explicit: set[tuple[str, str, int | None]] = set()
     conflicts: dict[tuple[str, str], tuple[int, ...]] = {}
@@ -125,8 +138,9 @@ class ManifestRepair:
             SELECT b.source_id, b.creator_handle, b.photo_id,
                    c.handle AS current_creator_handle,
                    p.source_id AS current_source_id,
-                   COALESCE(p.url_version, 1) AS url_version,
-                   p.removed_from_index_at, c.removed_from_index_at
+                   p.url_version,
+                   p.removed_from_index_at, c.removed_from_index_at,
+                   p.is_hidden, c.is_hidden
             FROM bot_ingested b
             JOIN photos p ON p.id=b.photo_id
             JOIN creators c ON c.id=p.creator_id
@@ -148,18 +162,23 @@ class ManifestRepair:
             url_version,
             photo_removed,
             creator_removed,
+            photo_hidden,
+            creator_hidden,
         ) = row
         if mapped_handle != expected_handle or current_handle != expected_handle:
             return "creator_mismatch"
-        if photo_removed is not None or creator_removed is not None:
+        if photo_removed is not None or creator_removed is not None or photo_hidden or creator_hidden:
             return "not_indexable"
         desired_source_id = str(mapped_source_id)
+        expected_source_id = current_source_id
         current_source_id = str(current_source_id or "")
         embedded_current = parse_public_id(current_source_id)
         # A manifest suffix can be stale. Only a suffix currently embedded in
         # photos.source_id is a defect to normalize into the version column.
         desired_version = int(url_version or 1)
         if embedded_current and embedded_current[0] == desired_source_id:
+            if embedded_current[1] is not None and embedded_current[1] < desired_version:
+                return "version_conflict"
             desired_version = embedded_current[1] or desired_version
 
         if current_source_id == desired_source_id and int(url_version or 1) == desired_version:
@@ -169,12 +188,23 @@ class ManifestRepair:
 
         self.cursor.execute(
             """
-            UPDATE photos SET source_id=%s, url_version=%s
-            WHERE id=%s
+            UPDATE photos p
+            JOIN creators c ON c.id=p.creator_id
+            JOIN bot_ingested b ON b.photo_id=p.id
+            SET p.source_id=%s, p.url_version=%s
+            WHERE p.id=%s AND b.source_id=%s
+              AND BINARY b.creator_handle=BINARY %s
+              AND BINARY c.handle=BINARY %s
+              AND (BINARY p.source_id <=> BINARY %s)
+              AND (p.url_version <=> %s)
+              AND p.is_hidden=0 AND c.is_hidden=0
+              AND p.removed_from_index_at IS NULL
+              AND c.removed_from_index_at IS NULL
             """,
-            (desired_source_id, desired_version, photo_id),
+            (desired_source_id, desired_version, photo_id, mapped_source_id,
+             mapped_handle, current_handle, expected_source_id, url_version),
         )
-        return "updated"
+        return "updated" if self.cursor.rowcount == 1 else "concurrent_change"
 
     def run(
         self,
@@ -214,6 +244,7 @@ def result_exit_code(result: dict[str, int] | Counter[str]) -> int:
         "not_indexable",
         "invalid_source_id",
         "version_conflict",
+        "concurrent_change",
     )
     return 2 if any(result.get(name, 0) for name in degraded) else 0
 
