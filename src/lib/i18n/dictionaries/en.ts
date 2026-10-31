@@ -2,8 +2,8 @@ export const enDictionary = {
   creator: {
     collections: {
       overview: {
-        title: "Photos and videos by {name}",
-        description: "Browse public photos and videos by {name}."
+        title: "{name} OnlyFans Leaks - LeakFanHub",
+        description: "Browse leaked OnlyFans photos and videos by {name}. Newest first. Free streaming, no signup on LeakFanHub."
       },
       photos: {
         title: "Photos by {name}",
@@ -259,7 +259,7 @@ export const enDictionary = {
     },
   },
   pages: {
-    home: { meta: { title: "Latest creator photos and videos", description: "Discover creator photos and videos, popular models and fresh media updated every day. Adults only." } },
+    home: { meta: { title: "Latest OnlyFans Leaks - LeakFanHub", description: "18,000,000+ leaked OnlyFans photos and videos on LeakFanHub, newest of the last hour first. Free streaming, no signup, new posts added every minute." } },
     models: { meta: { title: "Models & creators", description: "Browse all creators on LeakFanHub, sorted by followers or views." } },
     trending: { meta: { title: "Trending media", description: "Trending photos and videos ranked by engagement and updated continuously." } },
     mostLiked: { meta: { title: "Most liked", description: "The most liked photos and videos on LeakFanHub." } },
