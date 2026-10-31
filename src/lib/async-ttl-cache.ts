@@ -13,6 +13,38 @@ export function createAsyncTtlCache<T>(
   return () => loadByKey("singleton");
 }
 
+/** Keep a valid index available while its replacement is built. */
+export function createAsyncTtlCacheWithStale<T>(
+  loader: () => Promise<T>,
+  ttlMs: number,
+  now: () => number = Date.now,
+): () => Promise<T> {
+  let cached: { value: T; expiresAt: number } | undefined;
+  let inFlight: Promise<T> | undefined;
+  let retryAfter = 0;
+
+  function refresh(): Promise<T> {
+    if (inFlight) return inFlight;
+    inFlight = Promise.resolve().then(loader).then((value) => {
+      cached = { value, expiresAt: now() + Math.max(0, ttlMs) };
+      retryAfter = 0;
+      return value;
+    }).catch((error: unknown) => {
+      retryAfter = now() + 5_000;
+      throw error;
+    }).finally(() => { inFlight = undefined; });
+    return inFlight;
+  }
+
+  return () => {
+    if (!cached) return refresh();
+    if (now() >= cached.expiresAt && now() >= retryAfter) {
+      void refresh().catch(() => {});
+    }
+    return Promise.resolve(cached.value);
+  };
+}
+
 export function createAsyncTtlCacheMap<Key, Value>(
   loader: (key: Key) => Promise<Value>,
   ttlMs: number,

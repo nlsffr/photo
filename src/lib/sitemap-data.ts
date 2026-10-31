@@ -70,6 +70,9 @@ type SitemapBoundaryRow = RowDataPacket & {
   bucket_date: string;
   created_at: Date | string;
   id: string;
+  next_created_at: Date | string | null;
+  next_id: string | null;
+  last_created_at: Date | string;
 };
 
 function mapSitemapMedia(row: SitemapMediaRow): SitemapMedia {
@@ -140,17 +143,30 @@ export async function getSitemapMediaPartitions(): Promise<SitemapPartition[]> {
     [
       MEDIA_SITEMAP_CHUNK_SIZE,
       MEDIA_SITEMAP_CHUNK_SIZE,
-      MAX_MEDIA_SITEMAP_FILES,
+      MAX_MEDIA_SITEMAP_FILES + 1,
     ],
   );
+  if (rows.length > MAX_MEDIA_SITEMAP_FILES) {
+    throw new Error("sitemap_index_capacity_exceeded");
+  }
   const boundaries: SitemapBoundary[] = [];
   for (const row of rows) {
     const createdAt = toIso(row.created_at);
-    if (!createdAt) continue;
+    if (!createdAt) throw new Error("invalid_sitemap_boundary_date");
+    const nextCreatedAt = toIso(row.next_created_at);
+    if ((row.next_id == null) !== (nextCreatedAt == null)) {
+      throw new Error("invalid_sitemap_upper_boundary");
+    }
+    const lastCreatedAt = toIso(row.last_created_at);
+    if (!nextCreatedAt && !lastCreatedAt) throw new Error("invalid_sitemap_last_boundary");
     boundaries.push({
       date: row.bucket_date,
       createdAt,
       id: String(row.id),
+      upper: nextCreatedAt && row.next_id
+        ? { createdAt: nextCreatedAt, id: String(row.next_id) }
+        // created_at is TIMESTAMP(0); close the snapshot instead of opening the rest of the day.
+        : { createdAt: new Date(Date.parse(lastCreatedAt!) + 1).toISOString(), id: "0" },
     });
   }
   return buildSitemapPartitions(boundaries);
@@ -160,7 +176,6 @@ export async function getSitemapMediaPartitions(): Promise<SitemapPartition[]> {
 export async function getSitemapMediaPartition(
   date: string,
   cursor: string,
-  limit = MEDIA_SITEMAP_CHUNK_SIZE,
 ): Promise<SitemapMedia[]> {
   if (!isSitemapPartitionDate(date)) return [];
   const boundary = decodeSitemapCursor(cursor);
@@ -171,25 +186,21 @@ export async function getSitemapMediaPartition(
     new Date(Date.parse(dayStartIso) + 86_400_000).toISOString(),
   );
   const boundaryTimestamp = toMariaDbUtcTimestamp(boundary.createdAt);
-  const safeLimit = Math.min(
-    MEDIA_SITEMAP_CHUNK_SIZE,
-    Math.max(1, Math.floor(limit)),
-  );
+  const fixedInterval = boundary.upper !== undefined;
+  // Intermediate inserts must not evict old rows from a cached interval.
+  const safeLimit = fixedInterval ? 50_001 : MEDIA_SITEMAP_CHUNK_SIZE;
   const connection = await requireDbPool().getConnection();
   try {
     await connection.query("START TRANSACTION READ ONLY");
-    const [upperRows] = await connection.query<SitemapBoundaryRow[]>(
-      SITEMAP_NEXT_BOUNDARY_SQL,
-      [
-        dayStart,
-        nextDay,
-        boundaryTimestamp,
-        boundaryTimestamp,
-        boundary.id,
-        MEDIA_SITEMAP_CHUNK_SIZE - 1,
-      ],
-    );
-    const upper = upperRows[0];
+    let upper = boundary.upper;
+    if (!fixedInterval) {
+      const [upperRows] = await connection.query<SitemapBoundaryRow[]>(
+        SITEMAP_NEXT_BOUNDARY_SQL,
+        [dayStart, nextDay, boundaryTimestamp, boundaryTimestamp, boundary.id, MEDIA_SITEMAP_CHUNK_SIZE - 1],
+      );
+      const row = upperRows[0];
+      upper = row ? { createdAt: toIso(row.created_at) ?? "", id: String(row.id) } : null;
+    }
     const parameters: Array<string | number> = [
       dayStart,
       nextDay,
@@ -199,7 +210,7 @@ export async function getSitemapMediaPartition(
     ];
     if (upper) {
       const upperTimestamp = toMariaDbUtcTimestamp(
-        toIso(upper.created_at) ?? "",
+        upper.createdAt,
       );
       parameters.push(upperTimestamp, upperTimestamp, String(upper.id));
     }
@@ -208,6 +219,9 @@ export async function getSitemapMediaPartition(
       sitemapPartitionMediaSql(Boolean(upper)),
       parameters,
     );
+    if (fixedInterval && rows.length > 50_000) {
+      throw new Error("sitemap_partition_capacity_exceeded");
+    }
     await connection.commit();
     return rows.map(mapSitemapMedia);
   } catch (error) {

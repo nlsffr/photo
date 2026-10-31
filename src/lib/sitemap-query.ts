@@ -20,10 +20,11 @@ export const SITEMAP_MEDIA_SELECT = `
 `;
 
 /**
- * Rank physical media rows first. Removal flags only decide whether a fixed
- * partition is published; they never move the partition's keyset boundary.
+ * Rank the physical catalogue once. Retain every next boundary before hiding
+ * empty partitions, so exclusions cannot move a published interval's endpoint.
  */
-export const SITEMAP_PARTITION_BOUNDARIES_SQL = `WITH ranked AS (
+export const SITEMAP_PARTITION_BOUNDARIES_SQL = `SET STATEMENT max_statement_time=20 FOR
+WITH ranked AS (
   SELECT DATE_FORMAT(p.created_at, '%Y-%m-%d') AS bucket_date,
          p.created_at,
          p.id,
@@ -36,25 +37,32 @@ export const SITEMAP_PARTITION_BOUNDARIES_SQL = `WITH ranked AS (
   STRAIGHT_JOIN creators c ON c.id = p.creator_id
 ), chunked AS (
   SELECT bucket_date,
-         created_at,
-         id,
-         is_indexable,
-         partition_row_num,
-         FLOOR((partition_row_num - 1) / ?) AS partition_number
+         FLOOR((partition_row_num - 1) / ?) AS partition_number,
+         MIN(created_at) AS created_at,
+         MAX(created_at) AS last_created_at,
+         MAX(CASE WHEN MOD(partition_row_num - 1, ?) = 0 THEN id END) AS id,
+         MAX(is_indexable) AS has_indexable
   FROM ranked
-), active_partitions AS (
-  SELECT bucket_date, partition_number
-  FROM chunked
   GROUP BY bucket_date, partition_number
-  HAVING SUM(is_indexable) > 0
+), bounded AS (
+  SELECT bucket_date,
+         partition_number,
+         created_at,
+         last_created_at,
+         id,
+         has_indexable,
+         LEAD(created_at) OVER (
+           PARTITION BY bucket_date ORDER BY partition_number
+         ) AS next_created_at,
+         LEAD(id) OVER (
+           PARTITION BY bucket_date ORDER BY partition_number
+         ) AS next_id
+  FROM chunked
 )
-SELECT media.bucket_date, media.created_at, media.id
-FROM chunked media
-STRAIGHT_JOIN active_partitions active
-  ON active.bucket_date = media.bucket_date
- AND active.partition_number = media.partition_number
-WHERE media.partition_row_num = active.partition_number * ? + 1
-ORDER BY media.bucket_date DESC, media.partition_row_num ASC
+SELECT bucket_date, created_at, id, last_created_at, next_created_at, next_id
+FROM bounded
+WHERE has_indexable > 0
+ORDER BY bucket_date DESC, partition_number ASC
 LIMIT ?`;
 
 /** Locate the next fixed physical-row boundary inside the same UTC day. */

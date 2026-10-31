@@ -1,4 +1,4 @@
-import { createAsyncTtlCache } from "@/lib/async-ttl-cache";
+import { createAsyncTtlCacheWithStale } from "@/lib/async-ttl-cache";
 import { creatorSitemapPartitionLocations } from "@/lib/creator-sitemap-partitions";
 import { getSitemapMediaPartitions } from "@/lib/sitemap-data";
 import { renderSitemapIndex } from "@/lib/sitemap-xml";
@@ -12,8 +12,11 @@ const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").repl
   "",
 );
 
-const loadSitemapIndex = createAsyncTtlCache(async () => {
-  const partitions = await getSitemapMediaPartitions();
+const loadSitemapIndex = createAsyncTtlCacheWithStale(async () => {
+  const partitions = await getSitemapMediaPartitions().catch((error: unknown) => {
+    console.error("[sitemap-index] refresh failed", (error as { code?: string })?.code ?? "unknown");
+    throw error;
+  });
   const locations = [
     `${SITE}/sitemaps/static`,
     `${SITE}/sitemaps/popular`,

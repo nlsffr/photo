@@ -28,10 +28,12 @@ export async function GET(
   try {
     const items = await getSitemapMediaPartition(date, cursor);
     if (items.length === 0) return new Response("Not found\n", { status: 404 });
+    const body = renderMediaSitemap(items.map((photo) => toMediaSitemapEntry(photo, SITE)));
+    if (Buffer.byteLength(body, "utf8") > 50 * 1024 * 1024) {
+      throw new Error("sitemap_size_exceeded");
+    }
     return new Response(
-      renderMediaSitemap(
-        items.map((photo) => toMediaSitemapEntry(photo, SITE)),
-      ),
+      body,
       {
         headers: {
           "Content-Type": "application/xml; charset=utf-8",
