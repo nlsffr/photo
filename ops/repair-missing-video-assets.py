@@ -213,6 +213,7 @@ class Repair:
         with supervisor.source_environment(self.env):
             self.source = adapter.load_source(self.config['source_path'])
         self.bot = self.source.MegaBot.__new__(self.source.MegaBot)
+        self.direct_cdn = os.environ.get('MEDIA_REPAIR_DIRECT_CDN') == '1'
         self.bot.session = self.source.requests.Session(); self.bot.session.trust_env = False
         self.bot.session.headers.update({'User-Agent':'Mozilla/5.0','Accept':'application/json, text/plain, */*','Referer':'https://leakgallery.com/'})
         self.s3 = boto3.client('s3', endpoint_url=self.env['S3_ENDPOINT'], aws_access_key_id=self.env['S3_ACCESS_KEY'],
@@ -256,7 +257,11 @@ class Repair:
     def request(self, url, stream=False):
         url = source_url(url)
         for _ in range(4):
-            r = self.bot.session.get(url, stream=stream, timeout=(10,60), proxies=self.bot.get_proxy(), allow_redirects=False)
+            # The public CDN can be reached directly; keep API validation on its
+            # configured route. Never retry a CDN refusal through another route.
+            direct = stream and getattr(self, 'direct_cdn', False) and urlsplit(url).hostname == 'cdn.leakgallery.com'
+            r = self.bot.session.get(url, stream=stream, timeout=(10,60),
+                                     proxies=None if direct else self.bot.get_proxy(), allow_redirects=False)
             if r.status_code in (301,302,303,307,308):
                 location = r.headers.get('Location'); r.close()
                 url = source_url(urljoin(url, location or '')); continue

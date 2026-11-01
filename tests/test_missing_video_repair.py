@@ -5,7 +5,7 @@ from pathlib import Path
 import tempfile
 import types
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 MODULE = Path(__file__).resolve().parents[1]/'ops/repair-missing-video-assets.py'
 spec=importlib.util.spec_from_file_location('video_repair',MODULE)
@@ -148,5 +148,29 @@ class RepairTests(unittest.TestCase):
     def test_source_urls_reject_internal_and_unrelated_hosts(self):
         for url in ['http://cdn.leakgallery.com/x','https://127.0.0.1/x','https://leakgallery.com.attacker.test/x','https://name:password@cdn.leakgallery.com/x']:
             with self.assertRaises(repair.RepairError):repair.source_url(url)
+
+    def test_direct_transport_is_opt_in_and_limited_to_public_cdn_downloads(self):
+        response = Mock(status_code=200)
+        route = {'https': 'fixture-existing-route'}
+        self.runtime.bot = types.SimpleNamespace(session=Mock(), get_proxy=lambda: route)
+        self.runtime.bot.session.get.return_value = response
+        for enabled, url, stream, expected in [
+            (True, 'https://cdn.leakgallery.com/file.mp4', True, None),
+            (True, 'https://api.leakgallery.com/media/12', False, route),
+            (True, 'https://other.leakgallery.com/file.mp4', True, route),
+            (False, 'https://cdn.leakgallery.com/file.mp4', True, route),
+        ]:
+            self.runtime.direct_cdn = enabled
+            self.runtime.request(url, stream=stream)
+            self.assertEqual(self.runtime.bot.session.get.call_args.kwargs['proxies'], expected)
+
+    def test_cdn_refusal_does_not_retry_another_route(self):
+        response = Mock(status_code=403)
+        self.runtime.bot = types.SimpleNamespace(session=Mock(), get_proxy=Mock())
+        self.runtime.bot.session.get.return_value = response
+        self.runtime.direct_cdn = True
+        self.assertIs(self.runtime.request('https://cdn.leakgallery.com/file.mp4', stream=True), response)
+        self.assertEqual(self.runtime.bot.session.get.call_count, 1)
+        self.runtime.bot.get_proxy.assert_not_called()
 
 if __name__=='__main__':unittest.main()

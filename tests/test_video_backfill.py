@@ -120,6 +120,18 @@ class BackfillTests(unittest.TestCase):
         self.assertEqual(result['session'],{'already_present':1});self.assertFalse(runtime.uploads)
         self.assertEqual(result['jobs']['done'],1)
 
+    def test_progress_shows_claimed_job_before_download_finishes(self):
+        runtime = Runtime()
+        original = runtime.run
+        observed = []
+        def process(expected, apply=False):
+            progress = json.loads((self.root/'state/progress.json').read_text())
+            observed.append((progress['phase'], progress['jobs']['running']))
+            return original(expected, apply=apply)
+        runtime.run = process
+        self.run_plan(runtime)
+        self.assertEqual(observed, [('running', 1)])
+
     def test_excluded_notice_is_recorded_skipped_without_bypass(self):
         runtime=Runtime(actions={'a':repair.RepairError('notice_excluded')})
         result=self.run_plan(runtime,max_items=2)

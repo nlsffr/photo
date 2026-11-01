@@ -8,6 +8,7 @@ User=root
 Group=root
 UMask=0077
 Environment=PYTHONPATH=/opt/megabot-queue/current
+Environment=MEDIA_REPAIR_DIRECT_CDN=1
 ExecStart=/opt/megabot/venv/bin/python -B /opt/photo-media-repair/current/ops/backfill-missing-video-assets.py --run --plan /var/lib/video-repair/plan.json --state-dir /var/lib/video-repair/backfill --max-items 25 --delay 2
 TimeoutStartSec=1800
 TimeoutStopSec=30

@@ -312,6 +312,8 @@ def run_plan(plan, plan_digest, state_dir, repair, config, *, max_items=1, delay
                     break
                 expected = json.loads(job['expected'])
                 attempted += 1
+                atomic_json(root/'progress.json', {'phase': 'running', 'attempted': attempted,
+                            'session': dict(counters), 'jobs': state.summary()})
                 try:
                     with file_lock(locks/(hashlib.sha256(job['id'].encode()).hexdigest()+'.lock')):
                         if runtime is None:
