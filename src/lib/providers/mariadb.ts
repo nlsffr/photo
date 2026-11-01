@@ -23,6 +23,7 @@ import { toIso } from "../types";
 import { legacyTagPrefix, normalizeTagSlug } from "../seo-policy";
 import type { DataProvider } from "../data-provider";
 import { buildPhotoListPlan } from "./photo-query-plan";
+import { buildRelatedCandidatePlan } from "./related-query-plan";
 import { normalizeEngagement } from "../source-engagement";
 import {
   paginateHomeFeed,
@@ -541,40 +542,37 @@ export class MariaDBProvider implements DataProvider {
   }
 
   async getRelatedPhotos(photo: Photo, limit = 12): Promise<PhotoView[]> {
-    const tags = [...new Set(photo.tags.map(normalizeTagSlug).filter(Boolean))] as string[];
-    if (tags.length === 0) {
-      const page = await this.getPhotos({
-        creator: photo.creatorHandle,
-        sort: "popular",
-        limit,
-      });
-      return page.items.filter((p) => p.id !== photo.id).slice(0, limit);
+    const plan = buildRelatedCandidatePlan(photo.tags);
+    try {
+      if (!plan) {
+        const page = await this.getPhotos({
+          creator: photo.creatorHandle,
+          sort: "popular",
+          limit,
+        });
+        return page.items.filter((p) => p.id !== photo.id).slice(0, limit);
+      }
+      const [rows] = await this.pool.query<RowDataPacket[]>(
+        `SET STATEMENT max_statement_time=2 FOR
+         SELECT ${PHOTO_SELECT}
+         ${plan.fromSql}
+         WHERE p.id <> ?
+           AND ${activeMediaSql("p", "c")}
+         ORDER BY p.views_count + p.likes_count * 3 DESC, p.id ASC
+         LIMIT ?`,
+        [...plan.params, photo.id, limit],
+      );
+      const photoRows = rows as unknown as PhotoRow[];
+      const tagsMap = await this.tagsFor(photoRows.map((r) => r.id));
+      return photoRows.map((r) => rowToView(r, tagsMap.get(r.id) ?? []));
+    } catch (error) {
+      const failure = error as { code?: unknown; errno?: unknown } | null;
+      if (failure?.code !== "ER_STATEMENT_TIMEOUT" && failure?.errno !== 1969) throw error;
+      console.warn(JSON.stringify({
+        event: "database_query_timeout", query: "related_media", code: "ER_STATEMENT_TIMEOUT",
+      }));
+      return [];
     }
-    const legacyTags = tags
-      .map(legacyTagPrefix)
-      .filter((tag): tag is string => Boolean(tag));
-    const tagMatches = [
-      "SELECT photo_id FROM photo_tags FORCE INDEX (idx_photo_tags_tag_id) WHERE tag IN (?)",
-      ...legacyTags.map(
-        () =>
-          "SELECT photo_id FROM photo_tags FORCE INDEX (idx_photo_tags_tag_id) WHERE tag LIKE ?",
-      ),
-    ].join(" UNION ");
-    const [rows] = await this.pool.query<RowDataPacket[]>(
-      `SET STATEMENT max_statement_time=10 FOR
-       SELECT ${PHOTO_SELECT}
-       FROM (${tagMatches}) matched
-       JOIN photos p ON p.id = matched.photo_id
-       JOIN creators c ON c.id = p.creator_id
-       WHERE p.id <> ?
-         AND ${activeMediaSql("p", "c")}
-       ORDER BY p.views_count + p.likes_count * 3 DESC
-       LIMIT ?`,
-      [tags, ...legacyTags, photo.id, limit],
-    );
-    const photoRows = rows as unknown as PhotoRow[];
-    const tagsMap = await this.tagsFor(photoRows.map((r) => r.id));
-    return photoRows.map((r) => rowToView(r, tagsMap.get(r.id) ?? []));
   }
 
   async getCreatorCollectionContext(handle: string): Promise<{ creator: Creator; stats: CreatorCollectionStats } | undefined> {
