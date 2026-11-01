@@ -42,3 +42,15 @@ propres clients, et une panne provoque une pause commune aux files photo/vidéo.
 Les extensions de plan conservent les lignes attendues et résultats précédents.
 Un journal privé et deux sauvegardes exactes permettent de reprendre une migration
 interrompue ; ExecStartPre exécute cette récupération avant chaque nouveau lot.
+
+
+Une copie locale peut être réutilisée avec `MEDIA_REPAIR_LOCAL_CACHE` : nom exact
+issu de l'identifiant source et de la clé enregistrée, taille SQL positive égale,
+fichier régulier stable, copie bornée et validation média habituelle. L'API doit
+toujours confirmer identité, type et propriétaire ; les retraits restent contrôlés.
+Un cache rejeté entraîne le téléchargement normal. L'original local est conservé.
+
+La liste privée `--priority-ids` permet de traiter ces copies avant les autres
+travaux éligibles, sans réinitialiser les positions, résultats ou identités.
+Elle ne réactive jamais une tâche retirée ou exclue. Une fois ces tâches traitées,
+le coordinateur reprend automatiquement l'ordre ordinaire.

@@ -51,6 +51,13 @@ class WorkerTests(unittest.TestCase):
                           max_items=4,delay=kw.pop('delay',2),clock=self.clock,sleep=self.clock.sleep,
                           runtime_factory=lambda *_:Runtime(self.root/'calls.jsonl',actions),**kw)
     def events(self):return [json.loads(x) for x in (self.root/'calls.jsonl').read_text().splitlines()]
+    def test_priority_is_dispatched_first_without_skipping_the_rest(self):
+        r=self.run_plan(priority_ids=['d'])
+        starts=[e for e in self.events() if e['event']=='start']
+        self.assertEqual(starts[0]['id'],'d')
+        self.assertEqual(r['jobs']['done'],4)
+        self.assertEqual(sorted(e['id'] for e in starts),list('abcd'))
+
     def test_parallel_children_restore_each_job_once_and_resume(self):
         original=json.loads(json.dumps(self.plan));r=self.run_plan()
         self.assertEqual(r['jobs']['done'],4);self.assertEqual(r['session'],{'restored':4});self.assertEqual(self.plan,original)

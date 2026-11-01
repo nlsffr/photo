@@ -11,6 +11,7 @@ import argparse
 from contextlib import contextmanager
 import hashlib
 import html
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -23,6 +24,10 @@ from urllib.parse import unquote, urljoin, urlsplit
 
 MAX_BYTES = 2 * 1024**3
 MAX_IMAGE_BYTES = 25 * 1024**2
+
+_cache_spec = importlib.util.spec_from_file_location('repair_local_media_cache', Path(__file__).with_name('local-media-cache.py'))
+local_cache = importlib.util.module_from_spec(_cache_spec)
+_cache_spec.loader.exec_module(local_cache)
 
 
 class RepairError(RuntimeError):
@@ -303,6 +308,22 @@ class Repair:
         with self.request(url, stream=True) as r:
             return response_download(r, destination, MAX_IMAGE_BYTES if image else MAX_BYTES, image)
 
+    def download_video(self, row, key, url, destination):
+        # Called only after details() validates the live source ID/type/owner.
+        cached = local_cache.copy_media(row['source_id'], Path(key).suffix, destination,
+                                       expected_size=row.get('file_size'), limit=MAX_BYTES)
+        if cached is not None:
+            try:
+                cached.update(probe_video(destination))
+            except RepairError:
+                Path(destination).unlink(missing_ok=True)  # Our private copy only.
+            else:
+                self.log({'id':row['id'], 'status':'local_cache_used', 'kind':'video', **cached})
+                return cached
+        info = self.download(url, destination)
+        info.update(probe_video(destination))
+        return info
+
     def update_size(self, row, size):
         cur = self.db.cursor()
         try:
@@ -370,7 +391,7 @@ class Repair:
             video_info = None
             video_mime = None
             if video_head is None:
-                video_info = self.download(details['video'], video); video_info.update(probe_video(video))
+                video_info = self.download_video(row, video_key, details['video'], video)
             if poster_head is None:
                 # Prefer the existing source image; otherwise derive one local frame.
                 image = folder/'source.image'
@@ -381,7 +402,7 @@ class Repair:
                     make_poster(image, poster, poster_ext)
                 except Exception:
                     if not video.exists():
-                        self.download(details['video'], video); probe_video(video)
+                        self.download_video(row, video_key, details['video'], video)
                     make_poster(video, poster, poster_ext)
             # Re-check withdrawals and immutable URL identity after network work.
             self.candidate(expected)

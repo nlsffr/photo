@@ -156,9 +156,20 @@ class Repair(base.Repair):
         with tempfile.TemporaryDirectory(prefix='photo-repair-',dir=self.journal.parent) as folder:
             if original is None:
                 folder = Path(folder); downloaded = folder/'source.image'; extension = Path(key).suffix.lower(); image = folder/('full-image'+extension)
-                with self.request(source_url,stream=True) as response:
-                    base.response_download(response,downloaded,base.MAX_IMAGE_BYTES,image=True)
-                info = reencode_image(downloaded,image,extension)
+                cached = base.local_cache.copy_media(row['source_id'], Path(key).suffix, downloaded,
+                                                    expected_size=row.get('file_size'), limit=base.MAX_IMAGE_BYTES)
+                if cached is not None:
+                    try:
+                        info = reencode_image(downloaded,image,extension)
+                    except RepairError:
+                        downloaded.unlink(missing_ok=True); image.unlink(missing_ok=True)
+                        cached = None
+                if cached is None:
+                    with self.request(source_url,stream=True) as response:
+                        base.response_download(response,downloaded,base.MAX_IMAGE_BYTES,image=True)
+                    info = reencode_image(downloaded,image,extension)
+                else:
+                    self.log({'id':row['id'], 'status':'local_cache_used', 'kind':'photo', **cached})
                 self.candidate(expected)
                 written = base.put_missing(self.s3,self.bucket,key,image,MIMES[extension])
                 self.log({'id':row['id'],'status':'photo_uploaded' if written else 'photo_race_preserved','key':key,**info})

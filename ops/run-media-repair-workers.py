@@ -132,12 +132,17 @@ def stop_children(active):
 
 def run_pool(plan, digest, state_dir, repair, config, *, workers=3, max_items=100,
              delay=2, lock_dir=None, clock=time.time, sleep=time.sleep,
-             runtime_factory=None, source_backoff=None):
+             runtime_factory=None, source_backoff=None, priority_ids=None):
     if (type(workers) is not int or not 1 <= workers <= 4
             or type(max_items) is not int or not 1 <= max_items <= shared.MAX_SESSION_ITEMS
             or not math.isfinite(delay) or delay < 2):
         raise shared.BackfillError('run_limits_invalid')
     rows = shared.validate_plan(plan)
+    if priority_ids is None:
+        priority_ids = []
+    known = {row['id'] for row in rows}
+    if not isinstance(priority_ids, list) or any(not isinstance(value, str) or value not in known for value in priority_ids):
+        raise shared.BackfillError('priority_ids_invalid')
     root = shared.private_directory(state_dir)
     locks = shared.private_directory(lock_dir or root/'job-locks')
     source_pause = SourceBackoff(source_backoff)
@@ -152,6 +157,7 @@ def run_pool(plan, digest, state_dir, repair, config, *, workers=3, max_items=10
         with shared.file_lock(root/'driver.lock'):
             try:
                 state = shared.State(root, rows, digest)
+                state.prioritize(priority_ids)
 
                 def deadline():
                     return max(float(state.get_meta('global_not_before', '0')), source_pause.deadline())
@@ -260,12 +266,19 @@ def main(argv=None):
     parser.add_argument('--config', default='/etc/megabot-queue/config.json')
     parser.add_argument('--job-lock-dir', type=Path, default=Path('/var/lib/video-repair/job-locks'))
     parser.add_argument('--source-backoff', type=Path, default=Path('/var/lib/video-repair/backfill/source-backoff.json'))
+    parser.add_argument('--priority-ids', type=Path)
     parser.add_argument('--workers', type=int)
     parser.add_argument('--max-items', type=int, default=100)
     parser.add_argument('--delay', type=float, default=2)
     args = parser.parse_args(argv)
     try:
         plan, digest = shared.read_private_json(args.plan)
+        priority_ids = None
+        if args.priority_ids is not None:
+            priority, _ = shared.read_private_json(args.priority_ids)
+            if not isinstance(priority, dict) or set(priority) != {'ids'}:
+                raise shared.BackfillError('priority_ids_invalid')
+            priority_ids = priority['ids']
         if args.kind == 'photo':
             module = load_sibling('_media_worker_photos', 'backfill-missing-photos.py')
             if plan.get('kind') != 'photo-assets':
@@ -279,7 +292,7 @@ def main(argv=None):
         print(json.dumps(run_pool(plan, digest, args.state_dir, repair, args.config,
             workers=args.workers if args.workers is not None else (2 if args.kind == 'photo' else 3),
             max_items=args.max_items, delay=args.delay, lock_dir=args.job_lock_dir,
-            source_backoff=args.source_backoff)))
+            source_backoff=args.source_backoff, priority_ids=priority_ids)))
         return 0
     except Exception as error:
         reason = str(error) if isinstance(error, shared.BackfillError) else type(error).__name__

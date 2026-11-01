@@ -227,6 +227,7 @@ class State:
         os.chmod(path, 0o600)
         self.db.row_factory = sqlite3.Row
         self.db.execute('PRAGMA journal_mode=WAL'); self.db.execute('PRAGMA synchronous=FULL')
+        self.db.execute('CREATE TEMP TABLE repair_priority (id TEXT PRIMARY KEY)')
         self.db.execute('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY,value TEXT NOT NULL)')
         self.db.execute('''CREATE TABLE IF NOT EXISTS jobs (
             id TEXT PRIMARY KEY,expected TEXT NOT NULL,position INTEGER UNIQUE NOT NULL,
@@ -255,8 +256,12 @@ class State:
     def set_meta(self, key, value):
         self.db.execute('INSERT OR REPLACE INTO meta(key,value) VALUES(?,?)', (key, str(value)))
 
+    def prioritize(self, ids):
+        self.db.execute('DELETE FROM repair_priority')
+        self.db.executemany('INSERT OR IGNORE INTO repair_priority(id) VALUES(?)', [(value,) for value in ids])
+
     def next_job(self, now):
-        row = self.db.execute("SELECT * FROM jobs WHERE state IN ('pending','retry') AND available_at<=? ORDER BY CASE state WHEN 'pending' THEN 0 ELSE 1 END,position LIMIT 1", (now,)).fetchone()
+        row = self.db.execute("SELECT j.* FROM jobs j LEFT JOIN repair_priority p ON p.id=j.id WHERE j.state IN ('pending','retry') AND j.available_at<=? ORDER BY CASE WHEN p.id IS NULL THEN 1 ELSE 0 END,CASE j.state WHEN 'pending' THEN 0 ELSE 1 END,j.position LIMIT 1", (now,)).fetchone()
         if row:
             self.db.execute("UPDATE jobs SET state='running',attempts=attempts+1 WHERE id=?", (row['id'],))
         return row

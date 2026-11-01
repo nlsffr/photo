@@ -68,6 +68,18 @@ class BackfillTests(unittest.TestCase):
         return backfill.run_plan(self.plan,'digest',self.root/'state',repair,'config',
             clock=self.clock,sleep=self.clock.sleep,runtime_factory=lambda *args:runtime,**kw)
 
+    def test_priorities_choose_only_eligible_jobs_without_resetting_results(self):
+        root=backfill.private_directory(self.root/'priority-state')
+        state=backfill.State(root,[row('a'),row('b'),row('c')],'digest')
+        try:
+            state.prioritize(['c','b'])
+            state.finish('b','skipped',{'status':'skipped','reason':'notice_excluded'},0,0)
+            self.assertEqual(state.next_job(1000)['id'],'c')
+            state.finish('c','done',{'status':'restored'},0,0)
+            self.assertEqual(state.next_job(1000)['id'],'a')
+            self.assertEqual((state.summary()['done'],state.summary()['skipped']),(1,1))
+        finally:state.close()
+
     def test_plan_uses_primary_keys_and_checks_exact_registry_identity(self):
         db=Database([row('a'),row('b','456'),row('c',video=None)],
                     [{'source_id':'123','photo_id':'a','minio_key':'creators/owner/123.mp4'},
