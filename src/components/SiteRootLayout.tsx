@@ -1,5 +1,4 @@
 import { Suspense } from "react";
-import { AgeGate } from "@/components/AgeGate";
 import { AnalyticsBeacon } from "@/components/AnalyticsBeacon";
 import { AnonIdentityProvider } from "@/components/AnonIdentity";
 import { AppShell } from "@/components/AppShell";
@@ -34,7 +33,6 @@ export function SiteRootLayout({
                     <NavProgress />
                     <AnalyticsBeacon />
                   </Suspense>
-                  <AgeGate />
                   <AppShell>
                     {children}
                     <div className="mx-auto max-w-7xl px-4">
