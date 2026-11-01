@@ -84,6 +84,11 @@ def extend(plan_path,supplement_path,state_dir):
             merged={**old,'rows':merged_rows,'review':list(review.values()),'extended_at':time.time(),'previous_sha256':digest,
                     'summary':{'planned_rows':len(merged_rows),'review_rows':len(review),'added_rows':len(added)}}
             backup=shared.private_directory(root/'extensions'/str(time.time_ns()))
+            # Persist the directory entries that hold both recovery snapshots.
+            for directory in (backup.parent,root):
+                fd=os.open(directory,os.O_RDONLY|getattr(os,'O_DIRECTORY',0))
+                try:os.fsync(fd)
+                finally:os.close(fd)
             atomic_bytes(backup/'plan.before.json',plan_path.read_bytes())
             copy=sqlite3.connect(backup/'checkpoint.before.sqlite3');os.chmod(backup/'checkpoint.before.sqlite3',0o600)
             try:db.backup(copy)
