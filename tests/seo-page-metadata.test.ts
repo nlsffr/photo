@@ -92,6 +92,12 @@ test("all six bare and seven-language discovery routes apply saved text without 
         : route.generateMetadata!({ searchParams: Promise.resolve(search) });
       override = null;
       const baseline = await read();
+      if (key === "home") {
+        assert.equal((baseline.openGraph as { type?: string })?.type, "website");
+        assert.ok(baseline.openGraph?.url, "homepage keeps its Open Graph URL");
+        assert.equal(baseline.openGraph?.siteName, "LeakFanHub");
+        assert.equal((baseline.twitter as { card?: string })?.card, "summary_large_image");
+      }
       override = { ...saved, page: key, locale: locale ?? "en" };
       const result = await read();
       assertOverride(result);

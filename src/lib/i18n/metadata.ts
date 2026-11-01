@@ -87,7 +87,7 @@ export function buildLocalizedMetadata(
       url: alternates.canonical,
       siteName: "LeakFanHub",
     },
-    ...(pathname === "/" ? { twitter: { title: copy.title, description: copy.description } } : {}),
+    ...(pathname === "/" ? { twitter: { card: "summary_large_image" as const, title: copy.title, description: copy.description } } : {}),
     robots: { index: true, follow: true, "max-image-preview": "large" },
   };
 }

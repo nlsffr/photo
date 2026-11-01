@@ -29,8 +29,8 @@ const baseMetadata: Metadata = {
     absolute: homeCopy.title,
   },
   description: homeCopy.description,
-  openGraph: { title: homeCopy.title, description: homeCopy.description },
-  twitter: { title: homeCopy.title, description: homeCopy.description },
+  openGraph: { type: "website", locale: "en_US", url: SITE, siteName: "LeakFanHub", title: homeCopy.title, description: homeCopy.description },
+  twitter: { card: "summary_large_image", title: homeCopy.title, description: homeCopy.description },
   alternates: { canonical: "/" },
   robots: { index: true, follow: true, "max-image-preview": "large" },
 };
