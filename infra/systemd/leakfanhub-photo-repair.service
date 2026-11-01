@@ -1,0 +1,16 @@
+[Unit]
+Description=LeakFanHub - restauration bornee des images manquantes
+Wants=network-online.target
+After=network-online.target docker.service
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+Environment=PYTHONPATH=/opt/megabot-queue/current
+Environment=MEDIA_REPAIR_DIRECT_CDN=1
+ExecStart=/opt/megabot/venv/bin/python -B /opt/photo-image-repair/current/ops/backfill-missing-photos.py --run --plan /var/lib/photo-repair/plan.json --state-dir /var/lib/photo-repair/backfill --job-lock-dir /var/lib/video-repair/job-locks --max-items 25 --delay 2
+TimeoutStartSec=1800
+TimeoutStopSec=30
+KillMode=control-group
+Nice=10
