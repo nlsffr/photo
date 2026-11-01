@@ -1,0 +1,9 @@
+[Unit]
+Description=LeakFanHub - reprise des lots de restauration medias
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=30s
+AccuracySec=5s
+Unit=leakfanhub-video-repair.service
+[Install]
+WantedBy=timers.target
