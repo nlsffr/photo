@@ -20,7 +20,7 @@ Après intégration des changements CTR distants : 320 tests TypeScript réussis
 
 Dans Chrome, la page 2 de Modèles fonctionne et présente son canonical paginé. Le conteneur est healthy au dernier relevé, avec readiness MariaDB réussie, sans nouvelles erreurs d'authentification ni digest serveur observés dans les contrôles de reprise. La validation visuelle et interactive exhaustive reste à faire.
 
-Aucune migration, écriture SQL de réparation, exécution de réimport, modification massive des `noindex`, suppression de média ou rotation d'identifiants n'a été effectuée par ce lot.
+Aucune migration, écriture sur les lignes réelles du catalogue, modification massive des `noindex`, suppression de média ou rotation d'identifiants n'a été effectuée par ce lot. Les tests SQL du script d'URL décrits ci-dessous ont utilisé uniquement des tables temporaires de session.
 
 ## Incident de base et reprise réellement effectuée
 
@@ -42,13 +42,20 @@ Retour arrière conservé après la dernière reprise : `photo-app-rollback-db-2
 
 Le sitemap public annonce 851 fichiers enfants. Cinq fichiers XML échantillonnés ont répondu 200 ; aucune référence MP4 de miniature n'a été relevée dans les échantillons du sitemap populaire (1 939 références) et d'un sitemap médias (175 références). Ce contrôle n'est pas une validation exhaustive des 851 fichiers. `/sitemaps` redirige de nouveau en 308 vers l'adresse canonique ; `robots.txt` annonce le sitemap canonique.
 
-Dans Bing, le sitemap canonique a été soumis de nouveau le 1er novembre et son traitement est en cours. L'ancienne entrée en erreur, dont le dernier traitement affiché date du 27 octobre, a été conservée. Yandex avait annoncé un incident avec accès en lecture seule lors du relevé précédent ; son état n'a pas été revérifié après la reprise.
+Dans Bing, le sitemap canonique a été soumis de nouveau le 1er novembre et son traitement est en cours. L'ancienne entrée en erreur, dont le dernier traitement affiché date du 27 octobre, a été conservée. Yandex a été revérifié après la reprise : son outil Sitemap confirme toujours un mode lecture seule, avec ajout et retraitement désactivés ; les deux entrées restent dans la file affichée depuis le 9 octobre. Aucune soumission Yandex n'a donc été effectuée.
 
 Les erreurs 5xx peuvent ralentir l'exploration et, si elles persistent, entraîner une désindexation. Un retour HTTP 200 ne garantit pas l'indexation immédiate. L'effet réel de cet incident temporaire sur la couverture et les positions n'est pas encore mesuré. Référence : [traitement des codes HTTP par Google](https://developers.google.com/crawling/docs/troubleshooting/http-status-codes).
 
+## Nouveau script de changement d'URL
+
+Le script créé par l'autre intervention a été corrigé, versionné dans `9ace204` et installé à `/opt/photo/dmca/reimport_data.py` le 1er novembre à 00:48:59 UTC (01:48:59 Paris). L'original est conservé dans `/opt/photo/backups/reimport-data-20261101T004859Z`. Son lanceur `/opt/photo/dmca/run_reimport_data.py` réutilise la connexion de l'application active et son espace réseau, sans publier de port de base ni exposer les identifiants dans les arguments ou sorties. L'installation n'a redémarré aucun service.
+
+La simulation est le comportement par défaut ; `--apply` est nécessaire pour changer une version. Une URL de profil cible seulement la ligne du créateur ; une URL média cible seulement son média. Sept langues, versions publiques et identifiants numériques stockés comme chaînes sont pris en charge. Les anciennes demandes déjà avancées ne provoquent pas un second incrément ; les cibles privées, retirées, ambiguës ou non canoniques sont refusées. Le script ne réimporte pas de fichiers et ne modifie pas les exclusions de visibilité. Le sitemap dynamique annoncera les versions courantes après expiration de ses caches, sans manipulation manuelle du XML.
+
+Validation : les 47 tests Python du répertoire DMCA passent, dont les nouveaux tests du script, du lanceur et de l'isolation. Les 27 scénarios SQL ont réussi sur des tables `TEMPORARY` vérifiées, dans une connexion dédiée fermée sans commit. Deux simulations ont ensuite réussi avec le catalogue réel et le lanceur installé, pour un média et un profil : zéro UPDATE et versions inchangées. Aucun `--apply` n'a été lancé sur le catalogue. Voir [le mode d'emploi](REIMPORT-DATA.md).
+
 ## Travail restant
 
-- Le nouveau `reimport_data.py` demandé par l'utilisateur est en cours d'audit ; il n'a pas été exécuté. Ne pas confondre cette revue avec une reprise d'import réalisée.
 - Le bot Twitter n'a pas été retrouvé et n'a pas été relancé ; son identification reste ouverte.
-- Le traitement Bing et l'état Yandex doivent être contrôlés ultérieurement. Les mesures historiques de performances ne mesurent pas l'effet de ce déploiement.
+- Le résultat du traitement Bing et le rétablissement de l'outil Yandex restent à vérifier ultérieurement. Les mesures historiques de performances ne mesurent pas l'effet de ce déploiement.
 - Les autres défauts fonctionnels de l'audit global et les essais complets des médias, de charge et de restauration hors VPS ne sont pas certifiés par ce lot.
