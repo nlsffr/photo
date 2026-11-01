@@ -1,8 +1,8 @@
 # Cohérence recherche et langues — 1er novembre 2026
 
-État final vérifié : source `b95fe9b879b90c4a14e2523171c374bfad248bd4`, publiée sur `main` par avance rapide depuis `78ea229`. Les trois lots applicatifs sont `be04f51`, `f8285ad` et `7cb7ce4`. L'intégration conserve les changements CTR de l'autre intervention : contrôle opaque de 252 chaînes sur 252, sans relecture ni réécriture de leur contenu.
+État final publié et déployé : source `a135f9911866b94d355158ab7ac1c662b0c8b7a8`. La reprise initiale utilisait `b95fe9b879b90c4a14e2523171c374bfad248bd4`, publiée sur `main` par avance rapide depuis `78ea229`. Les trois lots applicatifs initiaux sont `be04f51`, `f8285ad` et `7cb7ce4`. Cette intégration conserve les changements CTR de l'autre intervention : contrôle opaque de 252 chaînes sur 252, sans relecture ni réécriture de leur contenu.
 
-L'image `photo-app:search-b95fe9b-20261101`, identifiant `sha256:6d8d7ae1d6c9d645953f7c5c2b15b4efa579a9106a7025d8c3dec9692d0d2ea0`, a été construite depuis `/opt/photo-release-search-b95fe9b-20261101`. Aucune construction n'a utilisé le checkout sale `/opt/photo`. Première reprise le 1er novembre à 00:36:04 UTC (01:36:04 à Paris), puis dernier remplacement applicatif à 00:40:08 UTC (01:40:08 à Paris), avec restauration des paramètres GeoIP antérieurs.
+L'image finale `photo-app:related-a135f99-20261101`, identifiant `sha256:cbb958245599dc8fb9aefac05c6fd0070e813c9e93473b22619a5542e711b967`, a été construite depuis `/opt/photo-release-related-a135f99-20261101` et déployée le 1er novembre à 01:02:06 UTC (02:02:06 à Paris). Aucune construction n'a utilisé le checkout sale `/opt/photo`. La première reprise avait eu lieu à 00:36:04 UTC (01:36:04 à Paris), puis la restauration des paramètres GeoIP antérieurs à 00:40:08 UTC (01:40:08 à Paris), avec l'image initiale `photo-app:search-b95fe9b-20261101`.
 
 ## Corrections applicatives
 
@@ -16,11 +16,29 @@ L'image `photo-app:search-b95fe9b-20261101`, identifiant `sha256:6d8d7ae1d6c9d64
 
 ## Validation et limites
 
-Après intégration des changements CTR distants : 320 tests TypeScript réussis, ESLint et TypeScript sans erreur, construction locale de production Webpack réussie. Dix tests supplémentaires des helpers de restauration de l'environnement ont réussi. La validation locale avec données de démonstration comprenait 21 contrôles HTTP ; elle a ensuite été complétée par deux séries de 27 contrôles avec la base réelle, sur le candidat puis en production. Ces séries couvrent les sondes, une API de catalogue non vide et les profils, médias et pages 2 de Modèles dans les sept langues : langue HTML correcte, canonical propre à la page et huit alternates. Il ne s'agit pas de 54 URL distinctes ni d'un parcours exhaustif du catalogue.
+Après intégration des changements CTR distants : 320 tests TypeScript réussis, puis 325 tests Web avec le correctif des recommandations ; ESLint, TypeScript et construction Docker de production réussis. Dix tests supplémentaires des helpers de restauration de l'environnement ont réussi. La validation locale avec données de démonstration comprenait 21 contrôles HTTP ; la reprise initiale a ensuite passé 27 contrôles sur le candidat et 27 en production. La promotion finale a passé deux séries de 30 contrôles avec la base réelle, sur le candidat puis en production : sondes, API de catalogue non vide, profils, médias et pages 2 de Modèles dans les sept langues, profil précédemment lent, collection vidéo française et médias avec recommandations par tags. Langue HTML, canonical propre à la page et huit alternates sont vérifiés. Les séries répètent des contrôles ; ce n'est pas un parcours exhaustif du catalogue.
 
-Dans Chrome, la page 2 de Modèles fonctionne et présente son canonical paginé. Le conteneur est healthy au dernier relevé, avec readiness MariaDB réussie, sans nouvelles erreurs d'authentification ni digest serveur observés dans les contrôles de reprise. La validation visuelle et interactive exhaustive reste à faire.
+Dans Chrome, la page 2 de Modèles fonctionne et présente son canonical paginé. Le conteneur final est healthy, avec readiness MariaDB réussie. Les contrôles de promotion ont réussi ; la validation visuelle et interactive exhaustive reste à faire. Les dépassements SQL observés après la reprise initiale sont détaillés ci-dessous, distinctement de l'incident d'authentification.
 
-Aucune migration, écriture sur les lignes réelles du catalogue, modification massive des `noindex`, suppression de média ou rotation d'identifiants n'a été effectuée par ce lot. Les tests SQL du script d'URL décrits ci-dessous ont utilisé uniquement des tables temporaires de session.
+Aucune écriture sur les lignes réelles du catalogue, modification massive des `noindex`, suppression de média ou rotation d'identifiants n'a été effectuée par ce lot. Une migration de schéma additive a été appliquée : l'index secondaire 022 décrit ci-dessous. Les tests SQL du script d'URL ont utilisé uniquement des tables temporaires de session.
+
+## Dépassements SQL et correction mesurée
+
+Après la reprise initiale, les journaux ont révélé 14 erreurs de recommandations avec un budget SQL de 10 secondes et une erreur d'agrégat de profil avec un budget de 5 secondes. Le statut healthy ne détectait pas ces requêtes spécifiques. Le profil `/alexapearl` reproduisait le problème en 5 145 ms : HTTP 200, mais digest serveur dans la réponse. Un statut HTTP seul était donc insuffisant pour valider cette page.
+
+Les recommandations utilisent maintenant les six premiers tags distincts après normalisation, au plus 100 identifiants par correspondance exacte ou héritée, soit 1 200 candidats indexés maximum avant classement. Leur budget SQL est de deux secondes. Seul ce dépassement connu produit une liste de recommandations vide et un journal indiquant le type de requête, sans valeurs sensibles ; les erreurs inattendues continuent de remonter. Le classement choisit les meilleurs médias dans cette fenêtre bornée : sa composition n'est pas garantie identique au classement global antérieur.
+
+Mesures des mêmes trois médias avec tags, deux passages alternés chacun :
+
+| Essai de recommandations | Résultat des six requêtes |
+| --- | --- |
+| Requête antérieure, budget de reproduction de 2 s | 6 dépassements sur 6 |
+| Première borne à 500 candidats par correspondance | 1 dépassement sur 6 |
+| Borne finale à 100 candidats par correspondance | 6 réussites, 11 à 374 ms, 12 résultats par requête |
+
+La migration `022-creator-public-stats-index.sql` a été appliquée à 01:00:01 UTC : création de `idx_photos_creator_public_stats` en 23,259 secondes, avec `ALGORITHM=INPLACE`, `LOCK=NONE` et attente de verrou limitée à cinq secondes. L'index couvre les colonnes de visibilité et de compteurs de l'agrégat existant, sans changer son SQL ni ses filtres. `EXPLAIN` confirme `Using index`. Les deux mesures d'agrégat sont passées de deux dépassements à cinq secondes à 18 et 20 ms ; les six compteurs sont identiques. Le profil `/alexapearl` a ensuite répondu en 633 ms, HTTP 200 sans digest. Ces mesures ne constituent pas un test de charge général.
+
+L'index ajoute du stockage et du travail lors des mises à jour des compteurs. Il ne modifie aucune ligne du catalogue ; son retrait manuel réversible est documenté dans la migration. Les index de tri préexistants restent présents.
 
 ## Incident de base et reprise réellement effectuée
 
@@ -36,7 +54,7 @@ L'environnement applicatif et le montage GeoIP en lecture seule ont été restau
 
 Les fichiers `.env` et `.env.prod` sont conservés en mode `0600`. Le service applicatif Compose référence l'image nommée ci-dessus, le contexte de construction propre et une sonde `/api/readyz`. La résolution effective de l'environnement a été comparée exactement aux valeurs attendues ; les autres services Compose sont restés inchangés. Aucun redémarrage global de la pile ni changement des identifiants MariaDB n'a été nécessaire. Contrairement à l'ancienne sonde `/api/healthz`, la readiness vérifie l'accès réel à la base.
 
-Retour arrière conservé après la dernière reprise : `photo-app-rollback-db-20261101T003913Z`. Sauvegarde privée correspondante : `/opt/photo/backups/db-recovery-20261101T003913Z`. La première sauvegarde de l'état défaillant reste également disponible : `/opt/photo/backups/db-recovery-20261101T003453Z`. La présence de ces sauvegardes ne constitue pas une restauration complète hors VPS testée.
+La promotion finale conserve exactement les paramètres applicatifs restaurés ; la résolution effective de l'environnement et les autres services Compose ont été comparés sans changement. Retour arrière applicatif le plus récent : `photo-app-rollback-db-20261101T010120Z`. Sauvegarde privée correspondante : `/opt/photo/backups/db-recovery-20261101T010120Z`. Les sauvegardes de reprise `003913Z` et du premier état défaillant `003453Z` restent conservées. Le retour arrière du conteneur ne retire pas automatiquement l'index additif. La présence de ces sauvegardes ne constitue pas une restauration complète hors VPS testée.
 
 ## Moteurs et sitemaps après reprise
 
