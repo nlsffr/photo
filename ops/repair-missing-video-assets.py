@@ -138,7 +138,7 @@ def source_url(value):
 
 def response_download(response, destination, limit, image=False):
     if response.status_code != 200:
-        raise RepairError('download_http_failed')
+        raise RepairError('source_http_' + str(response.status_code))
     mime = response.headers.get('Content-Type', '').split(';', 1)[0].lower()
     allowed = mime.startswith('image/') if image else mime.startswith('video/')
     if not allowed and mime not in ('application/octet-stream', 'binary/octet-stream'):
@@ -242,7 +242,8 @@ class Repair:
             cur.execute('''SELECT p.id,p.source_id photo_source_id,p.file_size,p.url_version,p.video_url,p.image_url,p.preview_url,
                            p.is_hidden,p.removed_from_index_at,c.id creator_id,c.handle,c.is_hidden creator_hidden,c.removed_from_index_at creator_removed,
                            b.source_id,b.minio_key FROM photos p JOIN creators c ON c.id=p.creator_id
-                           JOIN bot_ingested b ON b.photo_id=p.id WHERE p.id=%s AND p.type='video' ''', (expected['id'],))
+                           JOIN bot_ingested b ON b.source_id=%s AND b.photo_id=p.id
+                           WHERE p.id=%s AND p.type='video' ''', (expected['source_id'], expected['id']))
             row = cur.fetchone(); validate_candidate(expected, row)
             for table, fields in [('dmca_notices','urls'),('dmca_mail_events','urls,targets')]:
                 cur.execute('SELECT '+fields+' FROM '+table)
@@ -265,7 +266,9 @@ class Repair:
     def details(self, row):
         with self.request(self.source.Config.BASE_URL+'/media/'+str(row['source_id'])) as r:
             if r.status_code != 200:
-                raise RepairError('source_unavailable')
+                if r.status_code in (401, 403, 404, 410):
+                    raise RepairError('source_unavailable')
+                raise RepairError('source_http_' + str(r.status_code))
             d = r.json()
         if (not isinstance(d, dict) or d.get('error') or d.get('errors')
                 or any(d.get(x) for x in ('removed','is_removed','is_hidden','removed_at'))
