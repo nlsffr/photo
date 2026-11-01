@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Restore only missing objects for an explicitly bounded, private video plan.
 
-Never rewrites public URLs, source IDs or versions; never overwrites an object.
+Preserves page URLs, source IDs and versions; never overwrites an object.
+Legacy video-as-thumbnail references are changed only after a real image exists.
 The existing source and credentials are loaded from the pinned queue config.
 """
 from __future__ import annotations
@@ -41,12 +42,26 @@ def object_key(url):
     return path[len('/media/'):]
 
 
+def legacy_poster_url(expected):
+    """The only permitted image URL transition, including crash recovery."""
+    if (not expected.get('video_url') or expected.get('image_url') != expected['video_url']
+            or expected.get('preview_url') is not None):
+        return None
+    object_key(expected['video_url'])
+    parsed = urlsplit(expected['video_url'])
+    return parsed._replace(path=parsed.path.rsplit('.', 1)[0] + '_thumb.webp').geturl()
+
+
 def validate_candidate(expected, actual):
     if not actual or actual['is_hidden'] or actual['creator_hidden'] or actual['removed_from_index_at'] or actual['creator_removed']:
         raise RepairError('excluded')
-    for field in ('id', 'video_url', 'image_url', 'preview_url', 'url_version', 'photo_source_id'):
+    for field in ('id', 'video_url', 'preview_url', 'url_version', 'photo_source_id', 'creator_id', 'handle'):
         if actual.get(field) != expected.get(field):
             raise RepairError('candidate_changed')
+    derived_poster = legacy_poster_url(expected)
+    if actual.get('image_url') != expected.get('image_url') and (
+            derived_poster is None or actual.get('image_url') != derived_poster):
+        raise RepairError('candidate_changed')
     expected_source = expected.get('source_id')
     if not expected_source or str(actual.get('source_id')) != str(expected_source):
         raise RepairError('registry_changed')
@@ -55,7 +70,7 @@ def validate_candidate(expected, actual):
         raise RepairError('registry_key_changed')
     if not re.search(r'\.(mp4|mov|webm|m4v)$', video, re.I):
         raise RepairError('invalid_video_key')
-    poster = object_key(actual['image_url'])
+    poster = object_key(derived_poster or actual['image_url'])
     if not re.search(r'\.(webp|png|jpe?g)$', poster, re.I):
         raise RepairError('invalid_poster_key')
     if video == poster:
@@ -276,6 +291,8 @@ class Repair:
                 raise RepairError('source_http_' + str(r.status_code))
             d = r.json()
         if (not isinstance(d, dict) or d.get('error') or d.get('errors')
+                or d.get('is_video') is not True
+                or str(d.get('id') or d.get('media_id') or '') != str(row['source_id'])
                 or any(d.get(x) for x in ('removed','is_removed','is_hidden','removed_at'))
                 or self.source.extract_handle(d).casefold() != row['handle'].casefold()):
             raise RepairError('source_excluded')
@@ -305,14 +322,45 @@ class Repair:
         finally:
             cur.close()
 
+    def update_poster(self, row, poster_url, size):
+        if row['image_url'] == poster_url and row['file_size'] == size:
+            return
+        cur = self.db.cursor()
+        try:
+            self.db.start_transaction()
+            cur.execute('''UPDATE photos p JOIN creators c ON c.id=p.creator_id
+                JOIN bot_ingested b ON b.source_id=%s AND b.photo_id=p.id SET p.image_url=%s,p.file_size=%s
+                WHERE p.id=%s AND p.type='video' AND p.is_hidden=0 AND p.removed_from_index_at IS NULL
+                AND c.is_hidden=0 AND c.removed_from_index_at IS NULL AND p.creator_id=%s AND c.handle=%s
+                AND p.video_url=%s AND p.image_url <=> %s AND p.preview_url <=> %s
+                AND p.url_version <=> %s AND p.source_id <=> %s AND p.file_size <=> %s
+                AND b.minio_key=%s''',
+                (row['source_id'],poster_url,size,row['id'],row['creator_id'],row['handle'],row['video_url'],
+                 row['image_url'],row['preview_url'],row['url_version'],row['photo_source_id'],row['file_size'],row['minio_key']))
+            if cur.rowcount != 1:
+                raise RepairError('metadata_changed')
+            self.db.commit()
+        except BaseException:
+            self.db.rollback(); raise
+        finally:
+            cur.close()
+
     def run(self, expected, apply=False):
         row = self.candidate(expected); video_key, poster_key = validate_candidate(expected, row)
+        derived_poster = legacy_poster_url(expected)
+        poster_metadata_change = derived_poster is not None and row['image_url'] != derived_poster
         video_head = head(self.s3,self.bucket,video_key); poster_head = head(self.s3,self.bucket,poster_key)
-        if video_head and poster_head:
+        if derived_poster and poster_head and (poster_head.get('ContentType','').split(';',1)[0].lower() != 'image/webp'
+                                               or poster_head.get('ContentLength',0) <= 0):
+            raise RepairError('verification_failed')
+        if derived_poster and video_head and video_head.get('ContentLength',0) <= 0:
+            raise RepairError('verification_failed')
+        if video_head and poster_head and not poster_metadata_change:
             return {'id':row['id'],'status':'already_present'}
         details = self.details(row)
         if not apply:
-            return {'id':row['id'],'status':'would_restore','video_missing':video_head is None,'poster_missing':poster_head is None}
+            return {'id':row['id'],'status':'would_restore','video_missing':video_head is None,'poster_missing':poster_head is None,
+                    'poster_metadata_change':poster_metadata_change}
         self.journal.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         backup = self.journal.parent/(row['id']+'-'+str(time.time_ns())+'.before.json')
         private_json(backup, row)
@@ -347,15 +395,21 @@ class Repair:
                 written = put_missing(self.s3,self.bucket,poster_key,poster,mime)
                 self.log({'id':row['id'],'status':'poster_uploaded' if written else 'poster_race_preserved','key':poster_key,
                           'bytes':poster.stat().st_size,'sha256':hashlib.sha256(poster.read_bytes()).hexdigest()})
-            actual = head(self.s3,self.bucket,video_key)
-            if not actual or not head(self.s3,self.bucket,poster_key):
+            actual = head(self.s3,self.bucket,video_key); actual_poster = head(self.s3,self.bucket,poster_key)
+            if (not actual or actual.get('ContentLength',0) <= 0 or not actual_poster
+                    or (derived_poster and (actual_poster.get('ContentType','').split(';',1)[0].lower() != 'image/webp'
+                                           or actual_poster.get('ContentLength',0) <= 0))):
                 raise RepairError('verification_failed')
             # A racing uploader's object is preserved; use its actual stored size.
-            size = actual['ContentLength']
-            if size != row['file_size']:
+            row = self.candidate(expected); size = actual['ContentLength']
+            if derived_poster:
+                self.update_poster(row,derived_poster,size)
+            elif size != row['file_size']:
                 self.update_size(row,size)
-        self.log({'id':row['id'],'status':'restored','bytes':size,'public_urls_unchanged':True})
-        return {'id':row['id'],'status':'restored','bytes':size,'public_urls_unchanged':True, **({'codec':video_info['codec'],'mime':video_mime} if video_info else {})}
+        identity = {'page_urls_unchanged':True,'public_urls_unchanged':not poster_metadata_change,
+                    'poster_reference_corrected':poster_metadata_change}
+        self.log({'id':row['id'],'status':'restored','bytes':size,**identity})
+        return {'id':row['id'],'status':'restored','bytes':size,**identity, **({'codec':video_info['codec'],'mime':video_mime} if video_info else {})}
 
     def close(self):
         self.bot.session.close(); self.db.close()

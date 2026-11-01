@@ -18,7 +18,7 @@ class Store:
     def __init__(self):self.objects={};self.puts=[]
     def head_object(self,Bucket,Key):
         if Key not in self.objects:raise StoreError(404)
-        return {'ContentLength':len(self.objects[Key])}
+        return {'ContentLength':len(self.objects[Key]),'ContentType':'image/webp' if Key.endswith('.webp') else 'video/mp4'}
     def put_object(self,**kwargs):
         self.puts.append({k:v for k,v in kwargs.items() if k!='Body'})
         assert kwargs['IfNoneMatch']=='*'
@@ -50,6 +50,108 @@ class RepairTests(unittest.TestCase):
         self.runtime.download=download
         def update(row,size):self.runtime.updates.append((copy.deepcopy(row),size));self.row['file_size']=size
         self.runtime.update_size=update
+        self.runtime.poster_updates=[]
+        def update_poster(row,url,size):
+            self.runtime.poster_updates.append((copy.deepcopy(row),url,size));self.row['image_url']=url;self.row['file_size']=size
+        self.runtime.update_poster=update_poster
+
+    def legacy(self):
+        self.row['image_url']=self.row['video_url']
+        return copy.deepcopy(self.row)
+
+    def test_legacy_video_thumbnail_derives_image_and_allows_only_exact_replay(self):
+        expected=self.legacy()
+        self.assertEqual(repair.validate_candidate(expected,self.row),('creators/person/12.mp4','creators/person/12_thumb.webp'))
+        self.row['image_url']='/media/creators/person/12_thumb.webp'
+        self.assertEqual(repair.validate_candidate(expected,self.row)[1],'creators/person/12_thumb.webp')
+        self.row['image_url']='/media/creators/person/other_thumb.webp'
+        with self.assertRaises(repair.RepairError):repair.validate_candidate(expected,self.row)
+        self.row=copy.deepcopy(expected);self.row['preview_url']='/media/creators/person/preview.webp'
+        with self.assertRaises(repair.RepairError):repair.validate_candidate(self.row,self.row)
+        absolute={**expected,'video_url':'https://leakfanhub.com/media/creators/person/12.mov',
+                  'image_url':'https://leakfanhub.com/media/creators/person/12.mov','minio_key':'creators/person/12.mov'}
+        self.assertEqual(repair.legacy_poster_url(absolute),'https://leakfanhub.com/media/creators/person/12_thumb.webp')
+
+    def test_legacy_existing_assets_repair_metadata_without_downloading(self):
+        expected=self.legacy();self.runtime.s3.objects={'creators/person/12.mp4':b'video','creators/person/12_thumb.webp':b'image'}
+        result=self.runtime.run(expected,True)
+        self.assertEqual(result['status'],'restored');self.assertEqual(self.runtime.downloads,[])
+        self.assertEqual(self.row['image_url'],'/media/creators/person/12_thumb.webp')
+        self.assertEqual(len(self.runtime.poster_updates),1)
+        for field in ('id','video_url','preview_url','source_id','photo_source_id','url_version'):
+            self.assertEqual(self.row[field],expected[field])
+        self.assertEqual(self.row['file_size'],5)
+
+    def test_legacy_dry_run_does_not_change_metadata_with_existing_assets(self):
+        expected=self.legacy();self.runtime.s3.objects={'creators/person/12.mp4':b'video','creators/person/12_thumb.webp':b'image'}
+        result=self.runtime.run(expected,False)
+        self.assertEqual(result['status'],'would_restore');self.assertTrue(result['poster_metadata_change'])
+        self.assertEqual(self.row,expected);self.assertEqual(self.runtime.poster_updates,[])
+
+    def test_legacy_upload_then_replay_preserves_video_and_page_identity(self):
+        expected=self.legacy();self.runtime.s3.objects['creators/person/12.mp4']=b'video'
+        def poster(input_path,output_path,extension):Path(output_path).write_bytes(b'RIFF0000WEBPfixture')
+        with patch.object(repair,'make_poster',side_effect=poster):result=self.runtime.run(expected,True)
+        self.assertEqual(result['status'],'restored');self.assertEqual(self.runtime.s3.objects['creators/person/12.mp4'],b'video')
+        self.assertEqual([p['Key'] for p in self.runtime.s3.puts],['creators/person/12_thumb.webp'])
+        self.assertEqual(self.runtime.run(expected,True)['status'],'already_present')
+        self.assertEqual(len(self.runtime.poster_updates),1)
+
+    def test_legacy_bad_existing_poster_is_not_published(self):
+        expected=self.legacy();self.runtime.s3.objects={'creators/person/12.mp4':b'video','creators/person/12_thumb.webp':b'bad'}
+        old=self.runtime.s3.head_object
+        def wrong(**kwargs):
+            result=old(**kwargs)
+            if kwargs['Key'].endswith('.webp'):result['ContentType']='video/mp4'
+            return result
+        self.runtime.s3.head_object=wrong
+        with self.assertRaises(repair.RepairError):self.runtime.run(expected,True)
+        self.assertEqual(self.runtime.poster_updates,[]);self.assertEqual(self.row,expected)
+
+    def test_legacy_withdrawal_after_upload_prevents_metadata_update(self):
+        expected=self.legacy();self.runtime.s3.objects['creators/person/12.mp4']=b'video';calls=[]
+        def candidate(expected):
+            calls.append(1)
+            if len(calls)>=4:raise repair.RepairError('notice_excluded')
+            return copy.deepcopy(self.row)
+        self.runtime.candidate=candidate
+        def poster(input_path,output_path,extension):Path(output_path).write_bytes(b'RIFF0000WEBPfixture')
+        with patch.object(repair,'make_poster',side_effect=poster):
+            with self.assertRaises(repair.RepairError):self.runtime.run(expected,True)
+        self.assertEqual(self.runtime.poster_updates,[]);self.assertEqual(self.row,expected)
+        self.assertEqual([p['Key'] for p in self.runtime.s3.puts],['creators/person/12_thumb.webp'])
+
+    def test_source_video_type_and_returned_id_must_be_exact(self):
+        details={'id':12,'is_video':True,'file_path':'file.mp4','thumbnail_path':'thumb.jpg'}
+        self.runtime.source=types.SimpleNamespace(Config=types.SimpleNamespace(BASE_URL='https://api.leakgallery.com'),
+            extract_handle=lambda d:d.get('handle','person'),cdn_url=lambda path:'https://cdn.leakgallery.com/'+path if path else '')
+        def request(url):
+            response=Mock(status_code=200);response.json.return_value=details
+            context=Mock();context.__enter__=Mock(return_value=response);context.__exit__=Mock(return_value=False)
+            return context
+        self.runtime.request=request
+        self.assertIn('video',repair.Repair.details(self.runtime,self.row))
+        for update in [{'is_video':False},{'is_video':1},{'is_video':None},{'id':13},{'id':None},{'handle':'other'}]:
+            current={**details,**update};old=details;details=current
+            with self.assertRaises(repair.RepairError):repair.Repair.details(self.runtime,self.row)
+            details=old
+
+    def test_poster_metadata_sql_guards_original_identity_and_registry(self):
+        row=self.legacy();row['creator_id']='fixture-creator';cur=Mock(rowcount=1);db=Mock();db.cursor.return_value=cur
+        self.runtime.db=db
+        repair.Repair.update_poster(self.runtime,row,'/media/creators/person/12_thumb.webp',5)
+        sql,params=cur.execute.call_args.args
+        self.assertIn('SET p.image_url=%s,p.file_size=%s',sql)
+        for guard in ["p.type='video'",'p.video_url=%s','p.image_url <=> %s','p.preview_url <=> %s','p.url_version <=> %s','p.source_id <=> %s','p.file_size <=> %s','b.source_id=%s AND b.photo_id=p.id','b.minio_key=%s']:
+            self.assertIn(guard,sql)
+        self.assertIn(row['image_url'],params);db.commit.assert_called_once();db.rollback.assert_not_called()
+
+    def test_poster_metadata_concurrent_change_rolls_back(self):
+        row=self.legacy();row['creator_id']='fixture-creator';cur=Mock(rowcount=0);db=Mock();db.cursor.return_value=cur
+        self.runtime.db=db
+        with self.assertRaisesRegex(repair.RepairError,'metadata_changed'):
+            repair.Repair.update_poster(self.runtime,row,'/media/creators/person/12_thumb.webp',5)
+        db.rollback.assert_called_once();db.commit.assert_not_called()
 
     def test_dry_run_makes_no_upload_download_or_metadata_change(self):
         before=copy.deepcopy(self.row)
