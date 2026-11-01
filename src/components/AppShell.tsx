@@ -341,7 +341,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </p>
             <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm text-[var(--color-ink-muted)]">
               <Link href={localizedHref(locale, "/conditions")} prefetch={false} className="hover:text-[var(--color-ink)]">{t("shell.navigation.terms")}</Link>
-              <button type="button" onClick={() => window.dispatchEvent(new Event(OPEN_CHOICES))} className="hover:text-[var(--color-ink)]">{cookieCopy[locale].manage}</button>
+              <button type="button" onClick={(event) => { event.currentTarget.focus({ preventScroll: true }); window.dispatchEvent(new Event(OPEN_CHOICES)); }} className="hover:text-[var(--color-ink)]">{cookieCopy[locale].manage}</button>
               <Link href={localizedHref(locale, "/confidentialite")} prefetch={false} className="hover:text-[var(--color-ink)]">{t("shell.navigation.privacy")}</Link>
               <Link href={localizedHref(locale, "/trust-and-safety")} prefetch={false} className="hover:text-[var(--color-ink)]">{t("shell.navigation.trust")}</Link>
               <Link href={localizedHref(locale, "/dmca")} prefetch={false} className="hover:text-[var(--color-ink)]">{t("shell.navigation.dmca")}</Link>
