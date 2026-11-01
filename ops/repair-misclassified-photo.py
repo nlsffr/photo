@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Restore a missing original photo misclassified as video, preserving public IDs.
+"""Restore an ordinary or misclassified original photo, preserving public IDs.
 
 Dry-run by default. The private plan must pin the DB row and the source file_path
 observed during audit. Existing storage objects are never overwritten.
@@ -10,6 +10,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import tempfile
@@ -21,14 +22,17 @@ base = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(base)
 RepairError = base.RepairError
 MIMES = {'.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.png':'image/png', '.webp':'image/webp'}
-IDENTITY = ('id','creator_id','handle','type','photo_source_id','file_size','url_version','video_url','image_url','preview_url','minio_key')
+IDENTITY = ('id','creator_id','handle','photo_source_id','url_version','video_url','image_url','preview_url','minio_key')
 
 
 def validate_candidate(expected, actual):
     if not actual or actual.get('is_hidden') or actual.get('creator_hidden') or actual.get('removed_from_index_at') or actual.get('creator_removed'):
         raise RepairError('excluded')
-    if actual.get('type') != 'video' or actual.get('video_url') is not None:
-        raise RepairError('not_a_misclassified_photo')
+    if actual.get('type') not in ('photo', 'video') or actual.get('video_url') is not None:
+        raise RepairError('not_a_photo_candidate')
+    if (actual.get('type') != expected.get('type')
+            and not (expected.get('type') == 'video' and actual.get('type') == 'photo')):
+        raise RepairError('candidate_changed')
     try:
         uuid.UUID(actual['id'])
     except (ValueError, TypeError, KeyError):
@@ -36,8 +40,10 @@ def validate_candidate(expected, actual):
     for field in IDENTITY:
         if actual.get(field) != expected.get(field):
             raise RepairError('candidate_changed')
-    if (not actual.get('photo_source_id') or str(actual.get('source_id')) != str(actual['photo_source_id'])
-            or str(actual.get('source_id')) != str(expected.get('source_id'))):
+    source_id = actual.get('source_id')
+    if (not isinstance(source_id, (str, int)) or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', str(source_id))
+            or str(source_id) != str(expected.get('source_id'))
+            or (actual.get('photo_source_id') is not None and str(source_id) != str(actual['photo_source_id']))):
         raise RepairError('registry_changed')
     key = base.object_key(actual.get('image_url'))
     if key != actual.get('minio_key') or Path(key).suffix.lower() not in MIMES:
@@ -52,7 +58,7 @@ def validate_source(expected, row, details, source):
             or source.extract_handle(details).casefold() != row['handle'].casefold()):
         raise RepairError('source_not_matching_photo')
     sid = details.get('id') or details.get('media_id')
-    if sid is not None and str(sid) != str(row['source_id']):
+    if sid is None or str(sid) != str(row['source_id']):
         raise RepairError('source_id_changed')
     audited = expected.get('source_api', {}).get(str(row['source_id']), {})
     current_path = details.get('file_path') or details.get('url')
@@ -88,7 +94,9 @@ class Repair(base.Repair):
             cur.execute('''SELECT p.id,p.source_id photo_source_id,p.type,p.file_size,p.url_version,p.video_url,p.image_url,p.preview_url,
                 p.is_hidden,p.removed_from_index_at,c.id creator_id,c.handle,c.is_hidden creator_hidden,c.removed_from_index_at creator_removed,
                 b.source_id,b.minio_key FROM photos p JOIN creators c ON c.id=p.creator_id
-                JOIN bot_ingested b ON b.photo_id=p.id WHERE p.id=%s''', (expected['id'],))
+                JOIN bot_ingested b ON b.source_id=%s AND b.photo_id=p.id
+                WHERE p.id=%s AND p.type IN ('photo','video') AND p.video_url IS NULL''',
+                (expected['source_id'], expected['id']))
             row = cur.fetchone(); validate_candidate(expected, row)
             for table, fields in [('dmca_notices','urls'),('dmca_mail_events','urls,targets')]:
                 cur.execute('SELECT '+fields+' FROM '+table)
@@ -100,23 +108,27 @@ class Repair(base.Repair):
 
     def photo_source(self, expected, row):
         with self.request(self.source.Config.BASE_URL+'/media/'+str(row['source_id'])) as response:
-            if response.status_code != 200: raise RepairError('source_unavailable')
+            if response.status_code != 200:
+                if response.status_code in (401,403,404,410): raise RepairError('source_unavailable')
+                raise RepairError('source_http_' + str(response.status_code))
             details = response.json()
         return validate_source(expected, row, details, self.source)
 
     def update_photo(self, row, size):
+        if row['type'] == 'photo' and size == row['file_size']:
+            return
         cur = self.db.cursor()
         try:
             self.db.start_transaction()
             cur.execute('''UPDATE photos p JOIN creators c ON c.id=p.creator_id
-                JOIN bot_ingested b ON b.photo_id=p.id SET p.type='photo',p.file_size=%s
-                WHERE p.id=%s AND p.type='video' AND p.video_url IS NULL
+                JOIN bot_ingested b ON b.source_id=%s AND b.photo_id=p.id SET p.type='photo',p.file_size=%s
+                WHERE p.id=%s AND p.type=%s AND p.video_url IS NULL
                 AND p.is_hidden=0 AND p.removed_from_index_at IS NULL
                 AND c.is_hidden=0 AND c.removed_from_index_at IS NULL
                 AND p.creator_id=%s AND c.handle=%s AND p.image_url=%s AND p.preview_url <=> %s
                 AND p.source_id <=> %s AND p.url_version <=> %s AND p.file_size <=> %s
                 AND b.source_id=%s AND b.minio_key=%s''',
-                (size,row['id'],row['creator_id'],row['handle'],row['image_url'],row['preview_url'],
+                (row['source_id'],size,row['id'],row['type'],row['creator_id'],row['handle'],row['image_url'],row['preview_url'],
                  row['photo_source_id'],row['url_version'],row['file_size'],row['source_id'],row['minio_key']))
             if cur.rowcount != 1: raise RepairError('metadata_changed')
             self.db.commit()
@@ -132,8 +144,11 @@ class Repair(base.Repair):
         if original and (original.get('ContentType','').split(';',1)[0].lower() != MIMES[Path(key).suffix.lower()]
                          or original.get('ContentLength',0) <= 0):
             raise RepairError('existing_object_not_matching_image')
+        if original and row['type'] == 'photo' and original['ContentLength'] == row['file_size']:
+            return {'id':row['id'],'status':'already_present','bytes':original['ContentLength'],'public_urls_unchanged':True}
         if not apply:
-            return {'id':row['id'],'status':'would_reclassify','photo_missing':original is None,'public_urls_unchanged':True}
+            return {'id':row['id'],'status':'would_reclassify' if row['type']=='video' else 'would_restore',
+                    'photo_missing':original is None,'public_urls_unchanged':True}
         self.journal.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
         backup = self.journal.parent/(row['id']+'-'+str(time.time_ns())+'.before.json')
         base.private_json(backup,row)

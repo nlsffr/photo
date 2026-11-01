@@ -62,8 +62,8 @@ class PhotoRepairTests(unittest.TestCase):
         self.assertEqual((self.requests,self.runtime.s3.puts,self.updates),([],[],[]))
         self.assertEqual(self.row,before);self.assertFalse(self.runtime.journal.exists())
 
-    def test_only_video_without_video_url_can_be_repaired(self):
-        for values in [{'type':'photo'},{'video_url':'/media/creators/person/12.mp4'},{'video_url':''}]:
+    def test_only_photo_or_video_without_video_url_can_be_repaired(self):
+        for values in [{'type':'pack'},{'video_url':'/media/creators/person/12.mp4'},{'video_url':''}]:
             before=copy.deepcopy(self.row);self.row.update(values)
             with self.assertRaises(r.RepairError):self.runtime.run(before,True)
             self.row=before
@@ -81,7 +81,7 @@ class PhotoRepairTests(unittest.TestCase):
 
     def test_source_requires_false_boolean_same_owner_id_and_audited_full_file(self):
         for values in [{'is_video':True},{'is_video':0},{'is_video':None},{'owner':'other'},
-                       {'id':99},{'file_path':'content/person/thumbnail.jpg'},{'removed':True},{'error':'unavailable'}]:
+                       {'id':99},{'id':None},{'file_path':'content/person/thumbnail.jpg'},{'removed':True},{'error':'unavailable'}]:
             d={**self.details,**values}
             with self.assertRaises(r.RepairError):r.validate_source(self.row,self.row,d,self.source)
         self.assertEqual(r.validate_source(self.row,self.row,self.details,self.source),'https://cdn.leakgallery.com/content/person/original.jpg')
@@ -126,7 +126,63 @@ class PhotoRepairTests(unittest.TestCase):
         for guard in ['p.video_url IS NULL','p.is_hidden=0','c.is_hidden=0','p.removed_from_index_at IS NULL',
                       'c.removed_from_index_at IS NULL','p.url_version <=> %s','p.source_id <=> %s','b.minio_key=%s']:
             self.assertIn(guard,sql)
-        self.assertEqual(counts,['commit']);self.assertEqual(args[1],self.row['id'])
+        self.assertEqual(counts,['commit']);self.assertEqual(args[2],self.row['id'])
+        self.assertEqual(args[0],self.row['source_id']);self.assertEqual(args[3],self.row['type'])
+        self.assertIn('b.source_id=%s AND b.photo_id=p.id',sql)
+
+    def test_ordinary_photo_keeps_type_and_null_public_source_id(self):
+        self.row.update(type='photo',photo_source_id=None)
+        before=copy.deepcopy(self.row)
+        with patch.object(r,'reencode_image',side_effect=self.encoding):result=self.runtime.run(before,True)
+        self.assertEqual(result['status'],'photo_restored')
+        self.assertEqual(self.row['type'],'photo');self.assertIsNone(self.row['photo_source_id'])
+        for key in set(self.row)-{'file_size'}:self.assertEqual(self.row[key],before[key],key)
+
+    def test_ordinary_existing_photo_is_idempotent_without_update_or_upload(self):
+        key='creators/person/12.jpg';body=b'existing-image'
+        self.row.update(type='photo',file_size=len(body),photo_source_id=None)
+        self.runtime.s3.objects[key]=(body,'image/jpeg')
+        result=self.runtime.run(copy.deepcopy(self.row),True)
+        self.assertEqual(result['status'],'already_present')
+        self.assertEqual((self.updates,self.runtime.s3.puts,self.requests),([],[],[]))
+        self.assertFalse(self.runtime.journal.exists())
+
+    def test_replay_after_upload_and_metadata_commit_preserves_existing_image(self):
+        original=copy.deepcopy(self.row)
+        with patch.object(r,'reencode_image',side_effect=self.encoding):self.runtime.run(original,True)
+        self.assertEqual(self.runtime.run(original,True)['status'],'already_present')
+        self.assertEqual(len(self.runtime.s3.puts),1);self.assertEqual(len(self.updates),1)
+
+    def test_existing_ordinary_size_does_not_issue_noop_sql(self):
+        self.row.update(type='photo')
+        self.runtime.db=types.SimpleNamespace(cursor=lambda:(_ for _ in ()).throw(AssertionError('no query expected')))
+        r.Repair.update_photo(self.runtime,self.row,self.row['file_size'])
+
+    def test_photo_source_temporary_http_status_keeps_retry_classification(self):
+        self.runtime.source=types.SimpleNamespace(Config=types.SimpleNamespace(BASE_URL='https://api.leakgallery.com'))
+        class JsonResponse:
+            def __init__(self,status):self.status_code=status
+            def __enter__(self):return self
+            def __exit__(self,*_):pass
+        for status,reason in [(429,'source_http_429'),(503,'source_http_503'),(404,'source_unavailable')]:
+            self.runtime.request=lambda *_,status=status:JsonResponse(status)
+            with self.assertRaisesRegex(r.RepairError,reason):r.Repair.photo_source(self.runtime,self.row,self.row)
+
+    def test_candidate_uses_exact_registry_primary_key_with_null_public_source_id(self):
+        self.row.update(type='photo',photo_source_id=None)
+        queries=[];transactions=[]
+        cursor=types.SimpleNamespace(execute=lambda sql,args=None:queries.append((sql,args)),
+                                     fetchone=lambda:copy.deepcopy(self.row),fetchall=lambda:[],close=lambda:None)
+        self.runtime.db=types.SimpleNamespace(cursor=lambda **_:cursor,
+                          start_transaction=lambda **kw:transactions.append(kw),rollback=lambda:None)
+        actual=r.Repair.candidate(self.runtime,copy.deepcopy(self.row))
+        self.assertIsNone(actual['photo_source_id'])
+        sql,args=next((sql,args) for sql,args in queries if 'SELECT p.id' in sql)
+        self.assertIn('b.source_id=%s AND b.photo_id=p.id',sql)
+        self.assertEqual(args,(self.row['source_id'],self.row['id']))
+        self.assertEqual(transactions,[{'readonly':True}])
+        self.assertTrue(any('dmca_notices' in sql for sql,_ in queries))
+        self.assertTrue(any('dmca_mail_events' in sql for sql,_ in queries))
 
     def test_notice_matching_still_excludes_media_and_creator_targets(self):
         for notice in [{'urls':'https://leakfanhub.com/fr/person/12-v4'},
