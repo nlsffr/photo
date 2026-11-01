@@ -4,7 +4,7 @@ import queue
 import tempfile
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from ops.megabot_queue import adapter
 
@@ -16,19 +16,23 @@ def _lock_process(directory, entered, attempting, release):
         release.wait(5)
 
 
-def source_fixture(pages=None, details=None, *, active=True, stored=0, fail_media=False, remove_before_publish=False):
+def source_fixture(pages=None, details=None, *, active=True, stored=0, fail_media=False, remove_before_publish=False,
+                   notice_before_publish=False):
     state = SimpleNamespace(active=active, stored=stored, inserted=set(), requests=[],
                             checkpoints=[], closed=False, commits=0, rollbacks=0,
-                            transaction=False, statements=[], processing=0)
+                            transaction=False, statements=[], processing=0, notices=[], publication_checks=0,
+                            processed_details=[])
     class Cursor:
-        def execute(self, sql, params):
+        def execute(self, sql, params=()):
             state.statements.append((sql, params))
         def fetchone(self):
             return ("creator-id",) if state.active else None
         def close(self):
             pass
+        def fetchall(self):
+            return state.notices
     class Connection:
-        def cursor(self):
+        def cursor(self, **kwargs):
             return Cursor()
         def start_transaction(self):
             state.transaction = True
@@ -49,7 +53,7 @@ def source_fixture(pages=None, details=None, *, active=True, stored=0, fail_medi
             return source_id in state.inserted
         def total_storage_bytes(self):
             return state.stored
-        def insert_photo(self, photo_id, creator_id, source_id):
+        def insert_photo(self, photo_id, creator_id, source_id, *args):
             self._ensure()
             assert state.transaction
             state.inserted.add(source_id)
@@ -62,6 +66,9 @@ def source_fixture(pages=None, details=None, *, active=True, stored=0, fail_medi
                 value = (pages or {}).get(int(url.rsplit("/", 1)[1]), [])
             else:
                 value = (details or {}).get(url.rsplit("/", 1)[1], {})
+                if isinstance(value, dict):
+                    value = {'id': url.rsplit('/', 1)[1], 'handle': 'allowed',
+                             'is_video': False, 'file_path': 'neutral.jpg', **value}
             if isinstance(value, Exception):
                 raise value
             if isinstance(value, int):
@@ -74,6 +81,7 @@ def source_fixture(pages=None, details=None, *, active=True, stored=0, fail_medi
             self.db = Database()
             self.session = Session()
             self.total_new = self.total_skipped = self.total_errors = 0
+            self.r2 = SimpleNamespace(client=None, bucket='fixture')
         def get_proxy(self):
             return None
         def process_post(self, post):
@@ -82,6 +90,7 @@ def source_fixture(pages=None, details=None, *, active=True, stored=0, fail_medi
                 self.total_skipped += 1
                 return
             details_value = self.fetch_details(source_id)
+            state.processed_details.append(details_value)
             state.processing += 1
             if fail_media:
                 self.total_errors += 1
@@ -89,16 +98,20 @@ def source_fixture(pages=None, details=None, *, active=True, stored=0, fail_medi
             owner = {**post, **details_value}.get('handle', '')
             if remove_before_publish:
                 state.active = False
+            if notice_before_publish:
+                state.notices = [{'urls': 'https://leakfanhub.com/allowed/' + source_id}]
             try:
                 creator_id = self.db.upsert_creator(owner)
-                self.db.insert_photo('photo-id', creator_id, source_id)
+                self.db.insert_photo('photo-id', creator_id, source_id, 'title', 'image-url', None, 'photo',
+                                     [], 0, 0, 8, 8, None, False, 1, owner, 'image-key')
             except Exception:
                 self.total_errors += 1
             else:
                 self.total_new += 1
     source = SimpleNamespace(
         Config=SimpleNamespace(BASE_URL='https://fixture.invalid', DOWNLOAD_DIR=Path('/unused'),
-                               DETAILS_DELAY=0, DELAY_MIN=0, DELAY_MAX=0, MAX_STORAGE_TB=1),
+                               DETAILS_DELAY=0, DELAY_MIN=0, DELAY_MAX=0, MAX_STORAGE_TB=1,
+                               PUBLIC_MEDIA_BASE='https://fixture.invalid/media'),
         MegaBot=MegaBot, extract_handle=lambda post: post.get('handle', ''),
     )
     return source, state
@@ -110,7 +123,10 @@ class AdapterTest(unittest.TestCase):
         self.addCleanup(self.directory.cleanup)
 
     def run_fixture(self, source, state, **kwargs):
-        with patch.object(adapter, 'load_source', return_value=source):
+        def verified(*_):
+            state.publication_checks += 1
+        with patch.object(adapter, 'load_source', return_value=source), \
+             patch.object(adapter.integrity.VerifiedStorage, 'verify_publication', side_effect=verified):
             return adapter.run_profile(
                 'allowed', checkpoint=lambda page, empty: state.checkpoints.append((page, empty)),
                 download_dir=Path(self.directory.name) / 'worker',
@@ -144,6 +160,75 @@ class AdapterTest(unittest.TestCase):
             self.run_fixture(source, state)
         self.assertFalse(state.inserted)
         self.assertEqual(state.checkpoints, [])
+
+    def test_details_identity_mismatch_does_not_publish_or_advance(self):
+        source, state = source_fixture({1: [{'id': '1', 'handle': 'allowed'}]}, {'1': {'id': 'other'}})
+        with self.assertRaisesRegex(adapter.RetryableError, 'details_identity_mismatch'):
+            self.run_fixture(source, state)
+        self.assertFalse(state.inserted)
+        self.assertEqual(state.checkpoints, [])
+
+    def test_new_media_with_withdrawal_is_skipped_before_details_or_publication(self):
+        for notice in [{'urls': 'https://leakfanhub.com/fr/allowed/1-v3'},
+                       {'targets': [{'kind': 'creator', 'id': 'creator-id'}]}]:
+            source, state = source_fixture({1: [{'id': '1', 'handle': 'allowed'}]})
+            state.notices = [notice]
+            result = self.run_fixture(source, state)
+            self.assertEqual(result['notice_skipped'], 1)
+            self.assertFalse(state.inserted)
+            self.assertEqual(state.processing, 0)
+            self.assertFalse(any('/media/' in url for url in state.requests))
+
+    def test_notice_arriving_before_insert_rolls_back_without_advancing_as_error(self):
+        source, state = source_fixture({1: [{'id': '1', 'handle': 'allowed'}]}, notice_before_publish=True)
+        result = self.run_fixture(source, state)
+        self.assertEqual(result['notice_skipped'], 1)
+        self.assertEqual(result['errors'], 0)
+        self.assertFalse(state.inserted)
+        self.assertEqual(state.commits, 0)
+        self.assertEqual(state.rollbacks, 1)
+
+    def test_source_false_string_and_unchecked_thumbnail_are_normalized(self):
+        source, state = source_fixture({1: [{'id': '1', 'handle': 'allowed'}]},
+                                       {'1': {'is_video': 'false', 'thumbnail_path': 'bad.mp4'}})
+        self.run_fixture(source, state)
+        self.assertIs(state.processed_details[0]['is_video'], False)
+        self.assertEqual(state.processed_details[0]['thumbnail_path'], '')
+        self.assertEqual(state.publication_checks, 1)
+
+    def test_unverified_storage_blocks_sql_transaction(self):
+        source, state = source_fixture()
+        original = source.MegaBot().db
+        store = SimpleNamespace(verify_publication=Mock(side_effect=adapter.integrity.InvalidMedia('missing')))
+        guarded = adapter.EligibleDatabase(original, 'allowed', store)
+        with self.assertRaisesRegex(adapter.RetryableError, 'publication_assets_not_verified'):
+            guarded.insert_photo('uuid', 'creator-id', '1', 'title', 'image', None, 'photo',
+                                 [], 0, 0, 8, 8, None, False, 5, 'allowed', 'key')
+        self.assertFalse(state.inserted)
+        self.assertEqual(state.commits, 0)
+        self.assertFalse(state.transaction)
+
+    def test_video_download_hook_creates_local_poster_before_legacy_upload(self):
+        source, state = source_fixture({1: [{'id': '1', 'handle': 'allowed'}]}, {'1': {'is_video': True}})
+        def download(bot, url, path):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b'neutral-video')
+            return True
+        def poster(video, path):
+            path.write_bytes(b'neutral-poster')
+        def process(bot, post):
+            path = source.Config.DOWNLOAD_DIR / '1.mp4'
+            self.assertTrue(bot.download('https://fixture.invalid/video.mp4', path))
+            self.assertEqual((path.parent / '1_thumb.webp').read_bytes(), b'neutral-poster')
+            self.assertEqual(bot.fetch_details('1')['thumbnail_path'], '')
+        with patch.object(source.MegaBot, 'download', download, create=True), \
+             patch.object(source.MegaBot, 'process_post', process), \
+             patch.object(adapter.integrity, 'validate_file', return_value='video/mp4') as check, \
+             patch.object(adapter.integrity, 'make_poster', side_effect=poster) as make:
+            self.run_fixture(source, state)
+        check.assert_called_once()
+        self.assertEqual(check.call_args.kwargs, {'video': True})
+        make.assert_called_once()
 
     def test_profile_application_errors_do_not_publish_or_complete(self):
         payloads = [
@@ -210,7 +295,8 @@ class AdapterTest(unittest.TestCase):
             self.assertEqual(state.checkpoints, [])
 
     def test_cross_profile_media_and_duplicates_are_not_reimported(self):
-        source, state = source_fixture({1: [{'id': '1', 'handle': 'allowed'}, {'id': '2', 'handle': 'another'}]})
+        source, state = source_fixture({1: [{'id': '1', 'handle': 'allowed'}, {'id': '2', 'handle': 'another'}]},
+                                       {'2': {'handle': 'another'}})
         state.inserted.add('1')
         result = self.run_fixture(source, state)
         self.assertEqual((result['new'], result['skipped'], result['foreign_skipped']), (0, 2, 1))

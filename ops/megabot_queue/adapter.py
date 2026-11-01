@@ -16,6 +16,8 @@ import re
 import time
 from urllib.parse import quote
 
+from . import integrity, notices
+
 
 class RetryableError(RuntimeError):
     """No checkpoint was advanced for the failed page."""
@@ -31,6 +33,10 @@ class StorageFull(RuntimeError):
 
 class Excluded(RuntimeError):
     """The profile is absent or no longer eligible for ingestion."""
+
+
+class MediaExcluded(RuntimeError):
+    """A recorded withdrawal excludes this media from new publication."""
 
 
 def load_source(path):
@@ -99,10 +105,13 @@ def request_json(bot, url, *, profile=False):
 class EligibleDatabase:
     """Delegate media insertion, but never insert/re-enable a creator."""
 
-    def __init__(self, original, handle):
+    def __init__(self, original, handle, storage=None):
         self.original = original
         self.handle = handle
         self.excluded = False
+        self.media_excluded = False
+        self.storage = storage
+        self.creator_id = None
 
     def __getattr__(self, name):
         return getattr(self.original, name)
@@ -121,6 +130,7 @@ class EligibleDatabase:
             if row is None:
                 self.excluded = True
                 raise Excluded("profile_excluded")
+            self.creator_id = row[0]
             return row[0]
         finally:
             cur.close()
@@ -145,7 +155,29 @@ class EligibleDatabase:
             cur.close()
         return creator_id
 
+    def assert_media_allowed(self, source_id, *, photo_id=None, creator_id=None):
+        row = {'id': photo_id, 'source_id': source_id, 'handle': self.handle,
+               'creator_id': creator_id or self.creator_id}
+        cur = self.original.conn.cursor(dictionary=True)
+        try:
+            for table, fields in [('dmca_notices', 'urls'), ('dmca_mail_events', 'urls,targets')]:
+                cur.execute('SELECT ' + fields + ' FROM ' + table)
+                if any(notices.notice_matches(row, notice) for notice in cur.fetchall()):
+                    self.media_excluded = True
+                    raise MediaExcluded('notice_excluded')
+        finally:
+            cur.close()
+
     def insert_photo(self, photo_id, creator_id, *args, **kwargs):
+        if self.storage is not None:
+            names = ('source_id', 'title', 'image_url', 'video_url', 'media_type', 'tags',
+                     'views', 'likes', 'width', 'height', 'duration', 'is_ai', 'file_size', 'handle', 'minio_key')
+            values = {**dict(zip(names, args)), **kwargs}
+            try:
+                self.storage.verify_publication(*(values[key] for key in (
+                    'source_id', 'image_url', 'video_url', 'media_type', 'file_size', 'handle', 'minio_key')))
+            except (KeyError, integrity.InvalidMedia):
+                raise RetryableError('publication_assets_not_verified') from None
         # Hold the eligibility row until both photos and bot_ingested commit.
         self.original._ensure()
         connection = self.original.conn
@@ -155,6 +187,8 @@ class EligibleDatabase:
             if self.eligible_id(locked=True) != creator_id:
                 self.excluded = True
                 raise Excluded("profile_changed")
+            if self.storage is not None:
+                self.assert_media_allowed(values['source_id'], photo_id=photo_id, creator_id=creator_id)
             def ensure_transaction():
                 if self.original.conn is not connection or not connection.is_connected():
                     raise RetryableError("database_transaction_lost")
@@ -204,6 +238,16 @@ def run_profile(handle, next_page=1, empty_streak=0, checkpoint=None, *,
                 )
             return self.detail_cache[media_id]
 
+        def download(self, url, destination):
+            success = super().download(url, destination)
+            if success and self.current_media is not None:
+                sid, is_video = self.current_media
+                if Path(destination).stem == sid:
+                    integrity.validate_file(destination, video=is_video)
+                    if is_video:
+                        integrity.make_poster(destination, Path(destination).with_name(sid + '_thumb.webp'))
+            return success
+
         def process_post(self, post):
             source_id = str(post.get("id") or post.get("media_id") or "")
             if not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", source_id):
@@ -213,6 +257,13 @@ def run_profile(handle, next_page=1, empty_streak=0, checkpoint=None, *,
                 if self.db.already_ingested(source_id):
                     self.total_skipped += 1
                     return
+                self.db.media_excluded = False
+                try:
+                    self.db.assert_media_allowed(source_id)
+                except MediaExcluded:
+                    self.total_skipped += 1
+                    self.notice_skipped += 1
+                    return
                 self.detail_cache = {}
                 try:
                     details = self.fetch_details(source_id)
@@ -220,14 +271,33 @@ def run_profile(handle, next_page=1, empty_streak=0, checkpoint=None, *,
                     self.total_skipped += 1
                     self.unavailable_skipped += 1
                     return
-                if source.extract_handle({**post, **details}).casefold() != handle.casefold():
+                reported_id = details.get('id') if details.get('id') is not None else details.get('media_id')
+                if reported_id is None or str(reported_id) != source_id:
+                    raise RetryableError('details_identity_mismatch')
+                if source.extract_handle(details).casefold() != handle.casefold():
                     self.foreign_skipped += 1
                     self.total_skipped += 1
                     return
+                if any(details.get(field) for field in ('removed', 'is_removed', 'is_hidden', 'removed_at')):
+                    self.total_skipped += 1
+                    self.unavailable_skipped += 1
+                    return
+                merged = {**post, **details}
+                is_video = integrity.video_flag(merged.get('is_video'), merged.get('file_path') or merged.get('url') or '')
+                # The local video download produces a verified WebP; do not replace it with an unchecked remote thumbnail.
+                self.detail_cache[source_id] = {**details, 'is_video': is_video, 'thumbnail_path': ''}
+                self.current_media = (source_id, is_video)
+                self.r2.uploaded.clear()
                 before = self.total_errors
                 super().process_post(post)
+                self.current_media = None
                 if self.db.excluded:
                     raise Excluded("profile_excluded")
+                if self.db.media_excluded:
+                    self.total_errors = before
+                    self.total_skipped += 1
+                    self.notice_skipped += 1
+                    return
                 if self.total_errors != before:
                     raise RetryableError("media_processing_failed")
 
@@ -235,10 +305,16 @@ def run_profile(handle, next_page=1, empty_streak=0, checkpoint=None, *,
     try:
         bot = QueuedBot.__new__(QueuedBot)
         bot.__init__()
-        bot.db = EligibleDatabase(bot.db, handle)
+        original_store = bot.r2
+        bot.r2 = integrity.VerifiedStorage(original_store.client, original_store.bucket,
+                                          source.Config.PUBLIC_MEDIA_BASE,
+                                          before_write=lambda: bot.db.assert_media_allowed(bot.current_media[0]))
+        bot.db = EligibleDatabase(bot.db, handle, bot.r2)
+        bot.current_media = None
         bot.detail_cache = {}
         bot.foreign_skipped = 0
         bot.unavailable_skipped = 0
+        bot.notice_skipped = 0
         bot.db.eligible_id()
         if bot.db.total_storage_bytes() >= source.Config.MAX_STORAGE_TB * 1024**4:
             raise StorageFull("storage_limit_reached")
@@ -263,7 +339,7 @@ def run_profile(handle, next_page=1, empty_streak=0, checkpoint=None, *,
                 "next_page": next_page, "empty_streak": empty_streak,
                 "new": bot.total_new, "skipped": bot.total_skipped,
                 "errors": bot.total_errors, "foreign_skipped": bot.foreign_skipped,
-                "unavailable_skipped": bot.unavailable_skipped}
+                "unavailable_skipped": bot.unavailable_skipped, "notice_skipped": bot.notice_skipped}
     except (RetryableError, StorageFull, Excluded):
         raise
     except Exception:

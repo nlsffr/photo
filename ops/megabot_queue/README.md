@@ -35,6 +35,31 @@ plus dix pages et sauvegarde la progression après chaque page réussie.
   Le contrôle des médias déjà présents reste actif. Les URL publiques et leurs
   versions ne sont pas modifiées par cette file.
 
+## Intégrité des nouveaux fichiers
+
+Les nouveaux imports passent désormais par une validation du fichier téléchargé
+(signature, flux reconnu par ffprobe et dimensions ; durée positive pour une
+vidéo, sans décodage intégral de chaque image). Le booléen source est interprété explicitement : la chaîne `"false"` ne
+devient plus une vidéo. Une miniature WebP est générée depuis la vidéo locale ;
+un échec empêche la publication, au lieu d'utiliser le MP4 comme image.
+
+Le stockage est créé avec `IfNoneMatch=*`, sans écraser un objet existant. Avant
+l'insertion dans `photos` et `bot_ingested`, des HEAD vérifient la taille et le
+MIME du fichier et de sa véritable image. Les URL doivent correspondre aux objets
+vérifiés pendant cette ingestion et au propriétaire attendu. Les notices média
+et profil sont contrôlées avant récupération, avant chaque écriture de fichier
+et avant l'insertion SQL. Une notice apparue pendant le traitement entraîne un
+skip explicite, sans enregistrer le média comme nouvel import réussi.
+
+Cela protège la publication de nouveaux imports. Les entrées historiques déjà
+marquées importées ne déclenchent pas un HEAD à chaque parcours ; leur inventaire
+et leur restauration sont assurés par les traitements séparés. Un HEAD taille/MIME
+ne prouve pas l'intégrité de chaque octet d'un ancien objet déjà présent. Cette
+protection n'explique pas, à elle seule, l'origine des fichiers historiques absents.
+
+Les exécutables `ffmpeg` avec encodeur `libwebp` et `ffprobe` sont nécessaires. La
+source legacy reste inchangée et son SHA256 épinglé est toujours vérifié.
+
 Les jobs actifs n'expirent pas sur un simple délai : un téléchargement peut être
 long. Le superviseur confirme la fin d'un worker avant de libérer sa tâche. Un
 verrou hérité par les enfants interdit une seconde génération tant qu'un ancien
