@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { BrandLogo } from "./BrandLogo";
 import { useEffect, useState } from "react";
 import { localizedHref } from "@/lib/i18n/config";
 import { AUDIENCE_COOKIE, CHOICE_MAX_AGE, cookieCopy, type Choice } from "@/lib/audience-choice";
@@ -35,13 +36,16 @@ export function CookieBanner() {
       setOpened(false); setDismissed(true);
     } catch { if (value === "refused") { setOpened(false); setDismissed(true); } else { setError(true); } } finally { setPending(false); }
   }
-  return <section aria-label={copy.manage} className="fixed inset-x-0 top-1/2 z-50 mx-auto max-w-lg -translate-y-1/2 px-3">
-    <div className="max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-2xl">
-      <p className="text-sm text-[var(--color-ink-muted)]">{copy.body}{" "}
-        <Link href={localizedHref(locale,"/confidentialite")} className="text-[var(--color-accent)] hover:underline">{t("shell.cookies.more")}</Link>
+  return <section aria-label={copy.manage} className="fixed inset-x-0 top-[calc(50%+1.5rem)] z-50 mx-auto max-w-[27rem] -translate-y-1/2 px-4 font-sans">
+    <div className="max-h-[calc(100dvh-5rem)] overflow-y-auto rounded-[1.75rem] border border-[var(--color-border)] bg-[var(--color-surface)] px-6 pb-2 pt-6 text-center shadow-[0_24px_80px_-20px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.04)]">
+      <div className="mb-4 flex justify-center">
+        <BrandLogo href={localizedHref(locale, "/")} size="sm" />
+      </div>
+      <p className="text-sm leading-relaxed text-[var(--color-ink-muted)]">{copy.body}{" "}
+        <Link href={localizedHref(locale,"/confidentialite")} className="whitespace-nowrap text-[var(--color-accent)] underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--color-accent)]">{t("shell.cookies.more")}</Link>
       </p>
-      <button type="button" disabled={pending} onClick={() => choose("accepted")} className="mt-3 min-h-11 w-full rounded-full bg-[var(--color-accent)] px-4 text-sm font-bold text-white hover:bg-[var(--color-accent-600)]">{copy.accept}</button>
-      <button type="button" disabled={pending} onClick={() => choose("refused")} className="mx-auto mt-1 flex min-h-11 items-center justify-center px-4 text-xs text-[var(--color-ink-muted)] underline underline-offset-4">{copy.refuse}</button>
+      <button type="button" disabled={pending} onClick={() => choose("accepted")} className="mt-5 min-h-12 w-full rounded-full bg-[var(--color-accent)] px-5 text-[15px] font-bold tracking-tight text-white transition-colors hover:bg-[var(--color-accent-600)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--color-ink)] disabled:cursor-wait">{copy.accept}</button>
+      <button type="button" disabled={pending} onClick={() => choose("refused")} className="mx-auto mt-1 flex min-h-11 items-center justify-center rounded-full px-4 text-[0.6875rem] text-[var(--color-ink-muted)] underline underline-offset-4 hover:text-[var(--color-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] disabled:cursor-wait">{copy.refuse}</button>
       {error && <p role="alert" className="text-sm text-[var(--color-ink)]">{copy.error}</p>}
     </div>
   </section>;
