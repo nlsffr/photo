@@ -261,7 +261,7 @@ test("legacy non-aligned offsets preserve a functional cursor link and remain no
   );
 });
 
-test("cold proxy plus metadata and page share one combined context and stay within four real SQL round trips including tags", async () => {
+test("cold proxy plus metadata and page share one two-query context within five SQL round trips including tags", async () => {
   const { createRequire } = await import("node:module");
   const { dirname, join } = await import("node:path");
   const nativeRequire = createRequire(import.meta.url);
@@ -313,7 +313,7 @@ test("cold proxy plus metadata and page share one combined context and stay with
     const tree = await route.default(props);
     assert.ok(nodes(tree).some((node) => (node.props.initial as { items?: Array<{ tags: string[] }> } | undefined)?.items?.[0]?.tags.includes("portrait")));
   });
-  assert.equal(calls.length, 4, "cold budget is proxy creator + shared context + media + tags");
+  assert.equal(calls.length, 5, "cold budget is proxy creator + shared context metadata and counters + media + tags");
   assert.equal(calls.filter((call) => call.sql.includes("AS mediaCount")).length, 1);
   assert.equal(calls.filter((call) => call.operation === "query").length, 1);
   assert.equal(typeof photos.getCreatorCollectionContext, "function");
@@ -322,5 +322,5 @@ test("cold proxy plus metadata and page share one combined context and stay with
     assert.equal(context.creator.handle, "aria-lune");
     await photos.getCreatorCollectionContext("aria-lune-v3");
   });
-  assert.equal(calls.length, 5, "a new request rereads public context once; no persistent context cache");
+  assert.equal(calls.length, 7, "a new request rereads both context phases once; no persistent context cache");
 });
