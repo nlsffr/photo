@@ -10,7 +10,7 @@ L'image entière est validée puis créée avec `IfNoneMatch=*`. Les objets exis
 ne sont pas écrasés. Les URL, identifiants et versions publics sont conservés.
 Une ancienne ligne vidéo peut devenir une photo uniquement après confirmation.
 
-Le service `leakfanhub-photo-repair.service` traite 25 candidats avec une pause
+Le service `leakfanhub-photo-repair.service` traite au plus 100 candidats, avec deux processus isolés avec un lancement espacé
 d'au moins deux secondes ; le timer reprend après chaque lot. Son checkpoint est
 distinct dans `/var/lib/photo-repair/backfill`, ses verrous par média sont partagés
 avec le réparateur vidéo dans `/var/lib/video-repair/job-locks`. Une erreur réseau
@@ -35,3 +35,10 @@ systemctl stop leakfanhub-photo-repair.service
 Le retour arrière consiste à restaurer le lien et les unités sauvegardés, puis à
 recharger systemd. Si cette installation est la première, laisser le timer arrêté.
 Les sauvegardes de métadonnées et journaux privés permettent d'auditer les écritures.
+
+
+Le coordinateur conserve seul SQLite et son verrou. Les enfants créent leurs
+propres clients, et une panne provoque une pause commune aux files photo/vidéo.
+Les extensions de plan conservent les lignes attendues et résultats précédents.
+Un journal privé et deux sauvegardes exactes permettent de reprendre une migration
+interrompue ; ExecStartPre exécute cette récupération avant chaque nouveau lot.
