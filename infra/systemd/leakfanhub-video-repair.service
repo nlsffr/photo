@@ -10,7 +10,7 @@ UMask=0077
 Environment=PYTHONPATH=/opt/megabot-queue/current
 Environment=MEDIA_REPAIR_DIRECT_CDN=1
 ExecStartPre=/opt/megabot/venv/bin/python -B /opt/photo-media-repair/current/ops/extend-media-repair-plan.py --recover --plan /var/lib/video-repair/plan.json --state-dir /var/lib/video-repair/backfill
-ExecStart=/opt/megabot/venv/bin/python -B /opt/photo-media-repair/current/ops/run-media-repair-workers.py --kind video --plan /var/lib/video-repair/plan.json --state-dir /var/lib/video-repair/backfill --job-lock-dir /var/lib/video-repair/job-locks --source-backoff /var/lib/video-repair/source-backoff.json --workers 3 --max-items 100 --delay 2
+ExecStart=/opt/megabot/venv/bin/python -B /opt/photo-media-repair/current/ops/run-media-repair-workers.py --kind video --plan /var/lib/video-repair/plan.json --state-dir /var/lib/video-repair/backfill --job-lock-dir /var/lib/video-repair/job-locks --source-backoff /var/lib/video-repair/backfill/source-backoff.json --workers 3 --max-items 100 --delay 2
 TimeoutStartSec=1800
 TimeoutStopSec=30
 KillMode=control-group

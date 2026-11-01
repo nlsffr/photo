@@ -259,7 +259,7 @@ def main(argv=None):
     parser.add_argument('--state-dir', type=Path, required=True)
     parser.add_argument('--config', default='/etc/megabot-queue/config.json')
     parser.add_argument('--job-lock-dir', type=Path, default=Path('/var/lib/video-repair/job-locks'))
-    parser.add_argument('--source-backoff', type=Path, default=Path('/var/lib/video-repair/source-backoff.json'))
+    parser.add_argument('--source-backoff', type=Path, default=Path('/var/lib/video-repair/backfill/source-backoff.json'))
     parser.add_argument('--workers', type=int)
     parser.add_argument('--max-items', type=int, default=100)
     parser.add_argument('--delay', type=float, default=2)
