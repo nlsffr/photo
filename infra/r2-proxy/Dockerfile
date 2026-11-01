@@ -6,6 +6,11 @@ WORKDIR /src
 RUN git clone https://github.com/awslabs/aws-sigv4-proxy.git . \
     && git checkout fb42fe8db8d4ebed5f6761402d8a2617963d4c72
 
+# These pinned upstream read fixtures omit Method; real HTTP reads use GET.
+# Fail the build if upstream changes instead of silently changing other tests.
+RUN test "$(grep -F -c 'request: &http.Request{},' handler/handler_test.go)" = 2 \
+    && sed -i 's/request: &http\.Request{},/request: \&http.Request{Method: http.MethodGet},/' handler/handler_test.go
+
 COPY handler.go /src/handler/handler.go
 COPY streaming_test.go /src/handler/streaming_test.go
 

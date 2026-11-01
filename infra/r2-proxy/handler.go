@@ -33,6 +33,13 @@ func (h *Handler) write(w http.ResponseWriter, status int, body []byte) {
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// This public signer serves media reads only. Never sign a storage mutation.
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		w.Header().Set("Allow", "GET, HEAD")
+		w.Header().Set("Cache-Control", "no-store")
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 	resp, err := h.ProxyClient.Do(r)
 	if err != nil {
 		errorMsg := "unable to proxy request"
