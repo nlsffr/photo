@@ -11,9 +11,13 @@ export default function ConfidentialitePage() {
   return (
     <LegalPage
       title="Politique de confidentialité"
-      updated="6 août 2026"
+      updated="1er novembre 2026"
       intro="LeakFanHub est conçu « privacy by default ». Voici, concrètement, ce que nous faisons — et surtout ce que nous ne faisons pas — de tes données."
       sections={[
+        {
+          heading: "Mesure d’audience facultative",
+          body: <p>Si tu acceptes, un identifiant de navigateur permet de compter les visites et les pages vues et d’estimer leur pays. Tu peux refuser et utiliser le site. Le lien « Choix des cookies » en bas de page permet de modifier ton choix.</p>,
+        },
         {
           heading: "Ce que nous NE collectons pas",
           body: (

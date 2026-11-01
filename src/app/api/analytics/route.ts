@@ -1,3 +1,4 @@
+import { AUDIENCE_COOKIE } from "@/lib/audience-choice";
 import { NextRequest, NextResponse } from "next/server";
 import { recordAnalyticsEvent, pruneStaleAnalyticsPresence } from "@/lib/analytics-db";
 import {
@@ -49,6 +50,8 @@ export async function POST(request: NextRequest) {
   ) {
     return NextResponse.json({ error: "forbidden_origin" }, { status: 403 });
   }
+
+  if (request.cookies.get(AUDIENCE_COOKIE)?.value !== "accepted") return noContent();
 
   const secret =
     process.env.ANALYTICS_HASH_SECRET?.trim() ||
