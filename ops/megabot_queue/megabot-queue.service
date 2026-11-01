@@ -1,0 +1,24 @@
+[Unit]
+Description=MegaBot - file persistante pour quatre bots
+Wants=network-online.target
+After=network-online.target docker.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/megabot-queue/current
+ExecStart=/opt/megabot/venv/bin/python -B /opt/megabot-queue/current/ops/megabot_queue/supervisor.py run --config /etc/megabot-queue/config.json
+Restart=on-failure
+RestartSec=15
+KillMode=control-group
+TimeoutStopSec=60
+UMask=0077
+StateDirectory=megabot-queue
+StateDirectoryMode=0700
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONNOUSERSITE=1
+Nice=5
+
+[Install]
+WantedBy=multi-user.target
