@@ -3,10 +3,10 @@ import type { Dictionary } from "./en";
 export const esDictionary = {
   creator: {
     collections: {
-      overview: { title: "{name} Leaks de OnlyFans - LeakFanHub", description: "Explora las fotos y vídeos OnlyFans filtrados de {name}. Los más recientes primero. Streaming gratuito en LeakFanHub." },
-      photos: { title: "Fotos de {name}", description: "Explora las fotos públicas compartidas por {name}." },
-      videos: { title: "Vídeos de {name}", description: "Explora los vídeos públicos compartidos por {name}." },
-      popular: { title: "Contenido popular de {name}", description: "Explora el contenido público popular compartido por {name}." },
+      overview: { title: "Leaks de OnlyFans de {name}", description: "Fotos y vídeos exclusivos de OnlyFans filtrados de {name}. Streaming gratuito, sin registro. Solo +18." },
+      photos: { title: "Fotos OnlyFans filtradas de {name}", description: "Fotos de OnlyFans filtradas de {name}. Gratis en LeakFanHub. +18." },
+      videos: { title: "Vídeos OnlyFans filtrados de {name}", description: "Vídeos de OnlyFans filtrados de {name}. Streaming gratuito en LeakFanHub. +18." },
+      popular: { title: "Leaks populares de OnlyFans de {name}", description: "Fotos y vídeos de OnlyFans más vistos de {name}." },
     },
     tabs: { overview: "Todo", photos: "Fotos", videos: "Vídeos", popular: "Popular" },
     home: "Inicio", models: "Modelos", back: "Volver", followers: "seguidores", media: "contenidos", views: "visualizaciones",
@@ -100,7 +100,7 @@ export const esDictionary = {
     errors: { invalid_email: "La dirección de correo no parece válida.", empty_message: "El mensaje es demasiado corto.", rate_limited: "Demasiados intentos. Vuelve a intentarlo en unos minutos.", not_configured: "El envío aún no está activo. Usa la dirección de correo que aparece en la página.", send_failed: "No se pudo enviar. Inténtalo de nuevo o usa la dirección de correo de la página.", bad_request: "Solicitud no válida.", network: "No se puede conectar. Comprueba tu conexión e inténtalo de nuevo." },
   },
   pages: {
-    home: { meta: { title: "Últimos Leaks de OnlyFans - LeakFanHub", description: "Más de 18.000.000 de fotos y vídeos OnlyFans filtrados en LeakFanHub, los más recientes de la última hora primero. Streaming gratuito, sin registro, nuevos posts cada minuto." } },
+    home: { meta: { title: "Últimos Leaks de OnlyFans - LeakFanHub", description: "Millones de fotos y vídeos de OnlyFans filtrados en LeakFanHub, los más nuevos primero. Streaming gratuito, sin registro, nuevos posts cada minuto. Solo +18." } },
     models: { meta: { title: "Modelos y creadores", description: "Explora todos los creadores de LeakFanHub, ordenados por seguidores o visualizaciones." } },
     trending: { meta: { title: "Contenido en tendencia", description: "Fotos y vídeos en tendencia clasificados por interacción y actualizados continuamente." } },
     mostLiked: { meta: { title: "Más valorados", description: "Las fotos y los vídeos con más me gusta de LeakFanHub." } },

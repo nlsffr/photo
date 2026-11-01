@@ -4,20 +4,20 @@ export const frDictionary = {
   creator: {
     collections: {
       overview: {
-        title: "{name} Leaks OnlyFans - LeakFanHub",
-        description: "Parcourez les photos et vidéos OnlyFans leakées de {name}. Les plus récentes en premier. Streaming gratuit sur LeakFanHub."
+        title: "Leaks OnlyFans de {name}",
+        description: "Photos et vidéos OnlyFans leakées exclusives de {name}. Streaming gratuit, sans inscription. 18+ uniquement."
       },
       photos: {
-        title: "Photos de {name}",
-        description: "Parcourez les photos publiques partagées par {name}."
+        title: "Photos OnlyFans leakées de {name}",
+        description: "Photos OnlyFans leakées de {name}. Gratuit sur LeakFanHub. 18+."
       },
       videos: {
-        title: "Vidéos de {name}",
-        description: "Parcourez les vidéos publiques partagées par {name}."
+        title: "Vidéos OnlyFans leakées de {name}",
+        description: "Vidéos OnlyFans leakées de {name}. Streaming gratuit sur LeakFanHub. 18+."
       },
       popular: {
-        title: "Médias populaires de {name}",
-        description: "Parcourez les médias publics populaires partagés par {name}."
+        title: "Leaks OnlyFans populaires de {name}",
+        description: "Photos et vidéos OnlyFans leakées les plus vues de {name}."
       }
     },
     tabs: {
@@ -307,7 +307,7 @@ export const frDictionary = {
     },
   },
   pages: {
-    home: { meta: { title: "Derniers Leaks OnlyFans - LeakFanHub", description: "18 000 000+ photos et vidéos OnlyFans leakées sur LeakFanHub, les plus récentes de la dernière heure en premier. Streaming gratuit, pas d'inscription, nouveaux posts chaque minute." } },
+    home: { meta: { title: "Derniers Leaks OnlyFans - LeakFanHub", description: "Des millions de photos et vidéos OnlyFans leakées sur LeakFanHub, les plus récentes en premier. Streaming gratuit, sans inscription, nouveaux posts toutes les minutes. 18+ uniquement." } },
     models: { meta: { title: "Modèles et créateurs", description: "Parcours tous les créateurs LeakFanHub, classés par abonnés ou par vues." } },
     trending: { meta: { title: "Médias en tendance", description: "Photos et vidéos en tendance, classées par engagement et mises à jour en continu." } },
     mostLiked: { meta: { title: "Les plus aimés", description: "Les photos et vidéos les plus aimées sur LeakFanHub." } },

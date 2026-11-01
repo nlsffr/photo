@@ -24,7 +24,7 @@ test("editor defaults equal the current fully resolved metadata in every localiz
     assert.equal(typeof template, "string");
     for (const page of ["home", "models", "trending", "mostLiked", "rankings", "influencers"] as const) {
       const copy = getDictionary(locale).pages[page].meta, entry = getSeoDefault(locale, page);
-      assert.equal(hash(entry.title), hash(template!.replace(/%s/g, copy.title)), `${locale}/${page} title hash`);
+      assert.equal(hash(entry.title), hash(page === "home" ? copy.title : template!.replace(/%s/g, copy.title)), `${locale}/${page} title hash`);
       assert.equal(hash(entry.description), hash(copy.description), `${locale}/${page} description hash`);
       assert.equal(entry.revision, 0);
       assert.equal(entry.updatedAt, null);

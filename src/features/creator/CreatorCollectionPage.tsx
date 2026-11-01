@@ -127,7 +127,7 @@ export async function creatorCollectionMetadata(
     creator.name,
   );
   const ui = getDictionary(props.locale ?? "en").creator;
-  const title = `${copy.title}${pagination.page > 1 ? ` — ${ui.page} ${pagination.page}` : ""} — LeakFanHub`;
+  const title = `${copy.title}${pagination.page > 1 ? ` — ${ui.page} ${pagination.page}` : ""}`;
   const image = absUrl(creator.avatarUrl);
   return {
     title: { absolute: title },

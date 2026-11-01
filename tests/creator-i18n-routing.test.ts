@@ -1,9 +1,30 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import { isValidElement, type ReactNode } from "react";
 import type { Metadata } from "next";
+import type { Dictionary } from "../src/lib/i18n/dictionaries";
 // @ts-expect-error Native Node requires explicit suffixes.
 import { loadAppModule } from "./helpers/load-app-module.ts";
+
+const { getDictionary } = loadAppModule<{ getDictionary(locale: string): Dictionary }>("src/lib/i18n/dictionaries.ts");
+const hash = (value: string) => createHash("sha256").update(value).digest("hex");
+
+function assertExactCopy(actual: unknown, expected: string, label: string) {
+  assert.equal(typeof actual, "string", `${label}: expected text`);
+  // Keep authored copy out of assertion failures and test output.
+  assert.equal(hash(actual as string), hash(expected), label);
+}
+
+function assertExactCreatorMetadata(metadata: Metadata, title: string, description: string) {
+  assert.ok(metadata.title && typeof metadata.title === "object" && "absolute" in metadata.title, "creator title must bypass the layout suffix");
+  assertExactCopy((metadata.title as { absolute: string }).absolute, title, "absolute title");
+  assertExactCopy(metadata.description, description, "meta description");
+  assertExactCopy(metadata.openGraph?.title, title, "Open Graph title");
+  assertExactCopy(metadata.openGraph?.description, description, "Open Graph description");
+  assertExactCopy(metadata.twitter?.title, title, "Twitter title");
+  assertExactCopy(metadata.twitter?.description, description, "Twitter description");
+}
 
 type Search = Record<string, string | string[] | undefined>;
 type Route = {
@@ -69,7 +90,6 @@ test("every exact static route wins before creator parsing, including contact su
 });
 
 test("localized overview and exactly the three collection paths reuse the renderer and locale", async () => {
-  const intro = { en: "Browse", fr: "Parcourez", es: "Explora", de: "Entdecke", it: "Sfoglia", pt: "Explore", nl: "Bekijk" };
   const previous = { en: "Previous page", fr: "Page précédente", es: "Página anterior", de: "Vorherige Seite", it: "Pagina precedente", pt: "Página anterior", nl: "Vorige pagina" };
   const follow = { en: { follow: "Follow", following: "Following" }, fr: { follow: "Suivre", following: "Suivi·e" }, es: { follow: "Seguir", following: "Siguiendo" }, de: { follow: "Folgen", following: "Gefolgt" }, it: { follow: "Segui", following: "Seguito" }, pt: { follow: "Seguir", following: "A seguir" }, nl: { follow: "Volgen", following: "Volgend" } };
   const verified = { en: "Verified", fr: "Vérifié", es: "Verificado", de: "Verifiziert", it: "Verificato", pt: "Verificado", nl: "Geverifieerd" };
@@ -85,7 +105,17 @@ test("localized overview and exactly the three collection paths reuse the render
       assert.equal(queries.at(-1)?.sort, collection === "popular" ? "popular" : "recent");
       assert.ok(text(tree).includes(creator.name));
       assert.ok(text(tree).includes(creator.bio));
-      assert.ok(text(tree).includes(intro[locale]));
+      const dictionary = getDictionary(locale).creator;
+      const copy = dictionary.collections[collection as keyof typeof dictionary.collections];
+      const expectedTitle = copy.title.replace("{name}", () => creator.name);
+      const expectedDescription = copy.description.replace("{name}", () => creator.name);
+      const heading = nodes(tree).find((node) => node.type === "h1");
+      assert.ok(heading, "creator page needs a primary heading");
+      assertExactCopy(text(heading.props.children as ReactNode), expectedTitle, "creator H1");
+      assert.ok(nodes(tree).some((node) => node.type === "p" && hash(text(node.props.children as ReactNode)) === hash(expectedDescription)), "creator introduction must equal its dictionary description");
+      const firstPage = await route.generateMetadata(props(path));
+      assertExactCreatorMetadata(firstPage, expectedTitle, expectedDescription);
+      assertExactCreatorMetadata(metadata, `${expectedTitle} — ${dictionary.page} 2`, expectedDescription);
       assert.ok(text(tree).includes(previous[locale]));
       const links = nodes(tree).filter((node) => node.props.href);
       assert.ok(links.some((node) => node.props.href === `/${locale}/aria-lune-v3/photos`));

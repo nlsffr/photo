@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { applySeoPageMetadata } from "@/lib/seo-page-metadata";
+import { getDictionary } from "@/lib/i18n/dictionaries";
 import { getPhotos, getAllTags } from "@/lib/photos";
 import type { MediaType, SortKey } from "@/lib/types";
 import { InfiniteGallery } from "@/components/InfiniteGallery";
@@ -22,12 +23,14 @@ const VALID_SORTS: SortKey[] = [
   "random",
 ];
 
+const homeCopy = getDictionary("en").pages.home.meta;
 const baseMetadata: Metadata = {
   title: {
-    absolute: "Latest OnlyFans Leaks - LeakFanHub",
+    absolute: homeCopy.title,
   },
-  description:
-    "Free OnlyFans leaks gallery on LeakFanHub. Browse photos and videos from popular creators. Updated daily. 18+ only.",
+  description: homeCopy.description,
+  openGraph: { title: homeCopy.title, description: homeCopy.description },
+  twitter: { title: homeCopy.title, description: homeCopy.description },
   alternates: { canonical: "/" },
   robots: { index: true, follow: true, "max-image-preview": "large" },
 };

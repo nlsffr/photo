@@ -73,7 +73,7 @@ export function buildLocalizedMetadata(
     ? modelsPageAlternates(searchParams, renderedLocale)
     : { canonical: localePath(renderedLocale, pathname), languages: localeAlternates(pathname) };
   return {
-    title: copy.title,
+    title: pathname === "/" ? { absolute: copy.title } : copy.title,
     description: copy.description,
     alternates,
     openGraph: {
@@ -87,6 +87,7 @@ export function buildLocalizedMetadata(
       url: alternates.canonical,
       siteName: "LeakFanHub",
     },
+    ...(pathname === "/" ? { twitter: { title: copy.title, description: copy.description } } : {}),
     robots: { index: true, follow: true, "max-image-preview": "large" },
   };
 }

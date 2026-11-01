@@ -3,10 +3,10 @@ import type { Dictionary } from "./en";
 export const deDictionary = {
   creator: {
     collections: {
-      overview: { title: "{name} OnlyFans Leaks - LeakFanHub", description: "Entdecke geleakte OnlyFans Fotos und Videos von {name}. Neueste zuerst. Kostenloses Streaming auf LeakFanHub." },
-      photos: { title: "Fotos von {name}", description: "Entdecke öffentliche Fotos, die {name} geteilt hat." },
-      videos: { title: "Videos von {name}", description: "Entdecke öffentliche Videos, die {name} geteilt hat." },
-      popular: { title: "Beliebte Medien von {name}", description: "Entdecke beliebte öffentliche Medien, die {name} geteilt hat." },
+      overview: { title: "{name} OnlyFans Leaks", description: "Exklusive geleakte OnlyFans Fotos und Videos von {name}. Kostenloses Streaming, keine Anmeldung. Nur 18+." },
+      photos: { title: "{name} OnlyFans Fotos Leaks", description: "Geleakte OnlyFans Fotos von {name}. Kostenlos auf LeakFanHub. 18+." },
+      videos: { title: "{name} OnlyFans Videos Leaks", description: "Geleakte OnlyFans Videos von {name}. Kostenloses Streaming auf LeakFanHub. 18+." },
+      popular: { title: "{name} Beliebte OnlyFans Leaks", description: "Meistgesehene geleakte OnlyFans Fotos und Videos von {name}." },
     },
     tabs: { overview: "Alle", photos: "Fotos", videos: "Videos", popular: "Beliebt" },
     home: "Startseite", models: "Models", back: "Zurück", followers: "Follower", media: "Medien", views: "Aufrufe",
@@ -81,7 +81,7 @@ export const deDictionary = {
     errors: { invalid_email: "Die E-Mail-Adresse scheint ungültig zu sein.", empty_message: "Die Nachricht ist zu kurz.", rate_limited: "Zu viele Versuche. Probiere es in einigen Minuten erneut.", not_configured: "Der Versand ist noch nicht aktiv. Nutze die auf der Seite angegebene E-Mail-Adresse.", send_failed: "Senden fehlgeschlagen. Versuche es erneut oder nutze die auf der Seite angegebene E-Mail-Adresse.", bad_request: "Ungültige Anfrage.", network: "Verbindung nicht möglich. Prüfe deine Verbindung und versuche es erneut." },
   },
   pages: {
-    home: { meta: { title: "Neueste OnlyFans Leaks - LeakFanHub", description: "Über 18.000.000 geleakte OnlyFans Fotos und Videos auf LeakFanHub, die neuesten der letzten Stunde zuerst. Kostenloses Streaming, keine Anmeldung, neue Posts jede Minute." } },
+    home: { meta: { title: "Neueste OnlyFans Leaks - LeakFanHub", description: "Millionen geleakte OnlyFans Fotos und Videos auf LeakFanHub, die neuesten zuerst. Kostenloses Streaming, keine Anmeldung, neue Posts jede Minute. Nur 18+." } },
     models: { meta: { title: "Models & Creator", description: "Durchsuche alle Creator auf LeakFanHub, sortiert nach Followern oder Aufrufen." } },
     trending: { meta: { title: "Medien im Trend", description: "Fotos und Videos im Trend, nach Interaktionen sortiert und laufend aktualisiert." } },
     mostLiked: { meta: { title: "Meistgeliked", description: "Die am häufigsten gelikten Fotos und Videos auf LeakFanHub." } },
