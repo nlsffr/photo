@@ -35,13 +35,13 @@ export function CookieBanner() {
       setOpened(false); setDismissed(true);
     } catch { if (value === "refused") { setOpened(false); setDismissed(true); } else { setError(true); } } finally { setPending(false); }
   }
-  return <section aria-label={copy.manage} className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-50 mx-auto max-w-lg px-3 lg:bottom-4">
-    <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-center shadow-2xl">
+  return <section aria-label={copy.manage} className="fixed inset-x-0 top-1/2 z-50 mx-auto max-w-lg -translate-y-1/2 px-3">
+    <div className="max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-2xl">
       <p className="text-sm text-[var(--color-ink-muted)]">{copy.body}{" "}
-        <Link href={localizedHref(locale,"/confidentialite")} className="font-semibold text-[var(--color-ink)] underline">{t("shell.cookies.more")}</Link>
+        <Link href={localizedHref(locale,"/confidentialite")} className="text-[var(--color-accent)] hover:underline">{t("shell.cookies.more")}</Link>
       </p>
-      <button type="button" disabled={pending} onClick={() => choose("accepted")} className="mt-3 min-h-11 w-full rounded-full bg-[#b62560] px-4 text-base font-bold text-white hover:bg-[#a51f55]">{copy.accept}</button>
-      <button type="button" disabled={pending} onClick={() => choose("refused")} className="mt-1 min-h-11 w-full px-4 text-base font-semibold text-[var(--color-ink)] underline underline-offset-4">{copy.refuse}</button>
+      <button type="button" disabled={pending} onClick={() => choose("accepted")} className="mt-3 min-h-11 w-full rounded-full bg-[var(--color-accent)] px-4 text-sm font-bold text-white hover:bg-[var(--color-accent-600)]">{copy.accept}</button>
+      <button type="button" disabled={pending} onClick={() => choose("refused")} className="mx-auto mt-1 flex min-h-11 items-center justify-center px-4 text-xs text-[var(--color-ink-muted)] underline underline-offset-4">{copy.refuse}</button>
       {error && <p role="alert" className="text-sm text-[var(--color-ink)]">{copy.error}</p>}
     </div>
   </section>;
