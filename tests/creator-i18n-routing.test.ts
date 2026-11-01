@@ -19,6 +19,7 @@ function setup(locale: "en" | "fr" | "es" | "de" | "it" | "pt" | "nl", options: 
   const FollowButton = () => null;
   const VerifiedBadge = () => null;
   const replacements: Record<string, unknown> = {
+    "./seo-editor-store": { readSeoOverride: async () => null },
     "@/lib/photos": {
       getCreatorCollectionContext: async () => ({ creator: { ...creator, removedFromIndexAt: options.removed ? "2026-10-29" : null }, stats: options.empty ? { ...stats, mediaCount: 0 } : stats }),
       getPhotos: async (query: Record<string, unknown>) => { queries.push(query); return { items: [], nextCursor: 60 }; },

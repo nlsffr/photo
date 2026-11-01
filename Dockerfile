@@ -58,6 +58,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/scripts/analytics-report.mjs ./sc
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/analytics-country-*.mjs ./scripts/
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/update-country-db.mjs ./scripts/update-country-db.mjs
 COPY --from=builder --chown=nextjs:nodejs /app/ops/backfill-source-engagement.mjs ./ops/backfill-source-engagement.mjs
+COPY --from=builder --chown=nextjs:nodejs /app/ops/prepare-seo-editor.mjs ./ops/prepare-seo-editor.mjs
 
 USER nextjs
 

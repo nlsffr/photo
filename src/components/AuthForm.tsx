@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useSession } from "./Session";
 import { useLocale } from "./LocaleProvider";
 import { localePath } from "@/lib/i18n/config";
+import { safeAuthReturnPath } from "@/lib/auth-return-path";
 
 /**
  * Email + username + password auth form (login / signup), wired to the real
@@ -53,7 +54,8 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
       };
       if (res.ok && json.ok) {
         await refresh();
-        router.push(localePath(locale, "/"));
+        const next = new URLSearchParams(window.location.search).get("next");
+        router.push(safeAuthReturnPath(next, localePath(locale, "/")));
         router.refresh();
       } else {
         setError(json.message ?? t("auth.genericError"));

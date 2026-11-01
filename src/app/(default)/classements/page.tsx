@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { applySeoPageMetadata } from "@/lib/seo-page-metadata";
 import Link from "next/link";
 import { getRankings } from "@/lib/photos";
 import { formatCount } from "@/lib/format";
@@ -6,10 +7,14 @@ import { creatorHref } from "@/lib/types";
 import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { MediaImg } from "@/components/MediaImg";
 
-export const metadata: Metadata = {
+const baseMetadata: Metadata = {
   title: "Classements",
   alternates: { canonical: "/classements" },
 };
+
+export async function generateMetadata(): Promise<Metadata> {
+  return applySeoPageMetadata(baseMetadata, "en", "rankings");
+}
 
 export default async function RankingsPage() {
   const ranked = await getRankings(30);

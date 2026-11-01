@@ -24,6 +24,7 @@ function routes() {
     followers: 10, verified: false, photoCount: 1, totalViews: 20, totalLikes: 0, coverUrl: "",
   };
   const replacements: Record<string, unknown> = {
+    "./seo-editor-store": { readSeoOverride: async () => null },
     "@/lib/photos": {
       getModels: async (...args: unknown[]) => { reads.push(args); return Array.from({ length: 61 }, (_, index) => ({ ...creator, handle: `fixture-${index}` })); },
       getModelCount: async () => 240,

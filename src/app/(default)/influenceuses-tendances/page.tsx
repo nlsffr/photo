@@ -1,12 +1,17 @@
 import type { Metadata } from "next";
+import { applySeoPageMetadata } from "@/lib/seo-page-metadata";
 import Link from "next/link";
 import { getModels } from "@/lib/photos";
 import { CreatorCard } from "@/components/CreatorCard";
 
-export const metadata: Metadata = {
+const baseMetadata: Metadata = {
   title: "Influenceuses tendances",
   alternates: { canonical: "/influenceuses-tendances" },
 };
+
+export async function generateMetadata(): Promise<Metadata> {
+  return applySeoPageMetadata(baseMetadata, "en", "influencers");
+}
 
 export default async function InfluenceusesTendancesPage() {
   // "Trending" = models whose content is getting the most views right now.

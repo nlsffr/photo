@@ -50,6 +50,12 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
   if (isSystemPath(pathname)) return NextResponse.next();
+  if (["/admin/seo", "/admin/seo/activate"].includes(pathname.replace(/\/$/, ""))) {
+    const response = NextResponse.next();
+    response.headers.set("X-Robots-Tag", "noindex, nofollow");
+    response.headers.set("Cache-Control", "private, no-store");
+    return response;
+  }
 
   const localized = stripLocalePrefix(pathname);
   if (localized.locale) {

@@ -24,6 +24,8 @@ import { isCreatorLocale, localePath, localizedHref, resolveLocalizedPage, type 
 import { DISCOVERY_COPY } from "./discovery-copy";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { buildLocalizedMetadata } from "@/lib/i18n/metadata";
+import { SEO_PAGES } from "@/lib/seo-editor-contract";
+import { applySeoPageMetadata } from "@/lib/seo-page-metadata";
 import { buildModelsPagePayload, modelsPagePath, MODELS_PAGE_SIZE, parseModelsSearch } from "@/lib/models-pagination";
 import { getAllTags, getModelCount, getModels, getPhotos, getRankings } from "@/lib/photos";
 import { type MediaType, type SortKey } from "@/lib/types";
@@ -109,7 +111,11 @@ export async function localizedPageMetadata(
     });
   }
   const copy = metaCopy(locale, pathname);
-  if (copy) return buildLocalizedMetadata(locale, pathname, copy, pathname === "/models" ? await searchParams : {});
+  if (copy) {
+    const metadata = buildLocalizedMetadata(locale, pathname, copy, pathname === "/models" ? await searchParams : {});
+    const page = SEO_PAGES.find((entry) => entry.path === pathname);
+    return page ? applySeoPageMetadata(metadata, locale, page.key) : metadata;
+  }
   return {
     title: getFunctionalTitle(locale, pathname),
     robots: { index: false, follow: true },

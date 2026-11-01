@@ -152,3 +152,14 @@ test("collection lookup outages fail closed and malformed collection handles nev
     assert.deepEqual(lookups, []);
   }
 });
+
+test("only the private editor paths reach their own authorization without media lookup", async () => {
+  const { request, lookups } = collectionProxy();
+  for (const path of ["/admin/seo", "/admin/seo/activate"]) {
+    const response = await request(path);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("X-Robots-Tag"), "noindex, nofollow");
+    assert.equal(response.headers.get("Cache-Control"), "private, no-store");
+  }
+  assert.deepEqual(lookups, []);
+});

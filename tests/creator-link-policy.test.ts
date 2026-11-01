@@ -121,6 +121,7 @@ test("localized discovery surfaces link only to translated or canonical creator 
     const creatorPath = `/${locale}/aria-lune-v3`;
     const replacements: Record<string, unknown> = {
       ...boundaries,
+      "./seo-editor-store": { readSeoOverride: async () => null },
       "./LocaleProvider": { useLocale: () => ({ locale, t: (key: string) => key }) },
       "@/lib/photos": {
         getModels: async () => [creator],

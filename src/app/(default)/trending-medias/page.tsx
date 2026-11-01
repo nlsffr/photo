@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { applySeoPageMetadata } from "@/lib/seo-page-metadata";
 import Link from "next/link";
 import { getPhotos } from "@/lib/photos";
 import { InfiniteGallery } from "@/components/InfiniteGallery";
@@ -8,7 +9,7 @@ export const revalidate = 30;
 
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").replace(/\/$/, "");
 
-export const metadata: Metadata = {
+const baseMetadata: Metadata = {
   title: "Tendances",
   description:
     "Médias en tendance sur LeakFanHub — classés par vues et likes. Mis à jour en continu. 18+.",
@@ -21,6 +22,10 @@ export const metadata: Metadata = {
     siteName: "LeakFanHub",
   },
 };
+
+export async function generateMetadata(): Promise<Metadata> {
+  return applySeoPageMetadata(baseMetadata, "en", "trending");
+}
 
 const WINDOWS = [
   { key: "day", label: "24 h", minutes: 60 * 24 },

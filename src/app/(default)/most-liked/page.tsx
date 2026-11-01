@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { applySeoPageMetadata } from "@/lib/seo-page-metadata";
 import { getPhotos } from "@/lib/photos";
 import { InfiniteGallery } from "@/components/InfiniteGallery";
 
@@ -6,7 +7,7 @@ export const revalidate = 30;
 
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").replace(/\/$/, "");
 
-export const metadata: Metadata = {
+const baseMetadata: Metadata = {
   title: "Most liked",
   description:
     "Most liked photos and videos on LeakFanHub. Sorted by likes only. 18+.",
@@ -19,6 +20,10 @@ export const metadata: Metadata = {
     siteName: "LeakFanHub",
   },
 };
+
+export async function generateMetadata(): Promise<Metadata> {
+  return applySeoPageMetadata(baseMetadata, "en", "mostLiked");
+}
 
 function first(v?: string | string[]) {
   return Array.isArray(v) ? v[0] : v;

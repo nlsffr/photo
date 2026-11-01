@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { applySeoPageMetadata } from "@/lib/seo-page-metadata";
 import { getPhotos, getAllTags } from "@/lib/photos";
 import type { MediaType, SortKey } from "@/lib/types";
 import { InfiniteGallery } from "@/components/InfiniteGallery";
@@ -21,7 +22,7 @@ const VALID_SORTS: SortKey[] = [
   "random",
 ];
 
-export const metadata: Metadata = {
+const baseMetadata: Metadata = {
   title: {
     absolute: "Latest OnlyFans Leaks - LeakFanHub",
   },
@@ -30,6 +31,10 @@ export const metadata: Metadata = {
   alternates: { canonical: "/" },
   robots: { index: true, follow: true, "max-image-preview": "large" },
 };
+
+export async function generateMetadata(): Promise<Metadata> {
+  return applySeoPageMetadata(baseMetadata, "en", "home");
+}
 
 function first(v?: string | string[]): string | undefined {
   return Array.isArray(v) ? v[0] : v;

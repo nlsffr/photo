@@ -9,6 +9,7 @@ import {
   type ModelsSearchParams,
 } from "@/lib/models-pagination";
 import { modelsPageAlternates } from "@/lib/i18n/metadata";
+import { applySeoPageMetadata } from "@/lib/seo-page-metadata";
 import { creatorHref } from "@/lib/types";
 import { ModelsGrid } from "@/components/ModelsGrid";
 import { JsonLd } from "@/components/JsonLd";
@@ -35,11 +36,11 @@ type Props = { searchParams: Promise<ModelsSearchParams> };
 
 export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
   const alternates = modelsPageAlternates(await searchParams);
-  return {
+  return applySeoPageMetadata({
     ...baseMetadata,
     alternates,
     openGraph: { ...baseMetadata.openGraph, url: `${SITE}${alternates.canonical}` },
-  };
+  }, "en", "models");
 }
 
 export default async function ModelsPage({
