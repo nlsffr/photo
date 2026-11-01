@@ -17,6 +17,7 @@ import math
 import os
 from pathlib import Path
 import re
+import signal
 import sqlite3
 import stat
 import sys
@@ -395,4 +396,8 @@ def main(argv=None):
 
 
 if __name__ == '__main__':
+    def stop_cleanly(*_):
+        # Unwind the download's TemporaryDirectory and locks before a restart.
+        raise KeyboardInterrupt
+    signal.signal(signal.SIGTERM, stop_cleanly)
     raise SystemExit(main())
