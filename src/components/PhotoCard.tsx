@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PhotoView } from "@/lib/types";
 import { creatorHref, mediaHref } from "@/lib/types";
 import { localizedHref } from "@/lib/i18n/config";
@@ -38,22 +38,33 @@ export function PhotoCard({
   const href = localizedHref(locale, mediaHref(photo));
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [hovering, setHovering] = useState(false);
+  const hoverActive = useRef(false);
+  const previewRequest = useRef(0);
+  const [previewSource, setPreviewSource] = useState<string | null>(null);
   const isVideo = photo.type === "video" && !!photo.videoUrl;
+  const previewVisible = isVideo && previewSource === photo.videoUrl;
   const thumbnail = mediaThumbnailUrl(photo);
 
-  const onEnter = () => {
-    if (!isVideo) return;
-    setHovering(true);
+  const onEnter = (event: React.PointerEvent<HTMLDivElement>) => {
+    // Touch can synthesize mouse events; only a real mouse pointer previews.
+    if (!isVideo || event.pointerType !== "mouse" || event.buttons !== 0) return;
+    hoverActive.current = true;
     const v = videoRef.current;
     if (!v) return;
+    const request = ++previewRequest.current;
     v.currentTime = 0;
     v.muted = true;
-    void v.play().catch(() => undefined);
+    void v.play().catch(() => {
+      if (request !== previewRequest.current) return;
+      hoverActive.current = false;
+      setPreviewSource(null);
+    });
   };
 
   const onLeave = () => {
-    setHovering(false);
+    hoverActive.current = false;
+    previewRequest.current += 1;
+    setPreviewSource(null);
     const v = videoRef.current;
     if (!v) return;
     v.pause();
@@ -66,12 +77,21 @@ export function PhotoCard({
     if (v.currentTime >= PREVIEW_MAX_SEC) v.currentTime = 0;
   };
 
+  useEffect(() => {
+    const video = videoRef.current;
+    return () => {
+      hoverActive.current = false;
+      previewRequest.current += 1;
+      video?.pause();
+    };
+  }, []);
+
   return (
     <div
       className="group relative isolate w-full overflow-hidden rounded-xl bg-[var(--color-surface-2)]"
       style={{ aspectRatio: CARD_RATIO }}
-      onMouseEnter={onEnter}
-      onMouseLeave={onLeave}
+      onPointerEnter={onEnter}
+      onPointerLeave={onLeave}
     >
       <Link
         href={href}
@@ -86,11 +106,12 @@ export function PhotoCard({
           alt={photo.title}
           fill
           sizes={SIZES}
-          className={`pointer-events-none animate-fade-in object-cover object-center transition-opacity duration-300 ${hovering && isVideo ? "opacity-0" : "opacity-100"}`}
+          className={`pointer-events-none animate-fade-in object-cover object-center transition-opacity duration-300 ${previewVisible ? "opacity-0" : "opacity-100"}`}
         />
 
         {isVideo && (
           <video
+            key={photo.videoUrl}
             ref={videoRef}
             src={photo.videoUrl}
             muted
@@ -98,7 +119,17 @@ export function PhotoCard({
             preload="none"
             loop
             onTimeUpdate={onTimeUpdate}
-            className={`pointer-events-none absolute inset-0 h-full w-full object-cover object-center transition-opacity duration-300 ${hovering ? "opacity-100" : "opacity-0"}`}
+            onPlaying={(event) => {
+              if (hoverActive.current && !event.currentTarget.paused) setPreviewSource(photo.videoUrl!);
+              else event.currentTarget.pause();
+            }}
+            onPause={() => setPreviewSource(null)}
+            onError={() => {
+              hoverActive.current = false;
+              previewRequest.current += 1;
+              setPreviewSource(null);
+            }}
+            className={`pointer-events-none absolute inset-0 h-full w-full object-cover object-center transition-opacity duration-300 ${previewVisible ? "opacity-100" : "opacity-0"}`}
           />
         )}
 
@@ -111,7 +142,7 @@ export function PhotoCard({
           </span>
         )}
 
-        {isVideo && !hovering && (
+        {isVideo && !previewVisible && (
           <>
             <span className="absolute inset-0 grid place-items-center">
               <span className="grid h-10 w-10 place-items-center rounded-full bg-black/45 ring-1 ring-white/35 backdrop-blur-sm">

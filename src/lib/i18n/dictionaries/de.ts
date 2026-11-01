@@ -59,7 +59,7 @@ export const deDictionary = {
   },
   video: {
     errorTitle: "Video kann nicht abgespielt werden",
-    errorBody: "Große Datei oder langsame Verbindung — versuche es erneut.",
+    errorBody: "Das Video konnte nicht geladen werden. Versuche es gleich erneut.",
     retry: "Erneut versuchen",
     loading: "Video wird geladen…",
     progress: "Fortschritt",

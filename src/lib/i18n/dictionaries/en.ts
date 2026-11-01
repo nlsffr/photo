@@ -165,7 +165,7 @@ export const enDictionary = {
   },
   video: {
     errorTitle: "Unable to play the video",
-    errorBody: "Large file or slow network — try again.",
+    errorBody: "The video could not be loaded. Try again in a moment.",
     retry: "Try again",
     loading: "Loading video…",
     progress: "Progress",

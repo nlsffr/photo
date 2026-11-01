@@ -72,7 +72,7 @@ export const esDictionary = {
   },
   video: {
     errorTitle: "No se puede reproducir el vídeo",
-    errorBody: "Archivo grande o conexión lenta; inténtalo de nuevo.",
+    errorBody: "No se pudo cargar el vídeo. Inténtalo de nuevo en un momento.",
     retry: "Intentar de nuevo",
     loading: "Cargando vídeo…",
     progress: "Progreso",

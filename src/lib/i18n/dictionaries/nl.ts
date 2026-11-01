@@ -167,7 +167,7 @@ export const nlDictionary = {
   },
   video: {
     errorTitle: "Video kan niet worden afgespeeld",
-    errorBody: "Groot bestand of trage verbinding — probeer het opnieuw.",
+    errorBody: "De video kon niet worden geladen. Probeer het zo nog eens.",
     retry: "Opnieuw proberen",
     loading: "Video laden…",
     progress: "Voortgang",

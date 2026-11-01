@@ -59,7 +59,7 @@ export const ptDictionary = {
   },
   video: {
     errorTitle: "Não foi possível reproduzir o vídeo",
-    errorBody: "Ficheiro grande ou ligação lenta — tente novamente.",
+    errorBody: "Não foi possível carregar o vídeo. Tenta novamente dentro de instantes.",
     retry: "Tentar novamente",
     loading: "A carregar vídeo…",
     progress: "Progresso",

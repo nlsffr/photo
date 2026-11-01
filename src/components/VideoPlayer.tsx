@@ -28,7 +28,12 @@ function Icon({ d, size = 18 }: { d: string; size?: number }) {
   );
 }
 
-export function VideoPlayer({
+export function VideoPlayer(props: Props) {
+  // A new source owns fresh playback state and invalidates the previous promises.
+  return <VideoPlayerSource key={props.src} {...props} />;
+}
+
+function VideoPlayerSource({
   src,
   poster,
   title,
@@ -44,7 +49,8 @@ export function VideoPlayer({
   const copy = dictionary.video;
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const shellRef = useRef<HTMLDivElement | null>(null);
-  const [playing, setPlaying] = useState(autoPlay);
+  const playRequest = useRef(0);
+  const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(mutedProp);
   const [speed, setSpeed] = useState(1);
   const [progress, setProgress] = useState(0);
@@ -52,38 +58,51 @@ export function VideoPlayer({
   const [current, setCurrent] = useState(0);
   const [buffering, setBuffering] = useState(false);
   const [error, setError] = useState(false);
-  const [ratio, setRatio] = useState<number | null>(() => {
+  const [ratio, setRatio] = useState(() => {
     if (width && height && width > 0 && height > 0) return width / height;
-    return null;
+    return 16 / 9;
   });
+
+  const playFailed = useCallback((reason: unknown, request: number, video: HTMLVideoElement) => {
+    if (request !== playRequest.current || videoRef.current !== video) return;
+    setPlaying(false);
+    setBuffering(false);
+    const name = reason && typeof reason === "object" && "name" in reason ? reason.name : "";
+    // A replaced request or a browser autoplay policy is not a broken file.
+    if (name !== "AbortError" && name !== "NotAllowedError") setError(true);
+  }, []);
+
+  const startPlayback = useCallback((reload = false) => {
+    const video = videoRef.current;
+    if (!video) return;
+    const request = ++playRequest.current;
+    setError(false);
+    setBuffering(true);
+    if (reload) {
+      setCurrent(0);
+      setProgress(0);
+      video.load();
+    }
+    void video.play().then(() => {
+      if (request !== playRequest.current || videoRef.current !== video || video.paused) return;
+      setPlaying(true);
+    }).catch((reason: unknown) => playFailed(reason, request, video));
+  }, [playFailed]);
 
   const togglePlay = useCallback(() => {
     const v = videoRef.current;
     if (!v || error) return;
     if (v.paused) {
-      setBuffering(true);
-      void v.play().then(() => setPlaying(true)).catch(() => {
-        setPlaying(false);
-        setBuffering(false);
-      });
+      startPlayback();
     } else {
+      playRequest.current += 1;
       v.pause();
       setPlaying(false);
-    }
-  }, [error]);
-
-  const retry = useCallback(() => {
-    const v = videoRef.current;
-    setError(false);
-    setBuffering(true);
-    if (!v) return;
-    v.load();
-    void v.play().then(() => setPlaying(true)).catch(() => {
-      setPlaying(false);
       setBuffering(false);
-      setError(true);
-    });
-  }, []);
+    }
+  }, [error, startPlayback]);
+
+  const retry = useCallback(() => startPlayback(true), [startPlayback]);
 
   const toggleMute = useCallback(() => {
     const v = videoRef.current;
@@ -161,22 +180,20 @@ export function VideoPlayer({
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
-    setError(false);
-    setBuffering(false);
     v.muted = muted;
-    if (autoPlay) {
-      setBuffering(true);
-      void v.play().catch(() => {
-        setPlaying(false);
-        setBuffering(false);
-      });
-    }
-  }, [autoPlay, muted, src]);
+  }, [muted]);
 
-  const aspectStyle =
-    ratio && ratio > 0
-      ? { aspectRatio: String(ratio), maxHeight: "85vh" }
-      : { maxHeight: "85vh" };
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (autoPlay) {
+      const request = ++playRequest.current;
+      void v.play().catch((reason: unknown) => playFailed(reason, request, v));
+    }
+    return () => { playRequest.current += 1; };
+  }, [autoPlay, playFailed]);
+
+  const aspectStyle = { aspectRatio: String(ratio), maxHeight: "85vh" };
 
   return (
     <div
@@ -195,13 +212,15 @@ export function VideoPlayer({
         onTimeUpdate={onTime}
         onWaiting={() => setBuffering(true)}
         onStalled={() => setBuffering(true)}
-        onPlaying={() => {
+        onPlaying={(event) => {
+          if (event.currentTarget.paused) return;
           setBuffering(false);
           setError(false);
           setPlaying(true);
         }}
         onCanPlay={() => setBuffering(false)}
         onError={() => {
+          playRequest.current += 1;
           setError(true);
           setBuffering(false);
           setPlaying(false);

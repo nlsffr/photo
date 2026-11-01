@@ -59,7 +59,7 @@ export const itDictionary = {
   },
   video: {
     errorTitle: "Impossibile riprodurre il video",
-    errorBody: "File grande o connessione lenta: riprova.",
+    errorBody: "Non è stato possibile caricare il video. Riprova tra poco.",
     retry: "Riprova",
     loading: "Caricamento del video…",
     progress: "Avanzamento",

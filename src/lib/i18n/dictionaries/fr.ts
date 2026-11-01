@@ -167,7 +167,7 @@ export const frDictionary = {
   },
   video: {
     errorTitle: "Impossible de lire la vidéo",
-    errorBody: "Fichier lourd ou réseau lent — réessaie.",
+    errorBody: "La vidéo n’a pas pu être chargée. Réessaie dans un instant.",
     retry: "Réessayer",
     loading: "Chargement de la vidéo…",
     progress: "Progression",
