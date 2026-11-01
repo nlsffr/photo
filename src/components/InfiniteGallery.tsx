@@ -32,15 +32,28 @@ export function InfiniteGallery({ initial, params, premium = false }: Props) {
   const seenRef = useRef<Set<string>>(new Set(initial.items.map((i) => i.id)));
   const seedRef = useRef<number | undefined>(initial.seed);
   const cursorRef = useRef<number | null>(initial.nextCursor);
+  const generationRef = useRef(0);
+  const requestRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
+    generationRef.current += 1;
+    requestRef.current?.abort();
+    requestRef.current = null;
+    loadingRef.current = false;
+    setLoading(false);
     setItems(initial.items);
     setCursor(initial.nextCursor);
     cursorRef.current = initial.nextCursor;
     seedRef.current = initial.seed;
     seenRef.current = new Set(initial.items.map((i) => i.id));
     setErrored(false);
-  }, [initial]);
+    return () => {
+      generationRef.current += 1;
+      requestRef.current?.abort();
+      requestRef.current = null;
+      loadingRef.current = false;
+    };
+  }, [initial, params.sort, params.tag, params.q, params.creator, params.type, params.ai]);
 
   useEffect(() => {
     cursorRef.current = cursor;
@@ -67,20 +80,32 @@ export function InfiniteGallery({ initial, params, premium = false }: Props) {
     const c = cursorRef.current;
     if (loadingRef.current || c === null) return;
     loadingRef.current = true;
+    const generation = generationRef.current;
+    const controller = new AbortController();
+    requestRef.current = controller;
+    const currentRequest = () => generation === generationRef.current && requestRef.current === controller;
     setLoading(true);
     try {
-      const res = await fetch(buildUrl(c), { cache: "no-store" });
+      const res = await fetch(buildUrl(c), { cache: "no-store", signal: controller.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const page: PhotoPage = await res.json();
+      if (!currentRequest()) return;
+      // A server must either finish or advance. Do not loop on a stuck cursor.
+      if (page.nextCursor !== null && (!Number.isSafeInteger(page.nextCursor) || page.nextCursor <= c)) {
+        throw new Error("non_advancing_cursor");
+      }
       if (page.seed !== undefined) seedRef.current = page.seed;
 
-      const fresh = page.items.filter((p) => !seenRef.current.has(p.id));
-      for (const p of fresh) seenRef.current.add(p.id);
+      const fresh = page.items.filter((p) => {
+        if (seenRef.current.has(p.id)) return false;
+        seenRef.current.add(p.id);
+        return true;
+      });
       if (fresh.length > 0) {
         setItems((prev) => [...prev, ...fresh]);
       }
 
-      if (page.nextCursor === null || page.nextCursor === c || fresh.length === 0) {
+      if (page.nextCursor === null) {
         setCursor(null);
         cursorRef.current = null;
       } else {
@@ -89,10 +114,14 @@ export function InfiniteGallery({ initial, params, premium = false }: Props) {
       }
       setErrored(false);
     } catch {
+      if (!currentRequest() || controller.signal.aborted) return;
       setErrored(true);
     } finally {
-      loadingRef.current = false;
-      setLoading(false);
+      if (currentRequest()) {
+        requestRef.current = null;
+        loadingRef.current = false;
+        setLoading(false);
+      }
     }
   }, [buildUrl]);
 
