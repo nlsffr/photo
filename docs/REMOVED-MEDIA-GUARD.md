@@ -79,11 +79,24 @@ previous file atomically.
 
 It reads `DATABASE_URL` from `/opt/photo/.env` and then
 `/opt/photo/.env.prod` (the latter wins when both define it). Credentials and
-the database name are parsed from that URL, but its hostname is deliberately
-ignored: the service forces `127.0.0.1`, which is the working host-side
-MariaDB endpoint. `MEDIA_TOMBSTONE_DB_HOST` can override the script default,
+the database name are parsed from that URL. The service uses
+`--database-container photo-mariadb-1` to resolve the current container IP from
+`docker inspect --format '{{json .NetworkSettings.Networks}}'` on each run.
+Only network metadata is inspected; no container environment or root database
+password is read. MariaDB no longer publishes port 3306 on the host, so the old
+loopback endpoint fails. No host port needs to be opened and the IP is not pinned.
+Missing or ambiguous container networks stop the refresh and preserve the old map.
+
+For another deployment, `--database-host` or `MEDIA_TOMBSTONE_DB_HOST` selects a direct TCP host,
 and `MEDIA_TOMBSTONE_DB_PORT` or the URL port selects the TCP port. Neither the
 URL nor connector errors containing account details are written to logs.
+
+The service also opts into `--preserve-existing`: its existing generated creator
+and object entries are unioned with the current SQL result. An empty SQL result
+cannot clear existing protections. An unfamiliar or malformed old map fails before
+any write. This mode is deliberately opt-in and does not change the generator's
+default behavior. Removing an existing protection requires a separate reviewed
+action; the recurring refresh never makes that decision automatically.
 
 ```bash
 python3 -c 'import mysql.connector'
@@ -111,3 +124,8 @@ one day to five minutes limits future stale windows after the edge honors the
 new header, but objects cached earlier can survive until their old TTL expires.
 Configure and test the provider's authenticated purge API separately before
 claiming immediate external-cache removal.
+
+The maintained production unit runs its script from a clean versioned release
+under `/opt/photo-media-safety/current`, while preserving the existing environment
+files and generated-directory mount. No build or script replacement in the dirty
+`/opt/photo` source tree is needed.

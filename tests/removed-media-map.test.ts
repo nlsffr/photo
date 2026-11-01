@@ -253,9 +253,10 @@ test("nginx, systemd, and the runbook wire the generated guard without touching 
   assert.match(service, /\/opt\/photo\/infra\/nginx\/generated/);
   assert.match(service, /EnvironmentFile=-\/opt\/photo\/\.env/);
   assert.match(service, /EnvironmentFile=-\/opt\/photo\/\.env\.prod/);
-  assert.match(service, /--database-host 127\.0\.0\.1/);
+  assert.match(service, /--database-container photo-mariadb-1/);
+  assert.match(service, /--preserve-existing/);
   assert.match(service, /RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6/);
-  assert.doesNotMatch(service, /database-container|MARIADB_ROOT_PASSWORD/);
+  assert.doesNotMatch(service, /MARIADB_ROOT_PASSWORD/);
   assert.match(timer, /OnUnitActiveSec=1min/);
   assert.match(runbook, /photo-edge-1/);
   assert.match(runbook, /docker inspect/);
