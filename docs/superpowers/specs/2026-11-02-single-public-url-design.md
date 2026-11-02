@@ -22,11 +22,11 @@ Les API, médias binaires, `_next`, fichiers publics, robots/sitemaps et routes 
 
 Retirer la redirection `/creator/:handle` de next.config qui s’exécute avant le Proxy : le Proxy conserve seul sa résolution validée, y compris les handles versionnés. Construire les redirections à partir d’une URL canonique clonée, en affectant pathname/search ; jamais une concaténation susceptible de devenir une destination externe. Refuser antislashs et séparateurs encodés sur les anciennes variantes.
 
-Réponses HTML/RSC négociées : `Cache-Control: private, no-store`, `Vary` ajoutant Cookie et Accept-Language sans supprimer les valeurs RSC/Next. Retirer les règles HTML `s-maxage=120` de next.config ; conserver le cache des ressources statiques, icônes et médias. Les données partagées neutres et caches explicitement clés par langue peuvent rester. Un changement manuel de langue force un rechargement document complet afin d’éviter un ancien Router Cache.
+Réponses HTML/RSC négociées : `Cache-Control: private, no-store`. Le Proxy propose un `Vary` fusionné Cookie/Accept-Language ; le test du candidat Next16.4.3 a montré que le rendu final conserve seulement les variantes RSC/Next. La protection retenue et vérifiée sur HTML et RSC est donc `private, no-store`, qui interdit stockage/réutilisation aux caches conformes. Aucun patch du framework ni changement de l’edge n’est ajouté pour modifier ce seul en-tête. Cette décision suit RFC9110 §12.5.5 et RFC9111 §5.2.2.5. Retirer les règles HTML `s-maxage=120` de next.config ; conserver le cache des ressources statiques, icônes et médias. Les données partagées neutres et caches explicitement clés par langue peuvent rester. Un changement manuel de langue force un rechargement document complet afin d’éviter un ancien Router Cache.
 
 Les sitemaps médias sont déjà nus : partitions, frontières et requêtes SQL inchangées. Les sitemaps statiques et créateurs ne produisent qu’une entrée nue par ressource ; supprimer les hreflang de variantes. Aucune recréation de catalogue, aucune modification de noindex ni soumission d’indexation.
 
-L’éditeur SEO conserve ses42 entrées (6 pages ×7 langues) et toutes leurs valeurs. Son invalidation vise la page publique et son renderer interne pour la langue enregistrée.
+L’éditeur SEO conserve ses42 combinaisons (6 pages ×7 langues), dont7 overrides sauvegardés en base pour l’accueil dans le relevé réel, et toutes leurs valeurs. Les autres combinaisons utilisent les valeurs par défaut existantes. Son invalidation vise la page publique et son renderer interne pour la langue enregistrée.
 
 ## Découpage et propriété des fichiers
 
