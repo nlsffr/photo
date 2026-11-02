@@ -103,6 +103,31 @@ class DashboardTests(unittest.TestCase):
         with self.assertRaises(dashboard.DashboardUnavailable):
             self.tool.snapshot()
 
+    def test_enabled_slot_without_worker_reports_pause_or_waiting_honestly(self):
+        for phase, expected in [('network_paused', 'paused'), ('storage_paused', 'paused'), ('waiting_work', 'waiting')]:
+            self.raw['phase'] = phase
+            self.write('status.json', self.raw)
+            item = self.tool.item('mega-1', 'Mégabot 1', lambda: None)
+            self.assertEqual((item['state'], item['activity'], item['workerState']), (expected, expected, expected))
+            self.assertTrue(item['enabled'])
+            self.assertEqual((item['pid'], item['actions']), (None, ['stop']))
+
+    def test_live_worker_is_distinct_from_enabled_slot_during_global_pause(self):
+        self.process(91, '_worker', 'owner-1')
+        self.raw['phase'] = 'network_paused'
+        self.raw['slots'][0].update(pid=91, owner='owner-1', state='running')
+        self.write('status.json', self.raw)
+        item = self.tool.item('mega-1', 'Mégabot 1', lambda: None)
+        self.assertEqual((item['state'], item['workerState'], item['activity']), ('running', 'running', 'unknown'))
+        self.assertTrue(item['enabled'])
+
+    def test_health_can_read_failure_phase_without_enabling_commands(self):
+        self.raw.update(phase='source_changed', pause_kind='network', pause_until=120)
+        self.write('status.json', self.raw)
+        self.assertEqual(self.tool.health_snapshot()['phase'], 'source_changed')
+        with self.assertRaises(dashboard.DashboardUnavailable):
+            self.tool.set_enabled('mega-1', True)
+
     def test_reused_supervisor_pid_or_unowned_running_slot_is_unavailable(self):
         (self.proc / '90' / 'cmdline').write_bytes(b'python\0another_script.py\0')
         with self.assertRaises(dashboard.DashboardUnavailable):
@@ -213,6 +238,17 @@ class ControllerTests(unittest.TestCase):
         tool.set_enabled.assert_called_once_with('mega-1', False)
         opened.assert_not_called()
         self.assertEqual(reply['result'], 'stop_requested')
+
+    def test_status_collects_health_once_without_changing_bot_controls(self):
+        observed = Mock(); observed.snapshot.return_value = {'version':1,'queue':{'phase':'network_paused'}}
+        tool = self.managed()
+        self.controller.pipeline_health = observed
+        with patch.object(controller, 'managed_queue', return_value=tool), patch.object(controller, 'service_status', return_value=[]):
+            result = self.controller.status()
+        observed.snapshot.assert_called_once_with()
+        self.assertEqual(result['pipelineHealth']['queue']['phase'],'network_paused')
+        self.assertEqual(len(result['bots']),1)
+        self.assertEqual(result['bots'][0]['actions'],['stop'])
 
 
 if __name__ == '__main__':

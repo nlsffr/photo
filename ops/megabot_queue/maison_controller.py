@@ -22,6 +22,7 @@ import subprocess
 import sys
 import threading
 import time
+from ops.megabot_queue import health
 
 CONFIG=Path('/etc/maison-commandes/bots.json')
 SOCKET=Path('/run/maison-commandes/control.sock')
@@ -72,16 +73,16 @@ def managed_queue(proc=Path('/proc')):
     # Installation markers fail closed even if the helper or service is broken.
     if not os.path.lexists(QUEUE_CONFIG) and not os.path.lexists(QUEUE_CURRENT):return None
     try:
-        root=QUEUE_CURRENT.resolve(strict=True)
-        if str(QUEUE_CURRENT) not in sys.path:sys.path.insert(0,str(QUEUE_CURRENT))
+        QUEUE_CURRENT.resolve(strict=True)
         from ops.megabot_queue import dashboard
-        if Path(dashboard.__file__).resolve()!=root/'ops/megabot_queue/dashboard.py':raise ValueError('wrong_helper')
+        if Path(dashboard.__file__).resolve()!=Path(__file__).resolve().with_name('dashboard.py'):raise ValueError('wrong_helper')
         return dashboard.Dashboard(proc=proc)
     except Exception:raise ControlError('managed_queue_unavailable',409) from None
 
 class Controller:
     def __init__(self,config,*,proc=Path('/proc'),audit=AUDIT):
         self.entries={b['id']:b for b in config['bots']};self.proc=proc;self.audit=audit;self.lock=threading.Lock();self.children=[]
+        self.pipeline_health=health.PipelineHealth(queue_reader=lambda:managed_queue(self.proc),proc=self.proc)
     def process(self,p):
         try:
             fields=(p/'stat').read_text().rsplit(')',1)[1].split()
@@ -136,7 +137,10 @@ class Controller:
           'recent':counts,'progress':progress,'actions':[] if state=='error' else ['stop'] if matches else ['start']}
     def status(self):
         self.children=[p for p in self.children if p.poll() is None]
-        return {'ok':True,'observedAt':now(),'bots':[self.item(b) for b in self.entries.values()],'services':service_status()}
+        result={'ok':True,'observedAt':now(),'bots':[self.item(b) for b in self.entries.values()],'services':service_status()}
+        try:result['pipelineHealth']=self.pipeline_health.snapshot()
+        except Exception:result['pipelineHealth']=None
+        return result
     def record(self,bot,action,result):
         self.audit.parent.mkdir(mode=0o700,parents=True,exist_ok=True)
         flags=os.O_WRONLY|os.O_CREAT|os.O_APPEND|os.O_NOFOLLOW

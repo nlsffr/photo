@@ -17,6 +17,8 @@ CURRENT = Path('/opt/megabot-queue/current')
 STATE = Path('/var/lib/megabot-queue')
 AVAILABLE_PHASES = frozenset(('waiting_legacy', 'running', 'waiting_work',
                               'storage_paused', 'network_paused', 'paused_storage', 'paused_database'))
+HEALTH_PHASES = AVAILABLE_PHASES | {'starting', 'waiting_workers', 'source_changed', 'stopping', 'stopped', 'unknown'}
+PAUSED_PHASES = frozenset(('storage_paused', 'network_paused', 'paused_storage', 'paused_database'))
 
 
 class DashboardUnavailable(RuntimeError):
@@ -68,10 +70,10 @@ class Dashboard:
         except (OSError, ValueError, StopIteration, IndexError):
             return False
 
-    def snapshot(self):
+    def _snapshot(self, allowed_phases):
         try:
             raw = self._json(self.root / 'status.json')
-            if not isinstance(raw, dict) or raw.get('phase') not in AVAILABLE_PHASES:
+            if not isinstance(raw, dict) or raw.get('phase') not in allowed_phases:
                 raise DashboardUnavailable()
             updated = raw.get('updated_at')
             if (type(updated) not in (int, float) or not math.isfinite(updated)
@@ -92,9 +94,21 @@ class Dashboard:
                         or not isinstance(row.get('owner'), str) or not row['owner']):
                     raise DashboardUnavailable()
                 slots[row['slot']] = {key: row.get(key) for key in ('slot', 'pid', 'owner', 'handle', 'state')}
-            return {'phase': raw['phase'], 'updated_at': updated, 'slots': slots}
+            pause = raw.get('pause_until')
+            try: pause = pause if type(pause) in (int, float) and math.isfinite(pause) and pause >= 0 else None
+            except OverflowError: pause = None
+            return {'phase': raw['phase'], 'updated_at': updated, 'slots': slots,
+                    'pause_kind': raw.get('pause_kind') if raw.get('pause_kind') in ('network', 'storage') else None,
+                    'pause_until': pause}
         except Exception:
             raise DashboardUnavailable() from None
+
+    def snapshot(self):
+        return self._snapshot(AVAILABLE_PHASES)
+
+    def health_snapshot(self):
+        # Observation accepts terminal/error phases; mutation keeps its narrower gate.
+        return self._snapshot(HEALTH_PHASES)
 
     def disabled_slots(self):
         try:
@@ -154,16 +168,19 @@ class Dashboard:
             legacy = legacy_item()
             if legacy['state'] == 'error' or legacy.get('pid'):
                 return {**legacy, 'managedQueue': True, 'queuePhase': snapshot['phase'],
+                        'enabled': enabled, 'workerState': 'running' if legacy.get('pid') else None,
                         'actions': ['stop'] if enabled and legacy.get('pid') and legacy['state'] != 'error' else []}
         row = snapshot['slots'][slot]
         pid = row['pid'] if self._alive(row['pid'], '_worker', row['owner']) else None
-        state = 'running' if pid else 'active' if enabled else 'stopped'
+        state = ('running' if pid else 'stopped' if not enabled else
+                 'paused' if snapshot['phase'] in PAUSED_PHASES else 'waiting')
         handle = row['handle']
         if not isinstance(handle, str) or not re.fullmatch(r'[A-Za-z0-9_.-]{1,200}', handle):
             handle = None
         return {'id': bot_id, 'name': name, 'kind': 'process', 'state': state,
-                'activity': 'unknown', 'pid': pid, 'range': None, 'lastLogAt': None,
+                'activity': 'unknown' if pid else state, 'pid': pid, 'range': None, 'lastLogAt': None,
                 'recent': {'success': None, 'errors': None, 'skipped': None}, 'progress': None,
                 'actions': ['stop'] if enabled else [] if pid else ['start'],
                 'managedQueue': True, 'queuePhase': snapshot['phase'], 'currentHandle': handle,
+                'enabled': enabled, 'workerState': state,
                 'queueObservedAt': dt.datetime.fromtimestamp(snapshot['updated_at'], dt.timezone.utc).isoformat()}
