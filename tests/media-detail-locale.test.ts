@@ -60,23 +60,26 @@ test("media page UI, creator links and back controls use all seven active locale
     }
     assert.ok(visible.includes(photo.title), `${locale}: keep the source title`);
     assert.ok(visible.includes(dictionary.mediaDetails.allMedia.replace("{handle}", "aria")));
-    assert.ok(nodes(tree).some((node) => node.props.href === `/${locale}/aria-v3`));
-    assert.ok(nodes(tree).some((node) => node.props.fallback === `/${locale}` && node.props.label === dictionary.creator.back));
+    assert.ok(nodes(tree).some((node) => node.props.href === "/aria-v3"));
+    assert.ok(nodes(tree).some((node) => node.props.fallback === "/" && node.props.label === dictionary.creator.back));
+    const data = nodes(tree).find((node) => Array.isArray(node.props.data))?.props.data;
+    assert.ok(data, `${locale}: media structured data is present`);
+    const serialized = JSON.stringify(data);
+    assert.ok(serialized.includes("https://leakfanhub.com/aria/123-v2"));
+    assert.ok(serialized.includes("https://leakfanhub.com/aria-v3"));
+    assert.doesNotMatch(serialized, /https:\/\/leakfanhub\.com\/(?:en|fr|es|de|it|pt|nl)(?:\/|[?#"])/);
     const relativeAge = new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(-5, "hour");
     assert.ok(visible.includes(relativeAge), `${locale}: age must use its locale`);
   }
 });
 
-test("media metadata keeps versioned self canonicals and reciprocal alternates across seven locales", async () => {
+test("media metadata keeps the same versioned canonical and authored copy across seven languages", async () => {
   const { mediaDetailMetadata } = setup();
-  const languages = {
-    ...Object.fromEntries(locales.map((locale) => [locale, `/${locale}/aria/123-v2`])),
-    "x-default": "/aria/123-v2",
-  };
   for (const locale of [...locales, undefined]) {
     const metadata = await mediaDetailMetadata({ locale, handleParam: "aria", idParam: "123-v2" });
-    assert.equal(metadata.alternates?.canonical, locale ? `/${locale}/aria/123-v2` : "/aria/123-v2");
-    assert.deepEqual(metadata.alternates?.languages, languages);
+    assert.equal(metadata.alternates?.canonical, "/aria/123-v2");
+    assert.equal(metadata.alternates?.languages, undefined);
+    assert.equal(new URL(String(metadata.openGraph?.url), "https://leakfanhub.com").pathname, "/aria/123-v2");
     assert.deepEqual(metadata.title, { absolute: `${photo.title} — LeakFanHub` });
     assert.equal(metadata.description, photo.description);
     assert.equal(metadata.openGraph?.locale?.slice(0, 2), locale ?? "en");

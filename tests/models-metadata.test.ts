@@ -57,20 +57,16 @@ const requests: { search: Search; suffix: string; sort: string; offset: number }
   ...["invalid", "-2", "0", "16668", "999999999", "9".repeat(400)].map((page) => ({ search: { page }, suffix: "", sort: "followers", offset: 0 })),
 ];
 
-test("models canonical, Open Graph and reciprocal alternates retain the rendered page and valid sort", async () => {
+test("models canonical and Open Graph keep the numbered public URL in all rendered languages", async () => {
   const { models, localized } = routes();
   for (const { search, suffix } of requests) {
     for (const locale of ["", "en", "fr", "es", "de", "it", "pt", "nl"]) {
-      const base = locale ? `/${locale}/models` : "/models";
+      const base = "/models";
       const metadata = locale
         ? await localized.localizedPageMetadata(locale, "/models", Promise.resolve(search))
         : models.generateMetadata ? await models.generateMetadata({ searchParams: Promise.resolve(search) }) : models.metadata!;
       assert.equal(metadata.alternates?.canonical, `${base}${suffix}`, `${locale || "default"}: ${JSON.stringify(search)}`);
-      assert.deepEqual(metadata.alternates?.languages, {
-        en: `/en/models${suffix}`, fr: `/fr/models${suffix}`, es: `/es/models${suffix}`,
-        de: `/de/models${suffix}`, it: `/it/models${suffix}`, pt: `/pt/models${suffix}`,
-        nl: `/nl/models${suffix}`, "x-default": `/models${suffix}`,
-      });
+      assert.equal(metadata.alternates?.languages, undefined);
       assert.equal(new URL(String(metadata.openGraph?.url), "https://leakfanhub.com").href, `https://leakfanhub.com${base}${suffix}`);
     }
   }
@@ -89,7 +85,7 @@ test("models rendering uses the same normalized page as its metadata and collect
       assert.ok(isValidElement(tree));
       const children = (tree.props as { children: ReactElement[] }).children;
       const data = (children[0].props as { data: { url: string; mainEntity: { itemListElement: { position: number }[] } } }).data;
-      assert.equal(data.url, `https://leakfanhub.com${locale ? `/${locale}` : ""}/models${suffix}`);
+      assert.equal(data.url, `https://leakfanhub.com/models${suffix}`);
       assert.equal(data.mainEntity.itemListElement[0].position, offset + 1);
       const grid = children[children.length - 1].props as { initialModels: unknown[]; initialNextOffset: number; sort: string };
       assert.equal(grid.initialModels.length, 60);

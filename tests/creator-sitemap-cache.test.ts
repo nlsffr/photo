@@ -43,7 +43,7 @@ test("creator sitemap rendering coalesces by collection and retries rejected cap
   assert.equal(calls.get("photos:8"), 1);
 
   const filtered = await sitemapData.loadCreatorSitemap("overview", 1);
-  assert.equal((filtered.match(/<url>/g) ?? []).length, 2);
+  assert.equal((filtered.match(/<url>/g) ?? []).length, 1);
   assert.doesNotMatch(filtered, /\/contact/);
   await assert.rejects(
     sitemapData.loadCreatorSitemap("overview", 9),

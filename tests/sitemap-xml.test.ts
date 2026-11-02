@@ -145,54 +145,26 @@ async function loadLocalizedSitemap() {
   return import("../src/lib/i18n/sitemap.ts");
 }
 
-test("localized sitemap entries submit both translations with reciprocal alternates", async () => {
-  const { buildLocalizedSitemapEntries } = await loadLocalizedSitemap();
-  const entries = buildLocalizedSitemapEntries("https://leakfanhub.com");
-  const englishModels = entries.find((entry) => entry.url.endsWith("/en/models"));
-  const frenchModels = entries.find((entry) => entry.url.endsWith("/fr/models"));
-
-  assert.ok(englishModels);
-  assert.ok(frenchModels);
-  assert.deepEqual(englishModels.alternates.languages, {
-    en: "https://leakfanhub.com/en/models",
-    fr: "https://leakfanhub.com/fr/models",
-    es: "https://leakfanhub.com/es/models",
-    de: "https://leakfanhub.com/de/models",
-    it: "https://leakfanhub.com/it/models",
-    pt: "https://leakfanhub.com/pt/models",
-    nl: "https://leakfanhub.com/nl/models",
-    "x-default": "https://leakfanhub.com/models",
-  });
-  assert.deepEqual(frenchModels.alternates, englishModels.alternates);
-  assert.equal(entries.some((entry) => /\/[^/]+\/[^/]+-v\d+$/.test(entry.url)), false);
-  assert.equal(entries.length, 58);
-  assert.equal(new Set(entries.map((entry) => entry.url)).size, 58);
-  for (const locale of ["es", "de", "it", "pt", "nl"]) {
-    const translated = entries.filter((entry) => new URL(entry.url).pathname.startsWith(`/${locale}`));
-    assert.equal(translated.length, 6);
-    assert.ok(translated.every((entry) => Object.keys(entry.alternates.languages).length === 8));
-  }
-  const about = entries.find((entry) => entry.url.endsWith("/fr/about"));
-  assert.deepEqual(about?.alternates.languages, {
-    en: "https://leakfanhub.com/en/about",
-    fr: "https://leakfanhub.com/fr/about",
-    "x-default": "https://leakfanhub.com/about",
-  });
+test("static sitemap submits each of the fourteen canonical resources exactly once", async () => {
+  const { buildLocalizedSitemapEntries, LOCALIZED_INDEXABLE_ENTRIES } = await loadLocalizedSitemap();
+  const entries = buildLocalizedSitemapEntries("https://leakfanhub.com/");
+  assert.equal(entries.length, 14);
+  assert.equal(new Set(entries.map((entry) => entry.url)).size, 14);
+  assert.deepEqual(entries, LOCALIZED_INDEXABLE_ENTRIES.map((entry) => ({
+    url: `https://leakfanhub.com${entry.path}`,
+    changeFrequency: entry.changeFrequency,
+    priority: entry.priority,
+  })));
+  assert.ok(entries.some((entry) => entry.url === "https://leakfanhub.com/models"));
+  assert.ok(entries.some((entry) => entry.url === "https://leakfanhub.com/about"));
 });
 
-test("custom static sitemap XML declares xhtml and reciprocal hreflang links", async () => {
+test("static sitemap XML has bare locations and no retired hreflang variants", async () => {
   const { renderLocalizedStaticSitemapXml } = await loadLocalizedSitemap();
   const xml = renderLocalizedStaticSitemapXml("https://leakfanhub.com");
-
-  assert.match(xml, /xmlns:xhtml="http:\/\/www\.w3\.org\/1999\/xhtml"/);
-  assert.match(xml, /<loc>https:\/\/leakfanhub\.com\/en<\/loc>/);
-  assert.match(
-    xml,
-    /hreflang="fr" href="https:\/\/leakfanhub\.com\/fr"/,
-  );
-  assert.match(
-    xml,
-    /hreflang="x-default" href="https:\/\/leakfanhub\.com\/"/,
-  );
-  assert.doesNotMatch(xml, /<loc>https:\/\/leakfanhub\.com\/models<\/loc>/);
+  assert.match(xml, /<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9">/);
+  assert.equal((xml.match(/<url>/g) ?? []).length, 14);
+  assert.match(xml, /<loc>https:\/\/leakfanhub\.com\/<\/loc>/);
+  assert.match(xml, /<loc>https:\/\/leakfanhub\.com\/models<\/loc>/);
+  assert.doesNotMatch(xml, /xhtml|hreflang|\/(?:en|fr|es|de|it|pt|nl)(?:\/|<)/);
 });

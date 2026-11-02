@@ -1,10 +1,8 @@
 // @ts-expect-error Node's native type stripping requires the explicit suffix.
 import { creatorCollectionPath } from "./creator-collections.ts";
 import type { CreatorCollection } from "./creator-collections.ts";
-// @ts-expect-error Node's native type stripping requires the explicit suffix.
-import { LOCALES, type Locale } from "./i18n/config.ts";
 
-// Two URL entries with eight alternate links fit below 50 MiB even at max handle/version length.
+// Keep the existing conservative per-partition limit; one public URL is emitted per profile.
 export const CREATOR_SITEMAP_PROFILE_LIMIT = 12_000;
 export const CREATOR_SITEMAP_QUERY_LIMIT = 50_000;
 
@@ -23,12 +21,9 @@ export function assertCreatorSitemapCapacity(
   }
 }
 
-type CreatorSitemapAlternates = Record<Locale | "x-default", string>;
-
 type CreatorSitemapEntry = {
   url: string;
   lastmod?: string;
-  alternates: CreatorSitemapAlternates;
 };
 
 function xmlEscape(value: string): string {
@@ -71,12 +66,9 @@ export function buildCreatorSitemapEntries(
   let acceptedProfiles = 0;
 
   for (const profile of profiles) {
-    let paths: CreatorSitemapAlternates;
+    let path: string;
     try {
-      paths = Object.fromEntries([
-        ...LOCALES.map((locale) => [locale, creatorCollectionPath(profile.handle, profile.urlVersion, collection, locale)]),
-        ["x-default", creatorCollectionPath(profile.handle, profile.urlVersion, collection)],
-      ]) as CreatorSitemapAlternates;
+      path = creatorCollectionPath(profile.handle, profile.urlVersion, collection);
     } catch {
       // A malformed database handle must not make the whole sitemap unavailable.
       continue;
@@ -85,13 +77,8 @@ export function buildCreatorSitemapEntries(
     if (acceptedProfiles > CREATOR_SITEMAP_PROFILE_LIMIT) {
       throw new Error("creator_sitemap_partition_required");
     }
-    const alternates = Object.fromEntries(
-      Object.entries(paths).map(([language, path]) => [language, `${base}${path}`]),
-    ) as CreatorSitemapAlternates;
     const lastmod = latestIso(profile.updatedAt, profile.lastContentAt);
-    for (const language of ["en", "fr"] as const) {
-      entries.push({ url: alternates[language], lastmod, alternates });
-    }
+    entries.push({ url: `${base}${path}`, lastmod });
   }
   return entries;
 }
@@ -102,16 +89,8 @@ export function renderCreatorSitemap(
   profiles: readonly CreatorSitemapProfile[],
 ): string {
   const urls = buildCreatorSitemapEntries(site, collection, profiles)
-    .map((entry) => {
-      const alternates = Object.entries(entry.alternates)
-        .map(
-          ([language, href]) =>
-            `    <xhtml:link rel="alternate" hreflang="${language}" href="${xmlEscape(href)}" />`,
-        )
-        .join("\n");
-      return `  <url>\n    <loc>${xmlEscape(entry.url)}</loc>\n${alternates}\n${entry.lastmod ? `    <lastmod>${entry.lastmod}</lastmod>\n` : ""}    <changefreq>daily</changefreq>\n    <priority>${collection === "overview" ? "0.8" : "0.7"}</priority>\n  </url>`;
-    })
+    .map((entry) => `  <url>\n    <loc>${xmlEscape(entry.url)}</loc>\n${entry.lastmod ? `    <lastmod>${entry.lastmod}</lastmod>\n` : ""}    <changefreq>daily</changefreq>\n    <priority>${collection === "overview" ? "0.8" : "0.7"}</priority>\n  </url>`)
     .join("\n");
 
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${urls}\n</urlset>\n`;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
 }

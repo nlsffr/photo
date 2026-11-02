@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 // @ts-expect-error Node's native type stripping requires the explicit .ts suffix.
-import { LOCALES, localeAlternates, localePath, localesForPath, stripLocalePrefix, supportedLocaleForPath, type Locale, type CreatorLocale } from "./config.ts";
+import { LOCALES, localePath, localesForPath, stripLocalePrefix, supportedLocaleForPath, type Locale, type CreatorLocale } from "./config.ts";
 
 // @ts-expect-error Node's native type stripping requires the explicit .ts suffix.
 import { creatorCollectionPath, type CreatorCollection } from "../creator-collections.ts";
@@ -11,9 +11,6 @@ export function modelsPageAlternates(searchParams: ModelsSearchParams, locale?: 
   const search = parseModelsSearch(searchParams);
   return {
     canonical: modelsPagePath(locale ? localePath(locale, "/models") : "/models", search),
-    languages: Object.fromEntries(Object.entries(localeAlternates("/models")).map(
-      ([language, path]) => [language, modelsPagePath(path, search)],
-    )),
   };
 }
 
@@ -26,12 +23,6 @@ export function creatorCollectionAlternates(
 ): NonNullable<Metadata["alternates"]> {
   return {
     canonical: creatorCollectionPath(handle, version, collection, locale, page),
-    languages: {
-      ...Object.fromEntries(LOCALES.map((language) => [language,
-        creatorCollectionPath(handle, version, collection, language, page),
-      ])),
-      "x-default": creatorCollectionPath(handle, version, collection, undefined, page),
-    },
   };
 }
 
@@ -58,7 +49,6 @@ export function mediaPageAlternates(bareCanonicalPath: string, locale?: Locale) 
   const { pathname } = stripLocalePrefix(bareCanonicalPath);
   return {
     canonical: locale ? localePath(locale, pathname) : pathname,
-    languages: localeAlternates(pathname),
   };
 }
 
@@ -71,7 +61,7 @@ export function buildLocalizedMetadata(
   const renderedLocale = supportedLocaleForPath(locale, pathname);
   const alternates = pathname === "/models"
     ? modelsPageAlternates(searchParams, renderedLocale)
-    : { canonical: localePath(renderedLocale, pathname), languages: localeAlternates(pathname) };
+    : { canonical: localePath(renderedLocale, pathname) };
   return {
     title: pathname === "/" ? { absolute: copy.title } : copy.title,
     description: copy.description,

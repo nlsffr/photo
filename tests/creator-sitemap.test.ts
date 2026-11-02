@@ -20,30 +20,31 @@ const eligible = {
   lastContentAt: null,
 };
 
-test("creator sitemap keeps two URL entries with reciprocal seven-language collection alternates", async () => {
-  const { renderCreatorSitemap } = await loadCreatorSitemap();
-  const xml = renderCreatorSitemap(SITE, "photos", [eligible]);
+test("creator sitemap lists each eligible versioned collection once without retired language alternatives", async () => {
+  const { buildCreatorSitemapEntries, renderCreatorSitemap } = await loadCreatorSitemap();
+  for (const collection of ["overview", "photos", "videos", "popular"] as const) {
+    const path = `/tina_kitsune-v3${collection === "overview" ? "" : `/${collection}`}`;
+    const entries = buildCreatorSitemapEntries(SITE, collection, [eligible]);
+    assert.deepEqual(entries, [{ url: `${SITE}${path}`, lastmod: eligible.updatedAt }]);
+    const xml = renderCreatorSitemap(SITE, collection, [eligible]);
+    assert.equal((xml.match(/<url>/g) ?? []).length, 1);
+    assert.ok(xml.includes(`<loc>${SITE}${path}</loc>`));
+    assert.match(xml, /<lastmod>2026-10-30T08:00:00\.000Z<\/lastmod>/);
+    assert.doesNotMatch(xml, /xhtml|hreflang|\/(?:en|fr|es|de|it|pt|nl)\//);
+  }
+});
 
-  assert.match(xml, /xmlns:xhtml="http:\/\/www\.w3\.org\/1999\/xhtml"/);
-  for (const location of [
-    `${SITE}/en/tina_kitsune-v3/photos`,
-    `${SITE}/fr/tina_kitsune-v3/photos`,
-  ]) {
-    assert.match(xml, new RegExp(`<loc>${location}</loc>`));
-  }
-  assert.doesNotMatch(xml, new RegExp(`<loc>${SITE}/tina_kitsune-v3/photos</loc>`));
-  const blocks = xml.match(/<url>[\s\S]*?<\/url>/g) ?? [];
-  assert.equal(blocks.length, 2);
-  for (const block of blocks) {
-    for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"]) {
-      assert.equal((block.match(new RegExp(`hreflang="${locale}"`, "g")) ?? []).length, 1);
-      assert.ok(block.includes(`hreflang="${locale}" href="${SITE}/${locale}/tina_kitsune-v3/photos"`));
-    }
-    assert.equal((block.match(/<xhtml:link/g) ?? []).length, 8);
-    assert.equal((block.match(/hreflang="x-default"/g) ?? []).length, 1);
-    assert.match(block, /href="https:\/\/leakfanhub\.com\/tina_kitsune-v3\/photos"/);
-    assert.match(block, /<lastmod>2026-10-30T08:00:00\.000Z<\/lastmod>/);
-  }
+test("creator sitemap keeps the newest valid lastmod and skips invalid handles", async () => {
+  const { buildCreatorSitemapEntries } = await loadCreatorSitemap();
+  const entries = buildCreatorSitemapEntries(`${SITE}/`, "videos", [
+    { ...eligible, handle: "bad/handle" },
+    { ...eligible, updatedAt: "not-a-date", lastContentAt: "2026-11-01T01:00:00Z" },
+    { ...eligible, handle: "fixture_second", urlVersion: 1, lastContentAt: "2026-11-01T02:00:00Z" },
+  ]);
+  assert.deepEqual(entries, [
+    { url: `${SITE}/tina_kitsune-v3/videos`, lastmod: "2026-11-01T01:00:00.000Z" },
+    { url: `${SITE}/fixture_second/videos`, lastmod: "2026-11-01T02:00:00.000Z" },
+  ]);
 });
 
 test("creator sitemap query enforces each public quality threshold", async () => {
@@ -85,7 +86,7 @@ test("creator sitemap skips unsafe rows and remains below the protocol URL limit
   const bounded = rows.slice(0, CREATOR_SITEMAP_PROFILE_LIMIT + 1);
   const xml = renderCreatorSitemap(SITE, "popular", bounded);
 
-  assert.equal((xml.match(/<url>/g) ?? []).length, CREATOR_SITEMAP_PROFILE_LIMIT * 2);
+  assert.equal((xml.match(/<url>/g) ?? []).length, CREATOR_SITEMAP_PROFILE_LIMIT);
   assert.ok((xml.match(/<url>/g) ?? []).length < 50_000);
   assert.ok(Buffer.byteLength(xml, "utf8") < 50 * 1024 * 1024);
   assert.doesNotMatch(xml, /bad\/handle/);

@@ -19,7 +19,7 @@ type Schema = {
   numberOfItems: number;
   itemListElement: Array<{ position: number; item: Schema }>;
 };
-type Input = { creator: Creator; stats: CreatorCollectionStats; items: readonly Photo[]; collection: "overview" | "photos" | "videos" | "popular"; locale?: "en" | "fr"; page?: number; site: string };
+type Input = { creator: Creator; stats: CreatorCollectionStats; items: readonly Photo[]; collection: "overview" | "photos" | "videos" | "popular"; locale?: "en" | "fr" | "es" | "de" | "it" | "pt" | "nl"; page?: number; site: string };
 const creator: Creator = { handle: "aria-lune", name: "Aria Lune", bio: "A creator", avatarUrl: "/avatar.jpg", location: "", followers: 45, verified: true, urlVersion: 3 };
 const stats: CreatorCollectionStats = { mediaCount: 99, photoCount: 80, videoCount: 19, engagedCount: 10, totalViews: 1000, totalLikes: 20 };
 function media(id: string, type: Photo["type"] = "photo"): Photo {
@@ -29,18 +29,18 @@ function build(overrides: Partial<Input> = {}): Schema[] {
   return buildCreatorStructuredData({ creator, stats, items: [media("1")], collection: "overview", site: "https://example.test", ...overrides }) as unknown as Schema[];
 }
 
-test("overview has ProfilePage and a verified Person at the exact versioned localized URL", () => {
+test("overview has ProfilePage and a verified Person at the same versioned public URL with its rendered language", () => {
   const data = build({ locale: "fr", page: 2 });
   const profile = data.find((node) => node["@type"] === "ProfilePage")!;
   const person = data.find((node) => node["@type"] === "Person")!;
-  assert.equal(profile.url, "https://example.test/fr/aria-lune-v3?page=2");
+  assert.equal(profile.url, "https://example.test/aria-lune-v3?page=2");
   assert.equal(profile.inLanguage, "fr");
-  assert.deepEqual(profile.mainEntity, { "@id": "https://example.test/fr/aria-lune-v3#person" });
-  assert.equal(person.url, "https://example.test/fr/aria-lune-v3");
+  assert.deepEqual(profile.mainEntity, { "@id": "https://example.test/aria-lune-v3#person" });
+  assert.equal(person.url, "https://example.test/aria-lune-v3");
   assert.deepEqual(person.alternateName, ["aria-lune", "Aria Lune"]);
   assert.equal(person.image, "https://example.test/avatar.jpg");
   assert.equal(person.interactionStatistic.userInteractionCount, 45);
-  assert.equal(profile.hasPart[0].url, "https://example.test/fr/aria-lune/101-v2");
+  assert.equal(profile.hasPart[0].url, "https://example.test/aria-lune/101-v2");
   assert.equal(profile.hasPart[0]["@type"], "ImageObject");
 });
 
@@ -52,13 +52,13 @@ test("all collections list at most twelve loaded public entries in order with po
     const data = build({ collection, items, locale: "en", page: 2 });
     const page = data.find((node) => node["@type"] === "CollectionPage")!;
     const list = data.find((node) => node["@type"] === "ItemList")!;
-    assert.equal(page.url, `https://example.test/en/aria-lune-v3/${collection}?page=2`);
+    assert.equal(page.url, `https://example.test/aria-lune-v3/${collection}?page=2`);
     assert.equal(page.inLanguage, "en");
     assert.deepEqual(page.mainEntity, { "@id": `${page.url}#items` });
     assert.equal(list.numberOfItems, 12);
     assert.deepEqual(list.itemListElement.map((entry) => entry.position), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
     assert.deepEqual(list.itemListElement.map((entry) => entry.item.url), [
-      "https://example.test/en/aria-lune/102-v2", "https://example.test/en/aria-lune/103-v2", "https://example.test/en/aria-lune/104-v2", "https://example.test/en/aria-lune/105-v2", "https://example.test/en/aria-lune/106-v2", "https://example.test/en/aria-lune/107-v2", "https://example.test/en/aria-lune/108-v2", "https://example.test/en/aria-lune/109-v2", "https://example.test/en/aria-lune/110-v2", "https://example.test/en/aria-lune/111-v2", "https://example.test/en/aria-lune/112-v2", "https://example.test/en/aria-lune/113-v2",
+      "https://example.test/aria-lune/102-v2", "https://example.test/aria-lune/103-v2", "https://example.test/aria-lune/104-v2", "https://example.test/aria-lune/105-v2", "https://example.test/aria-lune/106-v2", "https://example.test/aria-lune/107-v2", "https://example.test/aria-lune/108-v2", "https://example.test/aria-lune/109-v2", "https://example.test/aria-lune/110-v2", "https://example.test/aria-lune/111-v2", "https://example.test/aria-lune/112-v2", "https://example.test/aria-lune/113-v2",
     ]);
     assert.deepEqual(page.hasPart, list.itemListElement.map((entry) => entry.item));
     assert.equal(page.hasPart[0]["@type"], "VideoObject");
@@ -110,5 +110,19 @@ test("every loaded item removal is honored without generating replacement entrie
     assert.equal(urls.length, 2);
     assert.equal(urls.includes(`https://example.test/aria-lune/${item.sourceId}-v2`), false);
     delete item.removedFromIndexAt;
+  }
+});
+
+
+test("seven rendered languages keep public structured-data URLs and entity IDs identical", () => {
+  const english = build({ locale: "en", collection: "videos", page: 2 });
+  for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"] as const) {
+    const data = build({ locale, collection: "videos", page: 2 });
+    const page = data.find((node) => node["@type"] === "CollectionPage")!;
+    assert.equal(page.inLanguage, locale);
+    assert.equal(page.url, english[0].url);
+    assert.deepEqual(page.mainEntity, english[0].mainEntity);
+    assert.deepEqual(page.hasPart.map((item) => item.url), english[0].hasPart.map((item) => item.url));
+    assert.doesNotMatch(JSON.stringify(data), /https:\/\/example\.test\/(?:en|fr|es|de|it|pt|nl)(?:\/|[?#"])/);
   }
 });

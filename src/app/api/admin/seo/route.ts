@@ -5,6 +5,7 @@ import {
 } from "@/lib/seo-editor-access";
 import { listSeoEntries, saveSeoEntry, validateSeoSave } from "@/lib/seo-editor-store";
 import { SEO_PAGES } from "@/lib/seo-editor-contract";
+import { internalLocalePath } from "@/lib/i18n/config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,8 +38,8 @@ export async function PUT(request: Request) {
     if (!result.ok) return json({ error: result.error }, result.error === "conflict" ? 409 : 503);
     const path = SEO_PAGES.find((page) => page.key === input.page)!.path;
     try {
-      revalidatePath(`/${input.locale}${path === "/" ? "" : path}`);
-      if (input.locale === "en") revalidatePath(path);
+      revalidatePath(internalLocalePath(input.locale, path));
+      revalidatePath(path);
     } catch {
       // The database transaction is committed: retain its revision so the
       // client does not mistake a cache refresh problem for an unsaved edit.

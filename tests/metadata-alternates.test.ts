@@ -11,7 +11,7 @@ async function loadDictionaries() {
   return import("../src/lib/i18n/dictionaries.ts");
 }
 
-test("localized metadata self-canonicalizes with reciprocal hreflang and x-default", async () => {
+test("localized metadata keeps one public canonical and its rendered language", async () => {
   const { buildLocalizedMetadata } = await loadMetadata();
 
   const english = buildLocalizedMetadata("en", "/models", {
@@ -23,24 +23,15 @@ test("localized metadata self-canonicalizes with reciprocal hreflang and x-defau
     description: "Parcourir les créateurs",
   });
 
-  assert.equal(english.alternates?.canonical, "/en/models");
-  assert.deepEqual(english.alternates?.languages, {
-    en: "/en/models",
-    fr: "/fr/models",
-    es: "/es/models",
-    de: "/de/models",
-    it: "/it/models",
-    pt: "/pt/models",
-    nl: "/nl/models",
-    "x-default": "/models",
-  });
-  assert.equal(french.alternates?.canonical, "/fr/models");
-  assert.deepEqual(french.alternates?.languages, english.alternates?.languages);
+  assert.deepEqual(english.alternates, { canonical: "/models" });
+  assert.deepEqual(french.alternates, { canonical: "/models" });
+  assert.equal(english.openGraph?.url, "/models");
+  assert.equal(french.openGraph?.url, "/models");
   assert.equal(english.openGraph?.locale, "en_US");
   assert.equal(french.openGraph?.locale, "fr_FR");
 });
 
-test("new discovery metadata uses seven reciprocal languages without expanding editorial pages", async () => {
+test("all discovery languages use bare canonicals without changing localized copy or Open Graph locales", async () => {
   const { buildLocalizedMetadata } = await loadMetadata();
   const { getDictionary } = await loadDictionaries();
   const pages = [
@@ -53,17 +44,18 @@ test("new discovery metadata uses seven reciprocal languages without expanding e
     for (const [path, key] of pages) {
       const copy = getDictionary(locale).pages[key].meta;
       const metadata = buildLocalizedMetadata(locale, path, copy);
-      assert.equal(metadata.alternates?.canonical, `/${locale}${path === "/" ? "" : path}`);
-      assert.equal(Object.keys(metadata.alternates?.languages || {}).length, 8);
+      assert.deepEqual(metadata.alternates, { canonical: path });
+      assert.equal(metadata.openGraph?.url, path);
       assert.equal(metadata.openGraph?.locale, ogLocales[locale]);
       assert.equal(metadata.openGraph?.alternateLocale?.length, 6);
       assert.notEqual(copy.description, getDictionary("en").pages[key].meta.description);
     }
   }
   const editorial = buildLocalizedMetadata("fr", "/about", getDictionary("fr").pages.about.meta);
-  assert.deepEqual(editorial.alternates?.languages, {
-    en: "/en/about", fr: "/fr/about", "x-default": "/about",
-  });
+  assert.deepEqual(editorial.alternates, { canonical: "/about" });
+  const fallback = buildLocalizedMetadata("es", "/about", getDictionary("en").pages.about.meta);
+  assert.deepEqual(fallback.alternates, { canonical: "/about" });
+  assert.equal(fallback.openGraph?.locale, "en_US");
 });
 
 test("the two server dictionaries translate primary UI and indexable metadata", async () => {
@@ -84,7 +76,7 @@ test("the two server dictionaries translate primary UI and indexable metadata", 
   assert.notEqual(en.pages.terms.meta.title, fr.pages.terms.meta.title);
 });
 
-test("unprefixed creator metadata completes reciprocal alternates without dropping the numbered page", async () => {
+test("creator metadata preserves collection, version and numbered page on the single canonical", async () => {
   // @ts-expect-error Native Node requires explicit suffixes.
   const { loadAppModule } = await import("./helpers/load-app-module.ts");
   const replacements: Record<string, unknown> = {
@@ -96,6 +88,14 @@ test("unprefixed creator metadata completes reciprocal alternates without droppi
     const path = `/aria-v3${collection === "overview" ? "" : `/${collection}`}${page > 1 ? `?page=${page}` : ""}`;
     const metadata = await renderer.creatorCollectionMetadata({ handleParam: "aria-v3", collection, searchParams: { page: String(page) } });
     assert.equal(metadata.alternates?.canonical, path);
-    assert.deepEqual(metadata.alternates?.languages, { en: `/en${path}`, fr: `/fr${path}`, es: `/es${path}`, de: `/de${path}`, it: `/it${path}`, pt: `/pt${path}`, nl: `/nl${path}`, "x-default": path });
+    assert.equal(metadata.alternates?.languages, undefined);
+  }
+});
+
+
+test("retired media prefixes never escape into a canonical, including the media version", async () => {
+  const { mediaPageAlternates } = await loadMetadata();
+  for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"] as const) {
+    assert.deepEqual(mediaPageAlternates(`/${locale}/aria/123-v4`, locale), { canonical: "/aria/123-v4" });
   }
 });

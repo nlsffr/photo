@@ -84,12 +84,12 @@ test("production with no canonical origin fails closed", () => {
   }
 });
 
-test("save replies expose the new revision and invalidate only the affected locale", async () => {
+test("save replies invalidate the affected renderer and its single public URL", async () => {
   const api = route({ user: { id: "owner" } });
   const response = await api.PUT(request());
   assert.equal(response.status, 200);
   assert.equal((await response.json()).entry.revision, 1);
-  assert.deepEqual(api.invalidated, ["/fr"]);
+  assert.deepEqual(api.invalidated, ["/fr", "/"]);
   assert.equal(api.writes.length, 1);
 });
 
@@ -100,6 +100,14 @@ test("English edits also invalidate the unprefixed route and conflicts do not in
   const conflict = route({ user: { id: "owner" }, result: { ok: false, error: "conflict" } });
   assert.equal((await conflict.PUT(request())).status, 409);
   assert.equal(conflict.invalidated.length, 0);
+});
+
+test("non-English discovery edits invalidate the same public page without changing saved copy", async () => {
+  const api = route({ user: { id: "owner" } });
+  const edited = { ...input, locale: "es", page: "models" };
+  assert.equal((await api.PUT(request(edited))).status, 200);
+  assert.deepEqual(api.invalidated, ["/es/models", "/models"]);
+  assert.deepEqual(api.writes[0], [edited, "owner"]);
 });
 
 test("a post-commit invalidation failure still returns the saved revision without retrying writes", async () => {
