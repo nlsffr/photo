@@ -439,22 +439,22 @@ function EnglishAboutPage() {
       <p className="mt-3 text-lg text-[var(--color-ink-muted)]">A modern, dense and fast media gallery built for discovery.</p>
       <div className="mt-8 grid gap-4 sm:grid-cols-2">{cards.map(([title, body]) => <section key={title} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5"><h2 className="font-bold">{title}</h2><p className="mt-1.5 text-sm text-[var(--color-ink-muted)]">{body}</p></section>)}</div>
       <section className="mt-8 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5"><h2 className="font-bold">Privacy by default</h2><p className="mt-1.5 text-sm text-[var(--color-ink-muted)]">We avoid third-party advertising trackers and let visitors browse before creating an account.</p></section>
-      <Link href="/en" className="mt-8 inline-flex rounded-full bg-[var(--color-accent)] px-6 py-2.5 text-sm font-semibold text-white">Explore the gallery</Link>
+      <Link href="/" className="mt-8 inline-flex rounded-full bg-[var(--color-accent)] px-6 py-2.5 text-sm font-semibold text-white">Explore the gallery</Link>
     </div>
   );
 }
 
 function EnglishContactPage() {
   const channels = [
-    ["/en/contact/support", "Support & help", "Report a bug, account problem or display issue."],
-    ["/en/contact/signalement", "Report content", "Report inappropriate content, impersonation or privacy issues."],
-    ["/en/contact/partenariats", "Partnerships & creators", "Creator publishing and commercial partnership requests."],
-    ["/en/contact/presse", "Press & media", "Interviews, press questions and brand resources."],
+    ["/contact/support", "Support & help", "Report a bug, account problem or display issue."],
+    ["/contact/signalement", "Report content", "Report inappropriate content, impersonation or privacy issues."],
+    ["/contact/partenariats", "Partnerships & creators", "Creator publishing and commercial partnership requests."],
+    ["/contact/presse", "Press & media", "Interviews, press questions and brand resources."],
   ];
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
       <h1 className="text-3xl font-black tracking-tight">Contact</h1>
-      <p className="mt-3 text-lg text-[var(--color-ink-muted)]">Choose the most relevant channel for a faster response. Copyright removal requests belong on the <Link className="text-[var(--color-accent)]" href="/en/dmca">DMCA page</Link>.</p>
+      <p className="mt-3 text-lg text-[var(--color-ink-muted)]">Choose the most relevant channel for a faster response. Copyright removal requests belong on the <Link className="text-[var(--color-accent)]" href="/dmca">DMCA page</Link>.</p>
       <div className="mt-8 grid gap-4 sm:grid-cols-2">{channels.map(([href, title, body]) => <Link key={href} href={href} className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5"><h2 className="font-bold">{title}</h2><p className="mt-1 text-sm text-[var(--color-ink-muted)]">{body}</p></Link>)}</div>
       <section className="mt-8 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5"><h2 className="font-bold">General email</h2><a href="mailto:contact@leakfanhub.com" className="mt-1.5 block font-mono text-sm">contact@leakfanhub.com</a></section>
     </div>
@@ -478,7 +478,7 @@ function EnglishTrustPage() {
     <div className="mx-auto max-w-3xl px-4 py-10">
       <h1 className="text-3xl font-bold tracking-tight">Trust & Safety</h1>
       <p className="mt-4 text-lg text-[var(--color-ink-muted)]">LeakFanHub applies zero tolerance to illegal or non-consensual content and provides direct reporting channels.</p>
-      <section className="mt-6 rounded-2xl border border-red-500/40 bg-red-500/10 p-5"><h2 className="text-lg font-bold text-red-400">Content involving minors is strictly forbidden</h2><p className="mt-2 text-sm text-[var(--color-ink-muted)]">Any content involving a person under 18 is illegal and must be reported immediately. We remove it and may report it to the appropriate authorities.</p><Link href="/en/contact/signalement" className="mt-4 inline-flex rounded-full bg-red-500 px-5 py-2.5 text-sm font-bold text-white">Report content →</Link></section>
+      <section className="mt-6 rounded-2xl border border-red-500/40 bg-red-500/10 p-5"><h2 className="text-lg font-bold text-red-400">Content involving minors is strictly forbidden</h2><p className="mt-2 text-sm text-[var(--color-ink-muted)]">Any content involving a person under 18 is illegal and must be reported immediately. We remove it and may report it to the appropriate authorities.</p><Link href="/contact/signalement" className="mt-4 inline-flex rounded-full bg-red-500 px-5 py-2.5 text-sm font-bold text-white">Report content →</Link></section>
       <h2 className="mt-10 text-xl font-bold">Other prohibited content</h2><ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-[var(--color-ink-muted)]"><li>Non-consensual content, doxxing and harassment</li><li>Extreme violence, threats and terrorism</li><li>Spam, malware and fraud</li><li>Copyright infringement</li></ul>
     </div>
   );
@@ -533,5 +533,5 @@ function EnglishContactFormPage({ kind }: { kind: "support" | "report" | "partne
     partnerships: { title: "Partnerships & creators", body: "Tell us about your creator profile, portfolio or partnership proposal.", apiKind: "partenariats", fields: [{ name: "email", label: "Your email", type: "email" as const, required: true }, { name: "name", label: "Name or handle", required: true }, { name: "link", label: "Portfolio or profile", type: "url" as const }], reasons: ["Creator application", "Brand partnership", "Editorial collaboration", "Other"] },
     press: { title: "Press & media", body: "For interviews, project information and brand resources, include your outlet and deadline.", apiKind: "presse", fields: [{ name: "email", label: "Professional email", type: "email" as const, required: true }, { name: "outlet", label: "Publication", required: true }, { name: "deadline", label: "Publication deadline" }], reasons: ["Interview", "Project information", "Brand kit", "Other"] },
   }[kind];
-  return <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6"><Link href="/en/contact" className="text-sm text-[var(--color-ink-muted)]">← Contact</Link><h1 className="mt-3 text-3xl font-black">{copy.title}</h1><p className="mt-3 text-[var(--color-ink-muted)]">{copy.body}</p><div className="mt-8"><ContactForm kind={copy.apiKind} fields={copy.fields} reasons={copy.reasons} /></div></div>;
+  return <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6"><Link href="/contact" className="text-sm text-[var(--color-ink-muted)]">← Contact</Link><h1 className="mt-3 text-3xl font-black">{copy.title}</h1><p className="mt-3 text-[var(--color-ink-muted)]">{copy.body}</p><div className="mt-8"><ContactForm kind={copy.apiKind} fields={copy.fields} reasons={copy.reasons} /></div></div>;
 }

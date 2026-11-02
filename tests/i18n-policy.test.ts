@@ -58,66 +58,25 @@ test("supports seven discovery and content locales while editorial routes stay E
   });
 });
 
-test("prefix and strip helpers preserve one equivalent public path", async () => {
-  const { localizedHref, localePath, stripLocalePrefix, switchLocalePath } =
-    await loadConfig();
-
-  assert.equal(localePath("en", "/"), "/en");
-  assert.equal(localePath("fr", "/models"), "/fr/models");
-  assert.deepEqual(stripLocalePrefix("/fr/trending-medias"), {
-    locale: "fr",
-    pathname: "/trending-medias",
-  });
-  assert.deepEqual(stripLocalePrefix("/nl/trending-medias"), {
-    locale: "nl",
-    pathname: "/trending-medias",
-  });
-  assert.deepEqual(stripLocalePrefix("/models"), {
-    locale: null,
-    pathname: "/models",
-  });
-  assert.equal(switchLocalePath("/en/models", "fr"), "/fr/models");
-  assert.equal(switchLocalePath("/en/models", "de"), "/de/models");
-  assert.equal(switchLocalePath("/fr/about", "de"), "/en/about");
-  assert.equal(switchLocalePath("/fr/aria-lune-v3", "de"), "/de/aria-lune-v3");
-  assert.equal(switchLocalePath("/fr", "en"), "/en");
-  assert.equal(
-    localizedHref("fr", "/connexion?next=/abonnements#form"),
-    "/fr/connexion?next=/abonnements#form",
-  );
-  assert.equal(localizedHref("fr", "/creator-name"), "/fr/creator-name");
-  assert.equal(localizedHref("es", "/models"), "/es/models");
-  assert.equal(localizedHref("es", "/about"), "/en/about");
+test("public helpers remove language prefixes while preserving query and fragments", async () => {
+  const { localizedHref, localePath, internalLocalePath, stripLocalePrefix, switchLocalePath } = await loadConfig();
+  for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"] as const) {
+    assert.equal(localePath(locale, "/"), "/");
+    assert.equal(localePath(locale, "/fr/models?page=2#items"), "/models?page=2#items");
+    assert.equal(localizedHref(locale, "/fr/aria-lune/123-v2?from=related#photo"), "/aria-lune/123-v2?from=related#photo");
+    assert.equal(switchLocalePath("/en/models?page=2#items", locale), "/models?page=2#items");
+    assert.equal(internalLocalePath(locale, "/models?page=2#items"), `/${locale}/models?page=2#items`);
+    assert.equal(internalLocalePath(locale, "/"), `/${locale}`);
+  }
+  assert.deepEqual(stripLocalePrefix("/nl/trending-medias"), { locale: "nl", pathname: "/trending-medias" });
+  for (const href of ["https://example.com/models?x=1#item", "//example.com/models", "mailto:a@example.com", "tel:+33123456789", "#items", "?page=2", "/api/photos?cursor=2", "/api/photos/", "/media/folder/?x=1#items", "/media/preview.jpg", "/_next/static/app.js"]) {
+    assert.equal(localizedHref("fr", href), href, href);
+  }
 });
 
-test("locale alternates are reciprocal and expose a neutral selector URL", async () => {
+test("a single public address exposes no hreflang URL alternatives", async () => {
   const { localeAlternates } = await loadConfig();
-
-  assert.deepEqual(localeAlternates("/models"), {
-    en: "/en/models",
-    fr: "/fr/models",
-    es: "/es/models",
-    de: "/de/models",
-    it: "/it/models",
-    pt: "/pt/models",
-    nl: "/nl/models",
-    "x-default": "/models",
-  });
-  assert.deepEqual(localeAlternates("/about"), {
-    en: "/en/about",
-    fr: "/fr/about",
-    "x-default": "/about",
-  });
-  assert.deepEqual(localeAlternates("/aria-lune-v3/photos"), {
-    en: "/en/aria-lune-v3/photos",
-    fr: "/fr/aria-lune-v3/photos",
-    es: "/es/aria-lune-v3/photos",
-    de: "/de/aria-lune-v3/photos",
-    it: "/it/aria-lune-v3/photos",
-    pt: "/pt/aria-lune-v3/photos",
-    nl: "/nl/aria-lune-v3/photos",
-    "x-default": "/aria-lune-v3/photos",
-  });
+  for (const path of ["/models", "/about", "/aria-lune-v3/photos"]) assert.deepEqual(localeAlternates(path), {});
 });
 
 test("the locale cookie wins, then Accept-Language quality values, then English", async () => {

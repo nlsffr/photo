@@ -16,7 +16,7 @@ test("private editor sends guests to login and refuses other accounts", async ()
       },
     );
     assert.equal(page.metadata.robots.index, false);
-    if (kind === "guest") await assert.rejects(page.default(), /redirect:\/en\/connexion\?next=%2Fadmin%2Fseo/);
+    if (kind === "guest") await assert.rejects(page.default(), /redirect:\/connexion\?next=%2Fadmin%2Fseo/);
     else if (kind === "other") await assert.rejects(page.default(), /notFound/);
     else assert.equal((await page.default()).type, "fixture-editor");
   }

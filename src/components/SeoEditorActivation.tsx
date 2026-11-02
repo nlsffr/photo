@@ -58,6 +58,6 @@ export function SeoEditorActivation() {
       <p role="alert" aria-live="polite" className="min-h-6 text-sm text-red-400">{error}</p>
       <button type="submit" disabled={busy || !token} className="min-h-12 w-full rounded-lg bg-[var(--color-accent)] px-5 py-3 font-semibold text-white disabled:opacity-50">{busy ? "Activation…" : "Activer mon accès"}</button>
     </form>
-    <Link href="/en/connexion?next=%2Fadmin%2Fseo" className="mt-5 inline-flex min-h-12 items-center text-sm underline underline-offset-4">Mon accès est déjà activé</Link>
+    <Link href="/connexion?next=%2Fadmin%2Fseo" className="mt-5 inline-flex min-h-12 items-center text-sm underline underline-offset-4">Mon accès est déjà activé</Link>
   </main>;
 }

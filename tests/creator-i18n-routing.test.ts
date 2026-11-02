@@ -99,7 +99,7 @@ test("localized overview and exactly the three collection paths reuse the render
       const path = `/aria-lune-v3${collection === "overview" ? "" : `/${collection}`}`;
       const tree = await render(path, { page: "2" });
       const metadata = await route.generateMetadata(props(path, { page: "2" }));
-      assert.equal(metadata.alternates?.canonical, `/${locale}${path}?page=2`);
+      assert.equal(metadata.alternates?.canonical, `${path}?page=2`);
       assert.equal(queries.at(-1)?.cursor, 30);
       assert.equal(queries.at(-1)?.type, collection === "photos" ? "photo" : collection === "videos" ? "video" : undefined);
       assert.equal(queries.at(-1)?.sort, collection === "popular" ? "popular" : "recent");
@@ -118,29 +118,25 @@ test("localized overview and exactly the three collection paths reuse the render
       assertExactCreatorMetadata(metadata, `${expectedTitle} — ${dictionary.page} 2`, expectedDescription);
       assert.ok(text(tree).includes(previous[locale]));
       const links = nodes(tree).filter((node) => node.props.href);
-      assert.ok(links.some((node) => node.props.href === `/${locale}/aria-lune-v3/photos`));
+      assert.ok(links.some((node) => node.props.href === "/aria-lune-v3/photos"));
       assert.deepEqual(nodes(tree).find((node) => node.type === FollowButton)?.props.labels, follow[locale]);
       assert.equal(nodes(tree).find((node) => node.type === VerifiedBadge)?.props.label, verified[locale]);
     }
   }
 });
 
-test("all seven localized media wrappers reuse media validation, reciprocal canonicals and source-authored text", async () => {
+test("all seven internal media renderers keep validation, one canonical and source-authored text", async () => {
   const ogLocales = { en: "en_US", fr: "fr_FR", es: "es_ES", de: "de_DE", it: "it_IT", pt: "pt_PT", nl: "nl_NL" };
   for (const locale of locales) {
     const { route, props, render } = setup(locale);
     const tree = await render("/aria-lune/123-v2");
     const metadata = await route.generateMetadata(props("/aria-lune/123-v2"));
-    assert.equal(metadata.alternates?.canonical, `/${locale}/aria-lune/123-v2`);
-    assert.deepEqual(metadata.alternates?.languages, {
-      en: "/en/aria-lune/123-v2", fr: "/fr/aria-lune/123-v2", es: "/es/aria-lune/123-v2",
-      de: "/de/aria-lune/123-v2", it: "/it/aria-lune/123-v2", pt: "/pt/aria-lune/123-v2",
-      nl: "/nl/aria-lune/123-v2", "x-default": "/aria-lune/123-v2",
-    });
+    assert.equal(metadata.alternates?.canonical, "/aria-lune/123-v2");
+    assert.equal(metadata.alternates?.languages, undefined);
     assert.equal(metadata.openGraph?.locale, ogLocales[locale]);
     assert.equal(metadata.description, "Original source description");
     assert.ok(text(tree).includes("Original source title"));
-    assert.ok(nodes(tree).some((node) => node.props.href === `/${locale}/aria-lune-v3`));
+    assert.ok(nodes(tree).some((node) => node.props.href === "/aria-lune-v3"));
     await assert.rejects(render("/aria-lune/123-v1"), /NOT_FOUND/);
     await assert.rejects(route.generateMetadata(props("/aria-lune/123-v1")), /NOT_FOUND/);
     // A profile version belongs to its profile URL, never to a media's owner segment.
@@ -152,7 +148,7 @@ test("all seven localized media wrappers reuse media validation, reciprocal cano
   }
 });
 
-test("localized metadata is reciprocal for seven languages and x-default on every collection and page", async () => {
+test("every collection and page shares one canonical while keeping localized metadata", async () => {
   const en = setup("en");
   const fr = setup("fr");
   for (const collection of ["overview", "photos", "videos", "popular"]) for (const page of [1, 2, 3]) {
@@ -160,11 +156,8 @@ test("localized metadata is reciprocal for seven languages and x-default on ever
     const suffix = page === 1 ? "" : `?page=${page}`;
     const english = await en.route.generateMetadata(en.props(path, { page: String(page) }));
     const french = await fr.route.generateMetadata(fr.props(path, { page: String(page) }));
-    const languages = { en: `/en${path}${suffix}`, fr: `/fr${path}${suffix}`, es: `/es${path}${suffix}`, de: `/de${path}${suffix}`, it: `/it${path}${suffix}`, pt: `/pt${path}${suffix}`, nl: `/nl${path}${suffix}`, "x-default": `${path}${suffix}` };
-    assert.deepEqual(english.alternates?.languages, languages);
-    assert.deepEqual(french.alternates?.languages, languages);
-    assert.equal(french.alternates?.canonical, languages.fr);
-    assert.equal(english.alternates?.canonical, languages.en);
+    assert.deepEqual(english.alternates, { canonical: `${path}${suffix}` });
+    assert.deepEqual(french.alternates, { canonical: `${path}${suffix}` });
     assert.notEqual(english.description, french.description);
   }
 });
@@ -200,7 +193,7 @@ test("localized routes preserve renderer version, removal, query and redirect po
     await assert.rejects(route.generateMetadata(props("/aria-lune-v2/photos")), /NOT_FOUND/);
     await assert.rejects(setup(locale, { removed: true }).render("/aria-lune-v3"), /NOT_FOUND/);
     await assert.rejects(setup(locale, { empty: true }).render("/aria-lune-v3"), /NOT_FOUND/);
-    await assert.rejects(render("/aria-lune-v3", { type: "photo" }), new RegExp(`REDIRECT:/${locale}/aria-lune-v3/photos`));
+    await assert.rejects(render("/aria-lune-v3", { type: "photo" }), /REDIRECT:\/aria-lune-v3\/photos/);
     for (const search of [{ sort: "liked" }, { page: "invalid" }, { page: "100" }]) {
       const metadata = await route.generateMetadata(props("/aria-lune-v3/photos", search));
       assert.equal((metadata.robots as { index: boolean }).index, false);

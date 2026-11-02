@@ -137,35 +137,36 @@ export function stripLocalePrefix(pathname: string): {
 }
 
 export function localePath(locale: Locale, pathname: string): string {
-  const { pathname: unprefixed } = stripLocalePrefix(pathname);
-  return unprefixed === "/" ? `/${locale}` : `/${locale}${unprefixed}`;
+  // Keep the language argument for existing callers; language is a preference,
+  // never part of a public URL. Do not turn external or fragment-only hrefs
+  // into local paths.
+  void locale;
+  if (/^(?:[a-z][a-z\d+.-]*:|\/\/|[?#])/i.test(pathname)) return pathname;
+  const [, path = "/", suffix = ""] = pathname.match(/^([^?#]*)(.*)$/) || [];
+  if (isSystemPath(path)) return pathname;
+  return `${stripLocalePrefix(path).pathname}${suffix}`;
+}
+
+/** Private renderer destination only; never use in links or metadata. */
+export function internalLocalePath(locale: Locale, pathname: string): string {
+  const [, path = "/", suffix = ""] = pathname.match(/^([^?#]*)(.*)$/) || [];
+  const unprefixed = stripLocalePrefix(path).pathname;
+  return `${unprefixed === "/" ? `/${locale}` : `/${locale}${unprefixed}`}${suffix}`;
 }
 
 export function localizedHref(locale: Locale, href: string): string {
-  const match = href.match(/^([^?#]*)(.*)$/);
-  const pathname = match?.[1] || href;
-  const suffix = match?.[2] || "";
-  return isLocalizedRoute(pathname)
-    ? `${localePath(supportedLocaleForPath(locale, pathname), pathname)}${suffix}`
+  return href.startsWith("/") && !href.startsWith("//")
+    ? localePath(locale, href)
     : href;
 }
 
 export function switchLocalePath(pathname: string, locale: Locale): string {
-  const current = stripLocalePrefix(pathname);
-  if (current.locale || isLocalizedRoute(current.pathname)) {
-    return localePath(supportedLocaleForPath(locale, current.pathname), current.pathname);
-  }
-  return current.pathname;
+  return localePath(locale, pathname);
 }
 
 export function localeAlternates(pathname: string): Record<string, string> {
-  const { pathname: unprefixed } = stripLocalePrefix(pathname);
-  return {
-    ...Object.fromEntries(localesForPath(unprefixed).map((locale) => [
-      locale, localePath(locale, unprefixed),
-    ])),
-    "x-default": unprefixed,
-  };
+  void pathname;
+  return {};
 }
 
 export function chooseLocale(
@@ -217,10 +218,12 @@ export function localeRedirectTarget(
   cookieValue?: string | null,
   acceptLanguage?: string | null,
 ): string | null {
+  void cookieValue;
+  void acceptLanguage;
   const normalized = normalizePathname(pathname);
   if (isSystemPath(normalized)) return null;
   const stripped = stripLocalePrefix(normalized);
-  if (stripped.locale || !LOCALIZED_ROUTES.has(stripped.pathname)) return null;
-  const locale = supportedLocaleForPath(chooseLocale(cookieValue, acceptLanguage), stripped.pathname);
-  return localePath(locale, stripped.pathname);
+  if (!stripped.locale || stripLocalePrefix(stripped.pathname).locale
+    || isSystemPath(stripped.pathname) || !isLocalizedRoute(stripped.pathname)) return null;
+  return localePath(stripped.locale, pathname);
 }

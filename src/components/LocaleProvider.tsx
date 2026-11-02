@@ -1,12 +1,10 @@
 "use client";
 
-import { usePathname } from "next/navigation";
 import { createContext, useContext, useMemo, useState } from "react";
 import {
   LOCALES,
   LOCALE_COOKIE,
   localePath,
-  switchLocalePath,
   type Locale,
 } from "@/lib/i18n/config";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
@@ -32,8 +30,9 @@ function translate(dictionary: Dictionary, key: string): string {
   return typeof value === "string" ? value : key;
 }
 
-function writeLocaleCookie(locale: Locale) {
-  document.cookie = `${LOCALE_COOKIE}=${locale};path=/;max-age=31536000;samesite=lax`;
+export function writeLocaleCookie(locale: Locale) {
+  const secure = window.location.protocol === "https:" ? ";secure" : "";
+  document.cookie = `${LOCALE_COOKIE}=${locale};path=/;max-age=31536000;samesite=lax${secure}`;
 }
 
 export function LocaleProvider({
@@ -71,7 +70,6 @@ export function LanguageSwitcher({
   className?: string;
   placement?: "up" | "down";
 }) {
-  const pathname = usePathname();
   const { locale, t } = useLocale();
   const [open, setOpen] = useState(false);
 
@@ -83,7 +81,6 @@ export function LanguageSwitcher({
         className="flex min-h-9 min-w-9 items-center gap-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-sm"
         aria-label={t("shell.language")}
         aria-expanded={open}
-        aria-haspopup="menu"
       >
         <span className="text-base leading-none" aria-hidden="true">
           {FLAGS[locale]}
@@ -107,20 +104,18 @@ export function LanguageSwitcher({
                 : "right-0 top-full mt-1"
             }`}
           >
-            {LOCALES.map((nextLocale) => {
-              const href = switchLocalePath(pathname, nextLocale);
-              return (
+            {LOCALES.map((nextLocale) => (
                 <li key={nextLocale}>
-                  <a
-                    href={href}
-                    hrefLang={nextLocale}
+                  <button
+                    type="button"
                     lang={nextLocale}
-                    onClick={(event) => {
+                    aria-pressed={nextLocale === locale}
+                    onClick={() => {
                       writeLocaleCookie(nextLocale);
                       setOpen(false);
-                      if (window.location.search) {
-                        event.currentTarget.href = `${href}${window.location.search}`;
-                      }
+                      // Reload the document even when the current URL has a
+                      // fragment; a same-URL link could only scroll instead.
+                      window.location.reload();
                     }}
                     className={`flex min-h-10 w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-[var(--color-surface-2)] ${
                       nextLocale === locale ? "text-[var(--color-accent)]" : ""
@@ -128,10 +123,9 @@ export function LanguageSwitcher({
                   >
                     <span aria-hidden="true">{FLAGS[nextLocale]}</span>
                     <span>{NAMES[nextLocale]}</span>
-                  </a>
+                  </button>
                 </li>
-              );
-            })}
+            ))}
           </ul>
         </>
       ) : null}

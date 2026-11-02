@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
+import { writeLocaleCookie } from "./LocaleProvider";
 import {
   SEO_PAGES, SEO_LANGUAGES, SEO_TITLE_LIMIT, SEO_DESCRIPTION_LIMIT,
   type SeoEditorEntry, type SeoPageKey, type SeoLocale,
@@ -46,7 +47,7 @@ export function SeoEditor() {
   const canUndo = !!entry && !!undo && undo.revision === entry.revision && !dirty && !conflict;
   const disabled = loading || saving;
   const selectedPage = SEO_PAGES.find((value) => value.key === page)!;
-  const previewPath = `/${locale}${selectedPage.path === "/" ? "" : selectedPage.path}`;
+  const previewPath = selectedPage.path;
 
   async function load(signal?: AbortSignal, refresh = false) {
     setLoading(true);
@@ -133,7 +134,7 @@ export function SeoEditor() {
           <p>{currentIssue?.message ?? "Une autre version a été enregistrée. Votre brouillon est conservé."}</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button type="button" className={buttonClass} disabled={disabled} onClick={() => load(undefined, true)}>{conflict ? "Charger la version actuelle" : "Réessayer le chargement"}</button>
-            {currentIssue?.kind === "auth" && <Link className={buttonClass} href="/fr/connexion?next=%2Fadmin%2Fseo" prefetch={false}>Se reconnecter</Link>}
+            {currentIssue?.kind === "auth" && <Link className={buttonClass} href="/connexion?next=%2Fadmin%2Fseo" prefetch={false}>Se reconnecter</Link>}
           </div>
         </div>
       )}
@@ -186,7 +187,7 @@ export function SeoEditor() {
                   <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--color-ink-muted)]">{draft.description || "Votre description"}</p>
                 </div>
                 <p className="mt-4 text-xs text-[var(--color-ink-muted)]">{dirty ? "Brouillon — modifications non enregistrées" : entry.source === "saved" ? `${publicationPending[key] ? "Enregistré" : "Publié"} le ${stamp(entry.updatedAt)}` : "Textes actuels du site"}</p>
-                <Link href={previewPath} prefetch={false} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex min-h-12 items-center text-sm font-semibold text-[var(--color-accent)] underline underline-offset-4">Ouvrir la page publiée ↗</Link>
+                <button type="button" onClick={() => { writeLocaleCookie(locale); window.open(previewPath, "_blank", "noopener,noreferrer"); }} className="mt-3 inline-flex min-h-12 items-center text-sm font-semibold text-[var(--color-accent)] underline underline-offset-4">Ouvrir la page publiée ↗</button>
               </div>
               {dirty && <details className="rounded-xl border border-[var(--color-border)] p-4 text-sm"><summary className="cursor-pointer font-semibold">Comparer avec la version publiée</summary><div lang={locale} className="mt-3 space-y-2 break-words text-[var(--color-ink-muted)]"><p>{entry.title}</p><p>{entry.description}</p></div></details>}
             </aside>

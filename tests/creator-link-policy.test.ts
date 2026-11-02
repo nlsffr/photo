@@ -33,17 +33,17 @@ function scripts(tree: ReactNode): Schema[] {
   });
 }
 
-test("CreatorCard preserves all seven creator locales and the bare neutral route", () => {
+test("CreatorCard uses the same public creator address for every rendering language", () => {
   const { CreatorCard } = loadAppModule<{ CreatorCard: (props: { creator: CreatorWithStats; locale?: "en" | "fr" | "es" | "de" | "it" | "pt" | "nl" }) => ReactNode }>("src/components/CreatorCard.tsx", boundaries);
   assert.equal(nodes(CreatorCard({ creator }))[0].props.href, "/aria-lune-v3");
-  assert.equal(nodes(CreatorCard({ creator, locale: "en" }))[0].props.href, "/en/aria-lune-v3");
-  assert.equal(nodes(CreatorCard({ creator, locale: "fr" }))[0].props.href, "/fr/aria-lune-v3");
+  assert.equal(nodes(CreatorCard({ creator, locale: "en" }))[0].props.href, "/aria-lune-v3");
+  assert.equal(nodes(CreatorCard({ creator, locale: "fr" }))[0].props.href, "/aria-lune-v3");
   for (const locale of ["es", "de", "it", "pt", "nl"] as const) {
-    assert.equal(nodes(CreatorCard({ creator, locale }))[0].props.href, `/${locale}/aria-lune-v3`);
+    assert.equal(nodes(CreatorCard({ creator, locale }))[0].props.href, `/aria-lune-v3`);
   }
 });
 
-test("media cards keep the selected content locale on both media and creator links", () => {
+test("media cards use bare media and creator links in every language", () => {
   for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"] as const) {
     const { getDictionary } = loadAppModule<{ getDictionary: (locale: string) => unknown }>("src/lib/i18n/dictionaries.ts");
     const { PhotoCard } = loadAppModule<{ PhotoCard: (props: { photo: PhotoView }) => ReactNode }>("src/components/PhotoCard.tsx", {
@@ -52,8 +52,8 @@ test("media cards keep the selected content locale on both media and creator lin
       "./MediaImg": { MediaImg: () => null },
     });
     const html = renderToStaticMarkup(createElement(PhotoCard, { photo: { ...photo, creator } }));
-    assert.ok(html.includes(`href="/${locale}/aria-lune/123-v2"`), `${locale}: media detail`);
-    assert.ok(html.includes(`href="/${locale}/aria-lune-v3"`), `${locale}: creator`);
+    assert.ok(html.includes(`href="/aria-lune/123-v2"`), `${locale}: media detail`);
+    assert.ok(html.includes(`href="/aria-lune-v3"`), `${locale}: creator`);
   }
 });
 
@@ -104,8 +104,9 @@ test("creator renderer uses the loaded page for structured data with one gallery
   });
   const props = { handleParam: "aria-lune-v3", collection: "photos", locale: "fr", searchParams: { page: "2" } };
   const data = scripts(await renderer.CreatorCollectionPage(props));
-  assert.equal(data.find((item) => item["@type"] === "CollectionPage")!.url, "https://leakfanhub.com/fr/aria-lune-v3/photos?page=2");
-  assert.equal(data.find((item) => item["@type"] === "ItemList")!.itemListElement[0].item.url, "https://leakfanhub.com/fr/aria-lune/123-v2");
+  assert.doesNotMatch(JSON.stringify(data), /https:\/\/leakfanhub\.com\/(?:en|fr|es|de|it|pt|nl)(?:\/|["?#])/);
+  assert.equal(data.find((item) => item["@type"] === "CollectionPage")!.url, "https://leakfanhub.com/aria-lune-v3/photos?page=2");
+  assert.equal(data.find((item) => item["@type"] === "ItemList")!.itemListElement[0].item.url, "https://leakfanhub.com/aria-lune/123-v2");
   assert.deepEqual(queries, [{ creator: "aria-lune", type: "photo", sort: "recent", cursor: 30, limit: 30 }]);
   assert.equal(contextReads, 1);
   items[0].removedFromIndexAt = "2026-10-29";
@@ -118,7 +119,7 @@ test("creator renderer uses the loaded page for structured data with one gallery
 
 test("localized discovery surfaces link only to translated or canonical creator pages", async () => {
   for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"] as const) {
-    const creatorPath = `/${locale}/aria-lune-v3`;
+    const creatorPath = `/aria-lune-v3`;
     const replacements: Record<string, unknown> = {
       ...boundaries,
       "./seo-editor-store": { readSeoOverride: async () => null },
@@ -186,7 +187,6 @@ test("media pages keep one bounded creator read regardless of collection eligibi
 
 test("guest account and feed controls use available functional routes from every discovery language", () => {
   for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"] as const) {
-    const functionalLocale = locale === "fr" ? "fr" : "en";
     const replacements = {
       "./LocaleProvider": { useLocale: () => ({ locale, t: (key: string) => key }) },
       "./Session": { useSession: () => ({ user: null, loading: false }) },
@@ -194,11 +194,11 @@ test("guest account and feed controls use available functional routes from every
     };
     const { AccountMenu } = loadAppModule<{ AccountMenu: () => ReactNode }>("src/components/AccountMenu.tsx", replacements);
     const accountHtml = renderToStaticMarkup(createElement(AccountMenu));
-    assert.ok(accountHtml.includes(`href="/${functionalLocale}/connexion"`));
-    assert.ok(accountHtml.includes(`href="/${functionalLocale}/inscription"`));
+    assert.ok(accountHtml.includes(`href="/connexion"`));
+    assert.ok(accountHtml.includes(`href="/inscription"`));
     const { HomeFilters } = loadAppModule<{ HomeFilters: (props: { tags: string[]; sort: "discover" }) => ReactNode }>("src/components/HomeFilters.tsx", replacements);
     const filtersHtml = renderToStaticMarkup(createElement(HomeFilters, { tags: [], sort: "discover" }));
-    assert.ok(filtersHtml.includes(`href="/${functionalLocale}/feed"`));
-    assert.ok(filtersHtml.includes(`href="/${locale}?sort=trending"`));
+    assert.ok(filtersHtml.includes(`href="/feed"`));
+    assert.ok(filtersHtml.includes(`href="/?sort=trending"`));
   }
 });

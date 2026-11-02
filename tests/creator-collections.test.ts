@@ -61,19 +61,19 @@ test("parses collection routes safely, including localized and versioned handles
   ]) assert.equal(parseCreatorCollectionPath(path), null, path);
 });
 
-test("parses safe page numbers and builds localized versioned canonical paths", async () => {
+test("parses safe page numbers and builds unique public versioned canonical paths", async () => {
   const { parseCreatorPage, creatorCollectionPath } = await policyPromise;
   for (const raw of [undefined, "", "1"]) assert.deepEqual(parseCreatorPage(raw), { page: 1, valid: true });
   for (const raw of ["0", "-1", "1.2", "10001", "abc"]) assert.equal(parseCreatorPage(raw).valid, false);
   assert.equal(creatorCollectionPath("alice", 1, "photos"), "/alice/photos");
   assert.equal(creatorCollectionPath("alice", 1, "overview"), "/alice");
-  assert.equal(creatorCollectionPath("alice", 1, "overview", "en"), "/en/alice");
-  assert.equal(creatorCollectionPath("alice", 1, "overview", "fr"), "/fr/alice");
-  assert.equal(creatorCollectionPath("alice", 3, "overview", "fr", 2), "/fr/alice-v3?page=2");
-  assert.equal(creatorCollectionPath("alice", 3, "photos", "fr", 1), "/fr/alice-v3/photos");
-  assert.equal(creatorCollectionPath("alice", 3, "photos", "en", 2), "/en/alice-v3/photos?page=2");
-  assert.equal(creatorCollectionPath("tina_kitsune", 1, "overview", "en"), "/en/tina_kitsune");
-  assert.equal(creatorCollectionPath("little.warren", 1, "photos", "fr"), "/fr/little.warren/photos");
+  assert.equal(creatorCollectionPath("alice", 1, "overview", "en"), "/alice");
+  assert.equal(creatorCollectionPath("alice", 1, "overview", "fr"), "/alice");
+  assert.equal(creatorCollectionPath("alice", 3, "overview", "fr", 2), "/alice-v3?page=2");
+  assert.equal(creatorCollectionPath("alice", 3, "photos", "fr", 1), "/alice-v3/photos");
+  assert.equal(creatorCollectionPath("alice", 3, "photos", "en", 2), "/alice-v3/photos?page=2");
+  assert.equal(creatorCollectionPath("tina_kitsune", 1, "overview", "en"), "/tina_kitsune");
+  assert.equal(creatorCollectionPath("little.warren", 1, "photos", "fr"), "/little.warren/photos");
   for (const handle of [".", "..", "alice/bob", "alice%2Fbob", "a".repeat(101), "contact", "models", "sitemaps", "en", "fr", "photos", "videos", "popular", "api", "creator", "photo", "media", "_next", "saved", "liked", "search", "random", "tag", "foo-v2"]) {
     assert.throws(() => creatorCollectionPath(handle, 1, "overview"), /Invalid creator handle/, handle);
   }

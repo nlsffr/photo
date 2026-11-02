@@ -265,13 +265,13 @@ export async function CreatorCollectionPage(props: CreatorCollectionPageProps) {
         "@type": "ListItem",
         position: 1,
         name: ui.home,
-        item: `${SITE}${locale ? `/${locale}` : ""}`,
+        item: `${SITE}/`,
       },
       {
         "@type": "ListItem",
         position: 2,
         name: ui.models,
-        item: `${SITE}${locale ? `/${locale}` : ""}/models`,
+        item: `${SITE}/models`,
       },
       {
         "@type": "ListItem",
@@ -295,12 +295,12 @@ export async function CreatorCollectionPage(props: CreatorCollectionPageProps) {
     <div className="pb-4">
       <JsonLd data={[...creatorLd, breadcrumbLd]} />
       <FloatingBack
-        fallback={locale ? `/${locale}` : "/"}
+        fallback="/"
         label={ui.back}
       />
       <div className="px-3 pt-3 sm:px-5">
         <BackLink
-          fallback={locale ? `/${locale}` : "/"}
+          fallback="/"
           label={ui.back}
         />
       </div>

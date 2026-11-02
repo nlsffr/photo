@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 export default async function SeoEditorPage() {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   const user = token ? await getSessionUser(token) : null;
-  if (!user) redirect("/en/connexion?next=%2Fadmin%2Fseo");
+  if (!user) redirect("/connexion?next=%2Fadmin%2Fseo");
   if (!isSeoEditorId(user.id)) notFound();
   return <SeoEditor />;
 }

@@ -91,6 +91,29 @@ function view() {
 }
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
+test("editor preview sets the selected form language before opening the bare public page", async (t) => {
+  const oldWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  const oldDocument = Object.getOwnPropertyDescriptor(globalThis, "document");
+  let cookie = "";
+  const opened: unknown[][] = [];
+  Object.defineProperty(globalThis, "document", { configurable: true, value: { get cookie() { return cookie; }, set cookie(value: string) { cookie = value; } } });
+  Object.defineProperty(globalThis, "window", { configurable: true, value: { location: { protocol: "https:" }, open: (...args: unknown[]) => opened.push([...args, cookie]) } });
+  t.after(() => {
+    if (oldWindow) Object.defineProperty(globalThis, "window", oldWindow); else Reflect.deleteProperty(globalThis, "window");
+    if (oldDocument) Object.defineProperty(globalThis, "document", oldDocument); else Reflect.deleteProperty(globalThis, "document");
+  });
+  const methods: string[] = [];
+  t.mock.method(globalThis, "fetch", async (_url: unknown, init?: RequestInit) => { methods.push(init?.method ?? "GET"); return Response.json({ entries: fixtures() }); });
+  const editor = view(); editor.render(); await settle(); editor.render();
+  await editor.click("Deutsch");
+  const title = editor.field("title").props.value;
+  await editor.click("Ouvrir la page publiée ↗");
+  assert.deepEqual(opened, [["/", "_blank", "noopener,noreferrer", "lfh_locale=de;path=/;max-age=31536000;samesite=lax;secure"]]);
+  assert.equal(editor.field("title").props.value, title);
+  assert.deepEqual(methods, ["GET"]);
+  editor.cleanup();
+});
+
 test("editor loads all page/language choices and exposes labeled native controls", async (t) => {
   t.mock.method(globalThis, "fetch", async () => Response.json({ entries: fixtures() }));
   const editor = view(); editor.render(); await settle(); editor.render();

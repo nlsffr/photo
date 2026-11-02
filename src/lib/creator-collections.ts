@@ -98,10 +98,10 @@ export function creatorCollectionPath(handle: string, urlVersion: number, collec
   const version = Number.isInteger(urlVersion) && urlVersion > 1 ? urlVersion : 1;
   const encodedHandle = encodeURIComponent(safeHandle);
   const versionedHandle = version > 1 ? `${encodedHandle}-v${version}` : encodedHandle;
-  const prefix = isCreatorLocale(locale) ? `/${locale}` : "";
+  void locale; // Public addresses are shared by every rendering language.
   const suffix = Number.isInteger(page) && (page as number) >= 2 ? `?page=${page}` : "";
   const collectionPath = collection === "overview" ? `/${versionedHandle}` : `/${versionedHandle}/${collection}`;
-  return `${prefix}${collectionPath}${suffix}`;
+  return `${collectionPath}${suffix}`;
 }
 
 export function creatorCollectionCopy(locale: CreatorLocale, collection: CreatorCollection, name: string) {
