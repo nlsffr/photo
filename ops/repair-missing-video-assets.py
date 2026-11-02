@@ -48,9 +48,10 @@ def object_key(url):
 
 
 def legacy_poster_url(expected):
-    """The only permitted image URL transition, including crash recovery."""
-    if (not expected.get('video_url') or expected.get('image_url') != expected['video_url']
-            or expected.get('preview_url') is not None):
+    """Repair a missing or video-valued image reference, including exact replay."""
+    if (not expected.get('video_url')
+            or expected.get('image_url') not in (None, '', expected['video_url'])
+            or expected.get('preview_url') not in (None, '')):
         return None
     object_key(expected['video_url'])
     parsed = urlsplit(expected['video_url'])

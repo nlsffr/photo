@@ -59,6 +59,42 @@ class RepairTests(unittest.TestCase):
         self.row['image_url']=self.row['video_url']
         return copy.deepcopy(self.row)
 
+    def test_missing_poster_reference_derives_an_image_for_null_or_empty_fields(self):
+        for image in (None, ""):
+            for preview in (None, ""):
+                with self.subTest(image=image, preview=preview):
+                    expected={**self.row, 'image_url':image, 'preview_url':preview}
+                    self.assertEqual(repair.legacy_poster_url(expected), '/media/creators/person/12_thumb.webp')
+                    self.assertEqual(repair.validate_candidate(expected,expected),
+                                     ('creators/person/12.mp4','creators/person/12_thumb.webp'))
+                    replay={**expected,'image_url':'/media/creators/person/12_thumb.webp'}
+                    self.assertEqual(repair.validate_candidate(expected,replay)[1],'creators/person/12_thumb.webp')
+                    changed={**replay,'image_url':'/media/creators/person/other.webp'}
+                    with self.assertRaises(repair.RepairError):repair.validate_candidate(expected,changed)
+
+    def test_missing_poster_reference_never_replaces_a_different_existing_reference(self):
+        for image,preview in [('/media/creators/person/custom.jpg',None),
+                              (None,'/media/creators/person/preview.webp'),
+                              ('/media/creators/person/other.mp4',None),
+                              ('https://unrelated.example/thumb.jpg',None)]:
+            self.assertIsNone(repair.legacy_poster_url({**self.row,'image_url':image,'preview_url':preview}))
+
+    def test_null_poster_existing_file_repair_preserves_identity_and_replays(self):
+        self.row['image_url']=None
+        expected=copy.deepcopy(self.row)
+        self.runtime.s3.objects={'creators/person/12.mp4':b'video','creators/person/12_thumb.webp':b'image'}
+        dry=self.runtime.run(expected,False)
+        self.assertEqual(dry['status'],'would_restore');self.assertTrue(dry['poster_metadata_change'])
+        self.assertEqual(self.row,expected);self.assertEqual(self.runtime.poster_updates,[])
+        result=self.runtime.run(expected,True)
+        self.assertEqual(result['status'],'restored')
+        self.assertEqual(self.row['image_url'],'/media/creators/person/12_thumb.webp')
+        self.assertEqual(self.runtime.downloads,[]);self.assertEqual(self.runtime.s3.puts,[])
+        for field in ('id','source_id','photo_source_id','video_url','preview_url','url_version'):
+            self.assertEqual(self.row[field],expected[field])
+        self.assertEqual(self.runtime.run(expected,True)['status'],'already_present')
+        self.assertEqual(len(self.runtime.poster_updates),1)
+
     def test_legacy_video_thumbnail_derives_image_and_allows_only_exact_replay(self):
         expected=self.legacy()
         self.assertEqual(repair.validate_candidate(expected,self.row),('creators/person/12.mp4','creators/person/12_thumb.webp'))
