@@ -199,6 +199,6 @@ test("guest account and feed controls use available functional routes from every
     const { HomeFilters } = loadAppModule<{ HomeFilters: (props: { tags: string[]; sort: "discover" }) => ReactNode }>("src/components/HomeFilters.tsx", replacements);
     const filtersHtml = renderToStaticMarkup(createElement(HomeFilters, { tags: [], sort: "discover" }));
     assert.ok(filtersHtml.includes(`href="/feed"`));
-    assert.ok(filtersHtml.includes(`href="/?sort=trending"`));
+    assert.ok(filtersHtml.includes(`href="${locale === "en" ? "/" : `/${locale}`}?sort=trending"`));
   }
 });

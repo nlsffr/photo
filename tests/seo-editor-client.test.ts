@@ -91,7 +91,7 @@ function view() {
 }
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-test("editor preview sets the selected form language before opening the bare public page", async (t) => {
+test("editor preview sets the selected form language before opening its stable discovery URL", async (t) => {
   const oldWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
   const oldDocument = Object.getOwnPropertyDescriptor(globalThis, "document");
   let cookie = "";
@@ -108,7 +108,7 @@ test("editor preview sets the selected form language before opening the bare pub
   await editor.click("Deutsch");
   const title = editor.field("title").props.value;
   await editor.click("Ouvrir la page publiée ↗");
-  assert.deepEqual(opened, [["/", "_blank", "noopener,noreferrer", "lfh_locale=de;path=/;max-age=31536000;samesite=lax;secure"]]);
+  assert.deepEqual(opened, [["/de", "_blank", "noopener,noreferrer", "lfh_locale=de;path=/;max-age=31536000;samesite=lax;secure"]]);
   assert.equal(editor.field("title").props.value, title);
   assert.deepEqual(methods, ["GET"]);
   editor.cleanup();

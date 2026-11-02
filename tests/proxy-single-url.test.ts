@@ -50,11 +50,18 @@ function rejected(response: Response, status: number, robots: string, cache: str
   assert.equal(response.headers.get("x-middleware-rewrite"), null);
 }
 
-test("one bare discovery URL rewrites privately to all seven renderers without a public redirect", async () => {
+test("bare discoveries always render English and localized discoveries keep their explicit URL", async () => {
   const { request, lookups } = fixture();
   for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"]) {
-    rewrite(await request("/models?page=2&sort=recent", { cookie: `lfh_locale=${locale}`, "accept-language": "fr" }), `/${locale}/models`, "?page=2&sort=recent");
-    rewrite(await request("/", { cookie: `lfh_locale=${locale}` }), `/${locale}`);
+    rewrite(await request("/models?page=2&sort=recent", { cookie: `lfh_locale=${locale}`, "accept-language": "fr" }), "/en/models", "?page=2&sort=recent");
+    rewrite(await request("/", { cookie: `lfh_locale=${locale}` }), "/en");
+    if (locale !== "en") {
+      const response = await request(`/${locale}/models?page=2`, { cookie: "lfh_locale=en", "accept-language": "en" });
+      assert.equal(response.headers.get("x-middleware-next"), "1");
+      assert.equal(response.headers.get("x-middleware-rewrite"), null);
+      assert.equal(response.headers.get("location"), null);
+      privateVariant(response);
+    }
   }
   assert.deepEqual(lookups, []);
 });
@@ -67,13 +74,13 @@ test("negotiation prefers valid cookie, then weighted browser language, then Eng
     ["", "fr;q=0,nl-NL;q=0.8,en;q=0.4", "nl"],
     ["", "ja-JP,zh;q=0.9", "en"],
     ["", "", "en"],
-  ]) rewrite(await request("/most-liked", { cookie: `lfh_locale=${cookie}`, "accept-language": language }), `/${expected}/most-liked`);
+  ]) rewrite(await request("/aria-lune-v3", { cookie: `lfh_locale=${cookie}`, "accept-language": language }), `/${expected}/aria-lune-v3`);
 });
 
 test("legacy locale URLs redirect308 to the same-origin bare path with exact search and no preference override", async () => {
   const { request } = fixture();
   for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"]) {
-    for (const path of ["", "/models", "/about", "/aria-lune-v3", "/aria-lune-v3/videos", "/aria-lune/123-v2"]) {
+    for (const path of ["/about", "/aria-lune-v3", "/aria-lune-v3/videos", "/aria-lune/123-v2"]) {
       const response = await request(`/${locale}${path}?page=2&next=https%3A%2F%2Fexample.invalid%2Fadmin%3Fx%3D1`, { cookie: "lfh_locale=nl", "accept-language": "de" });
       assert.equal(response.status, 308);
       assert.equal(response.headers.get("location"), `${ORIGIN}${path || "/"}?page=2&next=https%3A%2F%2Fexample.invalid%2Fadmin%3Fx%3D1`);
@@ -83,10 +90,20 @@ test("legacy locale URLs redirect308 to the same-origin bare path with exact sea
   }
 });
 
+test("historical English discovery aliases redirect to the bare stable English URL", async () => {
+  const { request } = fixture();
+  for (const path of ["", "/models", "/trending-medias", "/most-liked", "/classements", "/influenceuses-tendances"]) {
+    const response = await request(`/en${path}?page=2`, { cookie: "lfh_locale=fr" });
+    assert.equal(response.status, 308);
+    assert.equal(response.headers.get("location"), `${ORIGIN}${path || "/"}?page=2`);
+    privateVariant(response);
+  }
+});
+
 test("functional fallback does not replace a seven-language preference and legacy tags retain their renderer", async () => {
   const { request } = fixture();
   rewrite(await request("/about", { cookie: "lfh_locale=es" }), "/en/about");
-  rewrite(await request("/models", { cookie: "lfh_locale=es" }), "/es/models");
+  rewrite(await request("/models", { cookie: "lfh_locale=es" }), "/en/models");
   const tag = await request("/tag/portrait", { cookie: "lfh_locale=es" });
   assert.equal(tag.status, 200);
   assert.equal(tag.headers.get("x-middleware-next"), "1");
@@ -102,9 +119,12 @@ test("HTML and RSC/prefetch requests select the same private renderer without a 
     { "user-agent": "Googlebot" },
   ];
   for (const extra of modes) {
-    rewrite(await request("/models?page=2", { cookie: "lfh_locale=fr", ...extra }), "/fr/models", "?page=2");
+    rewrite(await request("/models?page=2", { cookie: "lfh_locale=fr", ...extra }), "/en/models", "?page=2");
+    const explicit = await request("/fr/models?page=2", { cookie: "lfh_locale=en", ...extra });
+    assert.equal(explicit.headers.get("x-middleware-next"), "1");
+    privateVariant(explicit);
   }
-  for (const locale of ["en", "fr", "en"]) rewrite(await request("/models", { cookie: `lfh_locale=${locale}` }), `/${locale}/models`);
+  for (const locale of ["en", "fr", "en"]) rewrite(await request("/aria-lune-v3", { cookie: `lfh_locale=${locale}` }), `/${locale}/aria-lune-v3`);
 });
 
 test("machine paths and private admin never negotiate or query public content", async () => {

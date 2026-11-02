@@ -61,13 +61,14 @@ test("media page UI, creator links and back controls use all seven active locale
     assert.ok(visible.includes(photo.title), `${locale}: keep the source title`);
     assert.ok(visible.includes(dictionary.mediaDetails.allMedia.replace("{handle}", "aria")));
     assert.ok(nodes(tree).some((node) => node.props.href === "/aria-v3"));
-    assert.ok(nodes(tree).some((node) => node.props.fallback === "/" && node.props.label === dictionary.creator.back));
+    assert.ok(nodes(tree).some((node) => node.props.fallback === (locale === "en" ? "/" : `/${locale}`) && node.props.label === dictionary.creator.back));
     const data = nodes(tree).find((node) => Array.isArray(node.props.data))?.props.data;
     assert.ok(data, `${locale}: media structured data is present`);
     const serialized = JSON.stringify(data);
     assert.ok(serialized.includes("https://leakfanhub.com/aria/123-v2"));
     assert.ok(serialized.includes("https://leakfanhub.com/aria-v3"));
-    assert.doesNotMatch(serialized, /https:\/\/leakfanhub\.com\/(?:en|fr|es|de|it|pt|nl)(?:\/|[?#"])/);
+    assert.ok(serialized.includes(`"item":"https://leakfanhub.com${locale === "en" ? "/" : `/${locale}`}"`));
+    assert.doesNotMatch(serialized, /https:\/\/leakfanhub\.com\/(?:en|fr|es|de|it|pt|nl)\/aria(?:-v3|\/123-v2)/);
     const relativeAge = new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(-5, "hour");
     assert.ok(visible.includes(relativeAge), `${locale}: age must use its locale`);
   }

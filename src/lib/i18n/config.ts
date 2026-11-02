@@ -136,15 +136,21 @@ export function stripLocalePrefix(pathname: string): {
   };
 }
 
+export function isDiscoveryPath(pathname: string): boolean {
+  return DISCOVERY_ROUTES.has(stripLocalePrefix(pathname).pathname);
+}
+
 export function localePath(locale: Locale, pathname: string): string {
-  // Keep the language argument for existing callers; language is a preference,
-  // never part of a public URL. Do not turn external or fragment-only hrefs
-  // into local paths.
-  void locale;
+  // Only fully translated discovery pages have language-specific public URLs.
+  // Content and functional pages keep their single public address.
   if (/^(?:[a-z][a-z\d+.-]*:|\/\/|[?#])/i.test(pathname)) return pathname;
   const [, path = "/", suffix = ""] = pathname.match(/^([^?#]*)(.*)$/) || [];
   if (isSystemPath(path)) return pathname;
-  return `${stripLocalePrefix(path).pathname}${suffix}`;
+  const unprefixed = stripLocalePrefix(path).pathname;
+  const publicPath = locale !== DEFAULT_LOCALE && DISCOVERY_ROUTES.has(unprefixed)
+    ? (unprefixed === "/" ? `/${locale}` : `/${locale}${unprefixed}`)
+    : unprefixed;
+  return `${publicPath}${suffix}`;
 }
 
 /** Private renderer destination only; never use in links or metadata. */
@@ -165,8 +171,11 @@ export function switchLocalePath(pathname: string, locale: Locale): string {
 }
 
 export function localeAlternates(pathname: string): Record<string, string> {
-  void pathname;
-  return {};
+  if (!isDiscoveryPath(pathname)) return {};
+  return {
+    ...Object.fromEntries(LOCALES.map((locale) => [locale, localePath(locale, pathname)])),
+    "x-default": localePath(DEFAULT_LOCALE, pathname),
+  };
 }
 
 export function chooseLocale(
@@ -225,5 +234,6 @@ export function localeRedirectTarget(
   const stripped = stripLocalePrefix(normalized);
   if (!stripped.locale || stripLocalePrefix(stripped.pathname).locale
     || isSystemPath(stripped.pathname) || !isLocalizedRoute(stripped.pathname)) return null;
-  return localePath(stripped.locale, pathname);
+  if (isDiscoveryPath(stripped.pathname) && stripped.locale !== DEFAULT_LOCALE) return null;
+  return localePath(DEFAULT_LOCALE, pathname);
 }

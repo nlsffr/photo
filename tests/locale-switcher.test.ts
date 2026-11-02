@@ -17,8 +17,8 @@ test("language choices are buttons that persist the preference before reloading 
   const originalDocument = Object.getOwnPropertyDescriptor(globalThis, "document");
   let cookie = "";
   const reloadCookies: string[] = [];
-  const location = { href: "https://example.test/models?page=2#items", protocol: "https:",
-    pathname: "/models", search: "?page=2", hash: "#items", reload: () => reloadCookies.push(cookie) };
+  const location = { href: "https://example.test/aria/123-v2?page=2#items", protocol: "https:",
+    pathname: "/aria/123-v2", search: "?page=2", hash: "#items", reload: () => reloadCookies.push(cookie) };
   Object.defineProperty(globalThis, "document", { configurable: true, value: { get cookie() { return cookie; }, set cookie(value: string) { cookie = value; } } });
   Object.defineProperty(globalThis, "window", { configurable: true, value: { location } });
   t.after(() => {
@@ -37,10 +37,40 @@ test("language choices are buttons that persist the preference before reloading 
     (choice.props.onClick as () => void)();
     assert.equal(cookie, `lfh_locale=${choice.props.lang};path=/;max-age=31536000;samesite=lax;secure`);
     assert.equal(reloadCookies.at(-1), cookie);
-    assert.equal(location.href, "https://example.test/models?page=2#items");
+    assert.equal(location.href, "https://example.test/aria/123-v2?page=2#items");
   }
   assert.equal(reloadCookies.length, 7);
   location.protocol = "http:";
   (choices[0].props.onClick as () => void)();
   assert.ok(!cookie.includes(";secure"));
+});
+
+
+test("discovery language choices persist before navigation and preserve query and fragment", (t) => {
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
+  const originalDocument = Object.getOwnPropertyDescriptor(globalThis, "document");
+  let cookie = "";
+  const events: unknown[][] = [];
+  const location = {
+    href: "https://example.test/fr/models?sort=views&page=2#items", protocol: "https:",
+    reload: () => events.push(["reload", cookie]),
+    assign: (url: string) => events.push(["assign", url, cookie]),
+  };
+  Object.defineProperty(globalThis, "document", { configurable: true, value: { set cookie(value: string) { cookie = value; } } });
+  Object.defineProperty(globalThis, "window", { configurable: true, value: { location } });
+  t.after(() => {
+    if (originalWindow) Object.defineProperty(globalThis, "window", originalWindow); else Reflect.deleteProperty(globalThis, "window");
+    if (originalDocument) Object.defineProperty(globalThis, "document", originalDocument); else Reflect.deleteProperty(globalThis, "document");
+  });
+  const { LanguageSwitcher } = loadAppModule<{ LanguageSwitcher(props: object): ReactNode }>("src/components/LocaleProvider.tsx", {
+    react: { ...React, useState: () => [true, () => {}], useContext: () => ({ locale: "fr", t: (key: string) => key }) },
+  });
+  const choices = nodes(LanguageSwitcher({})).filter((node) => node.type === "button" && node.props.lang);
+  for (const choice of choices) {
+    (choice.props.onClick as () => void)();
+    const locale = choice.props.lang;
+    const preference = `lfh_locale=${locale};path=/;max-age=31536000;samesite=lax;secure`;
+    assert.deepEqual(events.at(-1), locale === "fr" ? ["reload", preference] : ["assign", `https://example.test${locale === "en" ? "" : `/${locale}`}/models?sort=views&page=2#items`, preference]);
+  }
+  assert.equal(events.length, 7);
 });

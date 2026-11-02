@@ -58,13 +58,13 @@ test("supports seven discovery and content locales while editorial routes stay E
   });
 });
 
-test("public helpers remove language prefixes while preserving query and fragments", async () => {
+test("public helpers localize discoveries and keep content bare while preserving query and fragments", async () => {
   const { localizedHref, localePath, internalLocalePath, stripLocalePrefix, switchLocalePath } = await loadConfig();
   for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"] as const) {
-    assert.equal(localePath(locale, "/"), "/");
-    assert.equal(localePath(locale, "/fr/models?page=2#items"), "/models?page=2#items");
+    assert.equal(localePath(locale, "/"), locale === "en" ? "/" : `/${locale}`);
+    assert.equal(localePath(locale, "/fr/models?page=2#items"), `${locale === "en" ? "" : `/${locale}`}/models?page=2#items`);
     assert.equal(localizedHref(locale, "/fr/aria-lune/123-v2?from=related#photo"), "/aria-lune/123-v2?from=related#photo");
-    assert.equal(switchLocalePath("/en/models?page=2#items", locale), "/models?page=2#items");
+    assert.equal(switchLocalePath("/en/models?page=2#items", locale), `${locale === "en" ? "" : `/${locale}`}/models?page=2#items`);
     assert.equal(internalLocalePath(locale, "/models?page=2#items"), `/${locale}/models?page=2#items`);
     assert.equal(internalLocalePath(locale, "/"), `/${locale}`);
   }
@@ -74,9 +74,10 @@ test("public helpers remove language prefixes while preserving query and fragmen
   }
 });
 
-test("a single public address exposes no hreflang URL alternatives", async () => {
+test("only discoveries expose reciprocal hreflang URL alternatives", async () => {
   const { localeAlternates } = await loadConfig();
-  for (const path of ["/models", "/about", "/aria-lune-v3/photos"]) assert.deepEqual(localeAlternates(path), {});
+  assert.deepEqual(localeAlternates("/models"), { en: "/models", fr: "/fr/models", es: "/es/models", de: "/de/models", it: "/it/models", pt: "/pt/models", nl: "/nl/models", "x-default": "/models" });
+  for (const path of ["/about", "/aria-lune-v3/photos"]) assert.deepEqual(localeAlternates(path), {});
 });
 
 test("the locale cookie wins, then Accept-Language quality values, then English", async () => {

@@ -60,13 +60,15 @@ const requests: { search: Search; suffix: string; sort: string; offset: number }
 test("models canonical and Open Graph keep the numbered public URL in all rendered languages", async () => {
   const { models, localized } = routes();
   for (const { search, suffix } of requests) {
-    for (const locale of ["", "en", "fr", "es", "de", "it", "pt", "nl"]) {
-      const base = "/models";
+    for (const locale of ["", "en", "fr", "es", "de", "it", "pt", "nl"] as const) {
+      const base = `${locale && locale !== "en" ? `/${locale}` : ""}/models`;
       const metadata = locale
         ? await localized.localizedPageMetadata(locale, "/models", Promise.resolve(search))
         : models.generateMetadata ? await models.generateMetadata({ searchParams: Promise.resolve(search) }) : models.metadata!;
       assert.equal(metadata.alternates?.canonical, `${base}${suffix}`, `${locale || "default"}: ${JSON.stringify(search)}`);
-      assert.equal(metadata.alternates?.languages, undefined);
+      assert.equal(metadata.alternates?.languages?.[locale || "en"], `${base}${suffix}`);
+      assert.equal(metadata.alternates?.languages?.["x-default"], `/models${suffix}`);
+      assert.equal(Object.keys(metadata.alternates?.languages ?? {}).length, 8);
       assert.equal(new URL(String(metadata.openGraph?.url), "https://leakfanhub.com").href, `https://leakfanhub.com${base}${suffix}`);
     }
   }
@@ -75,7 +77,7 @@ test("models canonical and Open Graph keep the numbered public URL in all render
 test("models rendering uses the same normalized page as its metadata and collection JSON-LD", async () => {
   const { reads, models, localized } = routes();
   for (const { search, suffix, sort, offset } of requests) {
-    for (const locale of ["", "en", "fr", "es", "de", "it", "pt", "nl"]) {
+    for (const locale of ["", "en", "fr", "es", "de", "it", "pt", "nl"] as const) {
       reads.length = 0;
       let tree = locale
         ? await localized.LocalizedPage({ locale, pathname: "/models", searchParams: Promise.resolve(search) })
@@ -85,7 +87,7 @@ test("models rendering uses the same normalized page as its metadata and collect
       assert.ok(isValidElement(tree));
       const children = (tree.props as { children: ReactElement[] }).children;
       const data = (children[0].props as { data: { url: string; mainEntity: { itemListElement: { position: number }[] } } }).data;
-      assert.equal(data.url, `https://leakfanhub.com/models${suffix}`);
+      assert.equal(data.url, `https://leakfanhub.com${locale && locale !== "en" ? `/${locale}` : ""}/models${suffix}`);
       assert.equal(data.mainEntity.itemListElement[0].position, offset + 1);
       const grid = children[children.length - 1].props as { initialModels: unknown[]; initialNextOffset: number; sort: string };
       assert.equal(grid.initialModels.length, 60);

@@ -106,7 +106,7 @@ test("all six bare and seven-language discovery routes apply saved text without 
       assert.deepEqual(result.openGraph?.url, baseline.openGraph?.url);
       assert.deepEqual(result.openGraph?.locale, baseline.openGraph?.locale);
       assert.deepEqual(reads.at(-1), [locale ?? "en", key]);
-      if (key === "models") assert.equal(result.alternates?.canonical, "/models?sort=views&page=3");
+      if (key === "models") assert.equal(result.alternates?.canonical, `${locale && locale !== "en" ? `/${locale}` : ""}/models?sort=views&page=3`);
     }
   }
   reads.length = 0;

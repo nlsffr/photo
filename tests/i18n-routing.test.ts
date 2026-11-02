@@ -21,8 +21,8 @@ test("bare pages keep their public URL regardless of the negotiated or saved lan
 test("only known historical locale URLs have a bare redirect target", async () => {
   const { localeRedirectTarget } = await loadConfig();
   for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"]) {
-    assert.equal(localeRedirectTarget(`/${locale}`, "fr", "de"), "/");
-    assert.equal(localeRedirectTarget(`/${locale}/models`, "en", "fr"), "/models");
+    assert.equal(localeRedirectTarget(`/${locale}`, "fr", "de"), locale === "en" ? "/" : null);
+    assert.equal(localeRedirectTarget(`/${locale}/models`, "en", "fr"), locale === "en" ? "/models" : null);
     assert.equal(localeRedirectTarget(`/${locale}/aria-lune-v3/videos`, "en", "fr"), "/aria-lune-v3/videos");
   }
   for (const pathname of ["/api/healthz", "/_next/image", "/sitemap.xml", "/creator-handle", "/creator-handle/media-id", "/tag/portrait", "/fr/api/healthz", "/fr/en/models", "/fr/tag/portrait"]) {
@@ -30,10 +30,10 @@ test("only known historical locale URLs have a bare redirect target", async () =
   }
 });
 
-test("public and internal URLs are distinct for every declared localized route", async () => {
-  const { LOCALIZED_ROUTE_PATHS, localePath, internalLocalePath } = await loadConfig();
+test("public URLs localize only discoveries while private renderer addresses remain explicit", async () => {
+  const { LOCALIZED_ROUTE_PATHS, isDiscoveryPath, localePath, internalLocalePath } = await loadConfig();
   for (const pathname of LOCALIZED_ROUTE_PATHS) {
-    assert.equal(localePath("fr", pathname), pathname);
+    assert.equal(localePath("fr", pathname), isDiscoveryPath(pathname) ? `/fr${pathname === "/" ? "" : pathname}` : pathname);
     assert.equal(localePath("en", pathname), pathname);
     assert.equal(internalLocalePath("fr", pathname), `/fr${pathname === "/" ? "" : pathname}`);
     assert.equal(internalLocalePath("en", pathname), `/en${pathname === "/" ? "" : pathname}`);

@@ -5,6 +5,7 @@ import {
   LOCALES,
   LOCALE_COOKIE,
   localePath,
+  switchLocalePath,
   type Locale,
 } from "@/lib/i18n/config";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
@@ -111,11 +112,14 @@ export function LanguageSwitcher({
                     lang={nextLocale}
                     aria-pressed={nextLocale === locale}
                     onClick={() => {
+                      const target = new URL(window.location.href);
+                      target.pathname = switchLocalePath(target.pathname, nextLocale);
                       writeLocaleCookie(nextLocale);
                       setOpen(false);
-                      // Reload the document even when the current URL has a
-                      // fragment; a same-URL link could only scroll instead.
-                      window.location.reload();
+                      // A same-URL link with a fragment may only scroll. Bare
+                      // content pages must reload to apply the new preference.
+                      if (target.href === window.location.href) window.location.reload();
+                      else window.location.assign(target.href);
                     }}
                     className={`flex min-h-10 w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-[var(--color-surface-2)] ${
                       nextLocale === locale ? "text-[var(--color-accent)]" : ""

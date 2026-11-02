@@ -18,6 +18,7 @@ import {
 import {
   LOCALE_COOKIE,
   chooseLocale,
+  isDiscoveryPath,
   isSystemPath,
   internalLocalePath,
   resolveLocalizedPage,
@@ -64,14 +65,20 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  const locale = supportedLocaleForPath(chooseLocale(
+  const discovery = isDiscoveryPath(pathname);
+  // Discovery URLs are stable for crawlers and people. Other pages retain
+  // language negotiation at their single public address.
+  const locale = discovery ? (localized.locale ?? "en") : supportedLocaleForPath(chooseLocale(
     request.cookies.get(LOCALE_COOKIE)?.value,
     request.headers.get("accept-language"),
   ), pathname);
   function render() {
     // Validate resource existence, removal and version before redirecting an
     // old language URL. Historical links never overwrite the locale cookie.
-    if (localized.locale) return publicRedirect(request, pathname);
+    if (localized.locale) {
+      if (discovery && localized.locale !== "en") return privateResponse(NextResponse.next());
+      return publicRedirect(request, pathname);
+    }
     if (!resolveLocalizedPage(locale, pathname)) return privateResponse(NextResponse.next());
     const target = request.nextUrl.clone();
     target.pathname = internalLocalePath(locale, pathname);

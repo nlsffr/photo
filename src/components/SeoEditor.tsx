@@ -1,5 +1,6 @@
 "use client";
 
+import { localePath } from "@/lib/i18n/config";
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { writeLocaleCookie } from "./LocaleProvider";
@@ -47,7 +48,7 @@ export function SeoEditor() {
   const canUndo = !!entry && !!undo && undo.revision === entry.revision && !dirty && !conflict;
   const disabled = loading || saving;
   const selectedPage = SEO_PAGES.find((value) => value.key === page)!;
-  const previewPath = selectedPage.path;
+  const previewPath = localePath(locale, selectedPage.path);
 
   async function load(signal?: AbortSignal, refresh = false) {
     setLoading(true);

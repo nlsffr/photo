@@ -11,7 +11,7 @@ async function loadDictionaries() {
   return import("../src/lib/i18n/dictionaries.ts");
 }
 
-test("localized metadata keeps one public canonical and its rendered language", async () => {
+test("discovery metadata has a self canonical and reciprocal language URLs", async () => {
   const { buildLocalizedMetadata } = await loadMetadata();
 
   const english = buildLocalizedMetadata("en", "/models", {
@@ -23,15 +23,16 @@ test("localized metadata keeps one public canonical and its rendered language", 
     description: "Parcourir les créateurs",
   });
 
-  assert.deepEqual(english.alternates, { canonical: "/models" });
-  assert.deepEqual(french.alternates, { canonical: "/models" });
+  const languages = { en: "/models", fr: "/fr/models", es: "/es/models", de: "/de/models", it: "/it/models", pt: "/pt/models", nl: "/nl/models", "x-default": "/models" };
+  assert.deepEqual(english.alternates, { canonical: "/models", languages });
+  assert.deepEqual(french.alternates, { canonical: "/fr/models", languages });
   assert.equal(english.openGraph?.url, "/models");
-  assert.equal(french.openGraph?.url, "/models");
+  assert.equal(french.openGraph?.url, "/fr/models");
   assert.equal(english.openGraph?.locale, "en_US");
   assert.equal(french.openGraph?.locale, "fr_FR");
 });
 
-test("all discovery languages use bare canonicals without changing localized copy or Open Graph locales", async () => {
+test("all discovery languages have stable canonicals without changing localized copy or Open Graph locales", async () => {
   const { buildLocalizedMetadata } = await loadMetadata();
   const { getDictionary } = await loadDictionaries();
   const pages = [
@@ -44,8 +45,12 @@ test("all discovery languages use bare canonicals without changing localized cop
     for (const [path, key] of pages) {
       const copy = getDictionary(locale).pages[key].meta;
       const metadata = buildLocalizedMetadata(locale, path, copy);
-      assert.deepEqual(metadata.alternates, { canonical: path });
-      assert.equal(metadata.openGraph?.url, path);
+      const canonical = `/${locale}${path === "/" ? "" : path}`;
+      assert.equal(metadata.alternates?.canonical, canonical);
+      assert.equal(metadata.alternates?.languages?.[locale], canonical);
+      assert.equal(metadata.alternates?.languages?.["x-default"], path);
+      assert.equal(Object.keys(metadata.alternates?.languages ?? {}).length, 8);
+      assert.equal(metadata.openGraph?.url, canonical);
       assert.equal(metadata.openGraph?.locale, ogLocales[locale]);
       assert.equal(metadata.openGraph?.alternateLocale?.length, 6);
       assert.notEqual(copy.description, getDictionary("en").pages[key].meta.description);

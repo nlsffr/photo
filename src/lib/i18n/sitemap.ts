@@ -1,3 +1,6 @@
+// @ts-expect-error Node's native type stripping requires the explicit .ts suffix.
+import { LOCALES, isDiscoveryPath, localeAlternates, localePath } from "./config.ts";
+
 export const LOCALIZED_INDEXABLE_ENTRIES = [
   { path: "/", changeFrequency: "hourly", priority: 1 },
   { path: "/models", changeFrequency: "daily", priority: 0.9 },
@@ -25,11 +28,17 @@ function absoluteUrl(site: string, pathname: string): string {
 }
 
 export function buildLocalizedSitemapEntries(site: string) {
-  return LOCALIZED_INDEXABLE_ENTRIES.map((entry) => ({
-    url: absoluteUrl(site, entry.path),
-    changeFrequency: entry.changeFrequency,
-    priority: entry.priority,
-  }));
+  return LOCALIZED_INDEXABLE_ENTRIES.flatMap((entry) => {
+    const discovery = isDiscoveryPath(entry.path);
+    const languages = Object.fromEntries(Object.entries(localeAlternates(entry.path))
+      .map(([locale, path]) => [locale, absoluteUrl(site, path)]));
+    return (discovery ? LOCALES : ["en"] as const).map((locale) => ({
+      url: absoluteUrl(site, localePath(locale, entry.path)),
+      changeFrequency: entry.changeFrequency,
+      priority: entry.priority,
+      ...(discovery ? { alternates: { languages } } : {}),
+    }));
+  });
 }
 
 function xmlEscape(value: string): string {
@@ -42,8 +51,13 @@ function xmlEscape(value: string): string {
 
 export function renderLocalizedStaticSitemapXml(site: string): string {
   const urls = buildLocalizedSitemapEntries(site)
-    .map((entry) => `  <url>\n    <loc>${xmlEscape(entry.url)}</loc>\n    <changefreq>${entry.changeFrequency}</changefreq>\n    <priority>${entry.priority}</priority>\n  </url>`)
+    .map((entry) => {
+      const alternates = Object.entries(entry.alternates?.languages ?? {})
+        .map(([language, url]) => `    <xhtml:link rel="alternate" hreflang="${xmlEscape(language)}" href="${xmlEscape(url)}" />\n`)
+        .join("");
+      return `  <url>\n    <loc>${xmlEscape(entry.url)}</loc>\n${alternates}    <changefreq>${entry.changeFrequency}</changefreq>\n    <priority>${entry.priority}</priority>\n  </url>`;
+    })
     .join("\n");
 
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${urls}\n</urlset>\n`;
 }
