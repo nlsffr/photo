@@ -5,7 +5,6 @@ import { creatorHref, mediaHref, parseVersionedSlug } from "@/lib/types";
 import { parseCreatorCollectionPath } from "@/lib/creator-collections";
 import {
   creatorRouteDecision,
-  isRemovedContent,
 } from "@/lib/public-content-policy";
 import {
   isAllowedReservedTwoSegmentPath,
@@ -20,7 +19,9 @@ import {
   LOCALE_COOKIE,
   chooseLocale,
   isSystemPath,
-  localeRedirectTarget,
+  internalLocalePath,
+  resolveLocalizedPage,
+  supportedLocaleForPath,
   stripLocalePrefix,
 } from "@/lib/i18n/config";
 
@@ -42,54 +43,43 @@ export async function proxy(request: NextRequest) {
       CANONICAL_URL.hostname,
     )
   ) {
-    return NextResponse.redirect(
-      new URL(`${request.nextUrl.pathname}${request.nextUrl.search}`, CANONICAL_URL),
-      308,
-    );
+    return publicRedirect(request, request.nextUrl.pathname);
   }
 
-  const { pathname } = request.nextUrl;
-  if (isSystemPath(pathname)) return NextResponse.next();
-  if (["/admin/seo", "/admin/seo/activate"].includes(pathname.replace(/\/$/, ""))) {
-    const response = NextResponse.next();
-    response.headers.set("X-Robots-Tag", "noindex, nofollow");
-    response.headers.set("Cache-Control", "private, no-store");
-    return response;
-  }
-
+  let { pathname } = request.nextUrl;
+  // Encoded separators must never become a new path or an external redirect.
+  if (/%(?:2f|5c)/i.test(pathname) || pathname.includes("\\") || pathname.includes("//")) return missing();
   const localized = stripLocalePrefix(pathname);
   if (localized.locale) {
-    const response = NextResponse.next();
-    response.cookies.set(LOCALE_COOKIE, localized.locale, {
-      path: "/",
-      maxAge: 31_536_000,
-      sameSite: "lax",
-      secure: request.nextUrl.protocol === "https:",
-    });
+    const bare = localized.pathname;
+    const renderedLocale = supportedLocaleForPath(localized.locale, bare);
+    if (stripLocalePrefix(bare).locale || isSystemPath(bare)
+      || bare === "/admin" || bare.startsWith("/admin/")
+      || !resolveLocalizedPage(renderedLocale, bare)) return missing();
+    pathname = bare;
+  } else if (isSystemPath(pathname)) return NextResponse.next();
+  if (pathname === "/admin" || pathname.startsWith("/admin/")) {
+    const response = privateResponse(NextResponse.next());
+    response.headers.set("X-Robots-Tag", "noindex, nofollow");
     return response;
   }
 
-  const cookieLocale = request.cookies.get(LOCALE_COOKIE)?.value;
-  const acceptLanguage = request.headers.get("accept-language");
-  const localeTarget = localeRedirectTarget(pathname, cookieLocale, acceptLanguage);
-  if (localeTarget) {
+  const locale = supportedLocaleForPath(chooseLocale(
+    request.cookies.get(LOCALE_COOKIE)?.value,
+    request.headers.get("accept-language"),
+  ), pathname);
+  function render() {
+    // Validate resource existence, removal and version before redirecting an
+    // old language URL. Historical links never overwrite the locale cookie.
+    if (localized.locale) return publicRedirect(request, pathname);
+    if (!resolveLocalizedPage(locale, pathname)) return privateResponse(NextResponse.next());
     const target = request.nextUrl.clone();
-    target.pathname = localeTarget;
-    const response = NextResponse.redirect(target, 307);
-    response.cookies.set(LOCALE_COOKIE, chooseLocale(cookieLocale, acceptLanguage), {
-      path: "/",
-      maxAge: 31_536_000,
-      sameSite: "lax",
-      secure: request.nextUrl.protocol === "https:",
-    });
-    response.headers.set("Cache-Control", "private, no-store");
-    response.headers.append("Vary", "Accept-Language");
-    response.headers.append("Vary", "Cookie");
-    return response;
+    target.pathname = internalLocalePath(locale, pathname);
+    return privateResponse(NextResponse.rewrite(target));
   }
 
   if (pathname === "/tiktok") {
-    return NextResponse.redirect(new URL("/feed", CANONICAL_URL), 308);
+    return publicRedirect(request, "/feed");
   }
 
   const tagMatch = pathname.match(/^\/tag\/([^/]+)$/);
@@ -101,15 +91,12 @@ export async function proxy(request: NextRequest) {
     try {
       if (!(await getAllTags()).includes(tag)) return missing();
     } catch {
-      return NextResponse.next();
+      return render();
     }
     if (decoded !== tag) {
-      return NextResponse.redirect(
-        new URL(`/tag/${encodeURIComponent(tag)}`, CANONICAL_URL),
-        308,
-      );
+      return publicRedirect(request, `/tag/${encodeURIComponent(tag)}`);
     }
-    return NextResponse.next();
+    return render();
   }
 
   const mediaMatch = pathname.match(/^\/([^/]+)\/([^/]+)$/);
@@ -121,25 +108,21 @@ export async function proxy(request: NextRequest) {
     if (!handle) return missing();
     if (isReservedCreatorHandle(firstSegment)) {
       if (isAllowedReservedTwoSegmentPath(firstSegment, id)) {
-        return NextResponse.next();
+        return render();
       }
       try {
         if (firstSegment === "creator") {
-          const creator = await getCreator(id);
-          if (!creator) return missing();
-          if (isRemovedContent(creator)) return gone();
-          return NextResponse.redirect(
-            new URL(creatorHref(creator.handle, creator.urlVersion), CANONICAL_URL),
-            308,
-          );
+          const parsed = parseVersionedSlug(id);
+          const creator = await getCreator(parsed.base);
+          const decision = creatorRouteDecision(creator, parsed.version);
+          if (decision === "gone") return gone();
+          if (decision === "missing" || !creator) return missing();
+          return publicRedirect(request, creatorHref(creator.handle, creator.urlVersion));
         }
         if (firstSegment === "photo") {
           const photo = await getPhotoById(id);
           if (!photo || photo.removedFromIndexAt) return missing();
-          return NextResponse.redirect(
-            new URL(mediaHref(photo), CANONICAL_URL),
-            308,
-          );
+          return publicRedirect(request, mediaHref(photo));
         }
       } catch {
         return unavailable();
@@ -160,7 +143,7 @@ export async function proxy(request: NextRequest) {
       } catch {
         return unavailable();
       }
-      return NextResponse.next();
+      return render();
     }
     try {
       const photo = await getPhotoById(id);
@@ -176,16 +159,16 @@ export async function proxy(request: NextRequest) {
     } catch {
       return unavailable();
     }
-    return NextResponse.next();
+    return render();
   }
 
   const match = pathname.match(/^\/([^/]+)$/);
-  if (!match) return NextResponse.next();
+  if (!match) return render();
 
   const raw = safeDecodePathSegment(match[1] ?? "");
   if (raw == null) return missing();
   if (!raw || raw.includes(".") || isExistingTopLevelRoute(raw)) {
-    return NextResponse.next();
+    return render();
   }
   if (isReservedCreatorHandle(raw)) return missing();
 
@@ -201,7 +184,24 @@ export async function proxy(request: NextRequest) {
     return unavailable();
   }
 
-  return NextResponse.next();
+  return render();
+}
+
+function privateResponse(response: NextResponse) {
+  response.headers.set("Cache-Control", "private, no-store");
+  const vary = (response.headers.get("Vary") || "").split(",").map(value => value.trim()).filter(Boolean);
+  for (const value of ["Cookie", "Accept-Language"]) {
+    if (!vary.some(existing => existing.toLowerCase() === value.toLowerCase())) vary.push(value);
+  }
+  response.headers.set("Vary", vary.join(", "));
+  return response;
+}
+
+function publicRedirect(request: NextRequest, pathname: string) {
+  const target = new URL(CANONICAL_URL);
+  target.pathname = pathname;
+  target.search = request.nextUrl.search;
+  return privateResponse(NextResponse.redirect(target, 308));
 }
 
 function gone() {

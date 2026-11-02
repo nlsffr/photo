@@ -23,14 +23,14 @@ test("all seven content locales dispatch creators, collections and media without
   }
 });
 
-test("content links switch languages while retaining version, collection, pagination and query fragments", async () => {
+test("content links stay public while retaining version, collection, pagination and query fragments", async () => {
   const { localizedHref, switchLocalePath, localeRedirectTarget } = await config();
-  assert.equal(localizedHref("de", "/aria-lune-v3/photos?page=2#items"), "/de/aria-lune-v3/photos?page=2#items");
-  assert.equal(localizedHref("es", "/aria-lune/123-v2"), "/es/aria-lune/123-v2");
-  assert.equal(localizedHref("fr", "/de/aria-lune/123-v2?from=related"), "/fr/aria-lune/123-v2?from=related");
-  assert.equal(switchLocalePath("/fr/aria-lune-v3/photos", "it"), "/it/aria-lune-v3/photos");
-  assert.equal(switchLocalePath("/aria-lune/123-v2", "nl"), "/nl/aria-lune/123-v2");
-  assert.equal(localizedHref("de", "/contact/support"), "/en/contact/support");
+  assert.equal(localizedHref("de", "/aria-lune-v3/photos?page=2#items"), "/aria-lune-v3/photos?page=2#items");
+  assert.equal(localizedHref("es", "/aria-lune/123-v2"), "/aria-lune/123-v2");
+  assert.equal(localizedHref("fr", "/de/aria-lune/123-v2?from=related"), "/aria-lune/123-v2?from=related");
+  assert.equal(switchLocalePath("/fr/aria-lune-v3/photos", "it"), "/aria-lune-v3/photos");
+  assert.equal(switchLocalePath("/aria-lune/123-v2", "nl"), "/aria-lune/123-v2");
+  assert.equal(localizedHref("de", "/contact/support"), "/contact/support");
   // Existing bare content remains the neutral route instead of a language redirect.
   assert.equal(localeRedirectTarget("/aria-lune/123-v2", "fr", "de"), null);
   assert.equal(localeRedirectTarget("/aria-lune-v3", "fr", "de"), null);
@@ -45,24 +45,18 @@ test("content locale routing rejects malformed segments, reserved namespaces and
   ]) assert.equal(resolveLocalizedPage(locale, path), null, `${locale}${path}`);
 });
 
-test("creator metadata and path helpers preserve reciprocal seven-language versioned collection pages", async () => {
+test("creator metadata and path helpers preserve a single versioned numbered collection URL", async () => {
   // @ts-expect-error Native Node requires explicit suffixes.
   const { creatorCollectionAlternates } = await import("../src/lib/i18n/metadata.ts");
   // @ts-expect-error Native Node requires explicit suffixes.
   const { creatorCollectionPath, parseCreatorCollectionPath } = await import("../src/lib/creator-collections.ts");
   const { LOCALES } = await config();
-  const languages = {
-    en: "/en/aria-lune-v3/videos?page=2", fr: "/fr/aria-lune-v3/videos?page=2",
-    es: "/es/aria-lune-v3/videos?page=2", de: "/de/aria-lune-v3/videos?page=2",
-    it: "/it/aria-lune-v3/videos?page=2", pt: "/pt/aria-lune-v3/videos?page=2",
-    nl: "/nl/aria-lune-v3/videos?page=2", "x-default": "/aria-lune-v3/videos?page=2",
-  };
   for (const locale of LOCALES) {
-    assert.equal(creatorCollectionPath("aria-lune", 3, "videos", locale, 2), `/${locale}/aria-lune-v3/videos?page=2`);
+    assert.equal(creatorCollectionPath("aria-lune", 3, "videos", locale, 2), "/aria-lune-v3/videos?page=2");
     assert.deepEqual(parseCreatorCollectionPath(`/${locale}/aria-lune-v3/videos`), { handle: "aria-lune-v3", collection: "videos" });
     const metadata = creatorCollectionAlternates("aria-lune", 3, "videos", locale, 2);
-    assert.equal(metadata.canonical, `/${locale}/aria-lune-v3/videos?page=2`);
-    assert.deepEqual(metadata.languages, languages);
+    assert.equal(metadata.canonical, "/aria-lune-v3/videos?page=2");
+    assert.equal(metadata.languages, undefined);
   }
-  assert.deepEqual(creatorCollectionAlternates("aria-lune", 3, "videos", undefined, 2).languages, languages);
+  assert.deepEqual(creatorCollectionAlternates("aria-lune", 3, "videos", undefined, 2), { canonical: "/aria-lune-v3/videos?page=2" });
 });

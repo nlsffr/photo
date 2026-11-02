@@ -58,36 +58,6 @@ const mediaCacheHeaders = [
   },
 ];
 
-const htmlCacheHeaders = [
-  {
-    key: "Cache-Control",
-    value: "public, s-maxage=120, stale-while-revalidate=600",
-  },
-];
-
-const localizedIndexablePaths = [
-  "/",
-  "/models",
-  "/trending-medias",
-  "/most-liked",
-  "/classements",
-  "/influenceuses-tendances",
-  "/about",
-  "/dmca",
-  "/trust-and-safety",
-  "/contact",
-  "/conditions",
-  "/confidentialite",
-  "/mentions-legales",
-  "/qu-est-ce-que-lumengallery",
-];
-
-const localizedHtmlCacheRoutes = ["en", "fr"].flatMap((locale) =>
-  localizedIndexablePaths.map((pathname) =>
-    pathname === "/" ? `/${locale}` : `/${locale}${pathname}`,
-  ),
-);
-
 const nextConfig: NextConfig = {
   turbopack: { root: projectRoot },
   allowedDevOrigins: [
@@ -115,15 +85,6 @@ const nextConfig: NextConfig = {
         : []),
     ],
   },
-  async redirects() {
-    return [
-      {
-        source: "/creator/:handle",
-        destination: "/:handle",
-        permanent: true,
-      },
-    ];
-  },
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },
@@ -132,13 +93,7 @@ const nextConfig: NextConfig = {
       { source: "/icon", headers: mediaCacheHeaders },
       { source: "/apple-icon", headers: mediaCacheHeaders },
       { source: "/media/:path*", headers: mediaCacheHeaders },
-      ...localizedHtmlCacheRoutes.map((source) => ({ source, headers: htmlCacheHeaders })),
-      { source: "/", headers: htmlCacheHeaders },
-      { source: "/models", headers: htmlCacheHeaders },
-      { source: "/models/:path*", headers: htmlCacheHeaders },
-      { source: "/trending-medias", headers: htmlCacheHeaders },
-      { source: "/most-liked", headers: htmlCacheHeaders },
-      { source: "/tag/:path*", headers: htmlCacheHeaders },
+
     ];
   },
 };

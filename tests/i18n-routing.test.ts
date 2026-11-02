@@ -9,76 +9,49 @@ async function loadConfig() {
   return import("../src/lib/i18n/config.ts");
 }
 
-test("unprefixed localized pages redirect using the persisted or negotiated locale", async () => {
-  const { localeRedirectTarget } = await loadConfig();
-
-  assert.equal(localeRedirectTarget("/", null, "fr-FR,fr;q=0.9"), "/fr");
-  assert.equal(localeRedirectTarget("/", null, "es-ES,es;q=0.9"), "/es");
-  assert.equal(localeRedirectTarget("/trending-medias", "nl", "en"), "/nl/trending-medias");
-  assert.equal(localeRedirectTarget("/models", "en", "fr"), "/en/models");
-  assert.equal(
-    localeRedirectTarget("/contact/support", "fr", "en"),
-    "/fr/contact/support",
-  );
+test("bare pages keep their public URL regardless of the negotiated or saved language", async () => {
+  const { localeRedirectTarget, LOCALIZED_ROUTE_PATHS } = await loadConfig();
+  for (const pathname of LOCALIZED_ROUTE_PATHS) {
+    for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"]) {
+      assert.equal(localeRedirectTarget(pathname, locale, "fr-FR"), null, pathname);
+    }
+  }
 });
 
-test("prefixed, system and content-detail URLs are left alone", async () => {
+test("only known historical locale URLs have a bare redirect target", async () => {
   const { localeRedirectTarget } = await loadConfig();
-
-  for (const pathname of [
-    "/en",
-    "/fr/models",
-    "/de/models",
-    "/api/healthz",
-    "/_next/image",
-    "/sitemap.xml",
-    "/creator-handle",
-    "/creator-handle/media-id",
-    "/tag/portrait",
-  ]) {
+  for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"]) {
+    assert.equal(localeRedirectTarget(`/${locale}`, "fr", "de"), "/");
+    assert.equal(localeRedirectTarget(`/${locale}/models`, "en", "fr"), "/models");
+    assert.equal(localeRedirectTarget(`/${locale}/aria-lune-v3/videos`, "en", "fr"), "/aria-lune-v3/videos");
+  }
+  for (const pathname of ["/api/healthz", "/_next/image", "/sitemap.xml", "/creator-handle", "/creator-handle/media-id", "/tag/portrait", "/fr/api/healthz", "/fr/en/models", "/fr/tag/portrait"]) {
     assert.equal(localeRedirectTarget(pathname, "fr", "fr"), null, pathname);
   }
 });
 
-test("every declared localized route has a deterministic English and French URL", async () => {
-  const { LOCALIZED_ROUTE_PATHS, localePath, localeRedirectTarget } =
-    await loadConfig();
-
+test("public and internal URLs are distinct for every declared localized route", async () => {
+  const { LOCALIZED_ROUTE_PATHS, localePath, internalLocalePath } = await loadConfig();
   for (const pathname of LOCALIZED_ROUTE_PATHS) {
-    assert.equal(localeRedirectTarget(pathname, "fr", null), localePath("fr", pathname));
-    assert.equal(localeRedirectTarget(pathname, "en", null), localePath("en", pathname));
+    assert.equal(localePath("fr", pathname), pathname);
+    assert.equal(localePath("en", pathname), pathname);
+    assert.equal(internalLocalePath("fr", pathname), `/fr${pathname === "/" ? "" : pathname}`);
+    assert.equal(internalLocalePath("en", pathname), `/en${pathname === "/" ? "" : pathname}`);
   }
 });
 
-test("new locales redirect only discovery routes and fall back to English elsewhere", async () => {
-  const {
-    DISCOVERY_ROUTE_PATHS,
-    LOCALIZED_ROUTE_PATHS,
-    localeRedirectTarget,
-    resolveLocalizedPage,
-  } = await loadConfig();
-
+test("seven-language discovery dispatch remains available behind internal renderers with functional English fallback", async () => {
+  const { DISCOVERY_ROUTE_PATHS, LOCALIZED_ROUTE_PATHS, resolveLocalizedPage, supportedLocaleForPath } = await loadConfig();
   for (const locale of ["es", "de", "it", "pt", "nl"] as const) {
     for (const pathname of DISCOVERY_ROUTE_PATHS) {
-      assert.equal(
-        localeRedirectTarget(pathname, locale, null),
-        `/${locale}${pathname === "/" ? "" : pathname}`,
-      );
-      assert.deepEqual(resolveLocalizedPage(locale, pathname), {
-        kind: "static",
-        pathname,
-      });
+      assert.equal(supportedLocaleForPath(locale, pathname), locale);
+      assert.deepEqual(resolveLocalizedPage(locale, pathname), { kind: "static", pathname });
     }
     for (const pathname of LOCALIZED_ROUTE_PATHS) {
-      if (
-        DISCOVERY_ROUTE_PATHS.includes(
-          pathname as (typeof DISCOVERY_ROUTE_PATHS)[number],
-        )
-      ) {
-        continue;
-      }
-      assert.equal(localeRedirectTarget(pathname, locale, null), `/en${pathname}`);
+      if (DISCOVERY_ROUTE_PATHS.includes(pathname as (typeof DISCOVERY_ROUTE_PATHS)[number])) continue;
+      assert.equal(supportedLocaleForPath(locale, pathname), "en");
       assert.equal(resolveLocalizedPage(locale, pathname), null);
+      assert.deepEqual(resolveLocalizedPage("en", pathname), { kind: "static", pathname });
     }
   }
 });

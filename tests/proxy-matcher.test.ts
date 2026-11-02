@@ -101,7 +101,7 @@ test("reserved collection words win over colliding media IDs without any media l
 
 test("collection creator version and removal decisions keep exact existing HTTP headers", async () => {
   for (const [entity, handle, status, robots, cache] of [
-    [{ urlVersion: 1 }, "aria-lune", 200, null, null],
+    [{ urlVersion: 1 }, "aria-lune", 200, null, "private, no-store"],
     [{ urlVersion: 1 }, "aria-lune-v1", 404, "noindex", "public, max-age=60"],
     [{ urlVersion: 3 }, "aria-lune", 404, "noindex", "public, max-age=60"],
     [{ urlVersion: 3 }, "aria-lune-v2", 404, "noindex", "public, max-age=60"],
