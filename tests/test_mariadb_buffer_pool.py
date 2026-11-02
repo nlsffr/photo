@@ -47,8 +47,10 @@ class BufferPoolTests(unittest.TestCase):
                  mock.patch.object(module, 'docker', side_effect=[b'', b'--innodb_buffer_pool_size=1G\n']) as docker:
                 result = module.apply('a' * 64, backup)
             self.assertEqual(result['stage'], 'verified')
-            sql.assert_called_once_with('SET GLOBAL innodb_buffer_pool_size = 1073741824;')
+            sql.assert_called_once_with('SET GLOBAL innodb_buffer_pool_size = 1073741824;', 'a' * 64)
             self.assertEqual(docker.call_args_list[0].kwargs['data'], module.CONTENT)
+            self.assertEqual(docker.call_args_list[0].args[2], 'a' * 64)
+            self.assertEqual(docker.call_args_list[1].args[1], 'a' * 64)
             self.assertEqual(backup.stat().st_mode & 0o777, 0o600)
             self.assertEqual(json.loads(backup.read_text())['before'], state())
 
@@ -60,8 +62,8 @@ class BufferPoolTests(unittest.TestCase):
                  mock.patch.object(module, 'sql') as sql, mock.patch.object(module, 'docker') as docker:
                 result = module.rollback(backup)
             self.assertEqual(result['stage'], 'rolled_back')
-            sql.assert_called_once_with('SET GLOBAL innodb_buffer_pool_size = 134217728;')
-            docker.assert_called_once_with('exec', module.CONTAINER, 'rm', '--', module.CONFIG)
+            sql.assert_called_once_with('SET GLOBAL innodb_buffer_pool_size = 134217728;', 'a' * 64)
+            docker.assert_called_once_with('exec', 'a' * 64, 'rm', '--', module.CONFIG)
 
     def test_rollback_after_config_only_failure_does_not_send_unnecessary_set(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -111,12 +113,13 @@ class BufferPoolTests(unittest.TestCase):
     def test_resize_poll_is_bounded_and_never_repeats_the_set(self):
         with mock.patch.object(module, 'observe', side_effect=[state(), state(module.TARGET)]), \
              mock.patch.object(module.time, 'sleep') as sleep:
-            self.assertEqual(module.wait_size(module.TARGET)['values']['innodb_buffer_pool_size'], str(module.TARGET))
+            self.assertEqual(module.wait_size(module.TARGET, 'a' * 64)['values']['innodb_buffer_pool_size'], str(module.TARGET))
             sleep.assert_called_once_with(.5)
         with mock.patch.object(module, 'observe', return_value=state()) as observe, \
              mock.patch.object(module.time, 'sleep'):
-            with self.assertRaisesRegex(RuntimeError, 'resize_not_verified'): module.wait_size(module.TARGET)
+            with self.assertRaisesRegex(RuntimeError, 'resize_not_verified'): module.wait_size(module.TARGET, 'a' * 64)
             self.assertEqual(observe.call_count, 6)
+            observe.assert_called_with('a' * 64)
 
     def test_source_config_and_future_compose_mount_match_the_single_setting(self):
         self.assertEqual((ROOT / 'infra/mariadb/tuning.cnf').read_bytes(), module.CONTENT)

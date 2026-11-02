@@ -26,16 +26,17 @@ def docker(*args, data=None):
     return result.stdout
 
 
-def sql(statement):
-    return docker('exec', '-i', CONTAINER, *AUTH, data=statement.encode()).decode()
+def sql(statement, container=CONTAINER):
+    return docker('exec', '-i', container, *AUTH, data=statement.encode()).decode()
 
 
-def observe():
+def observe(container=CONTAINER):
     template = '{"id":{{json .Id}},"image":{{json .Image}},"cmd":{{json .Config.Cmd}},"mounts":{{json .Mounts}}}'
-    identity = json.loads(docker('inspect', '--format', template, CONTAINER))
-    text = sql("SELECT 'version',VERSION(); SHOW GLOBAL VARIABLES WHERE Variable_name IN (" + ','.join("'" + key + "'" for key in VARIABLES) + ');')
+    identity = json.loads(docker('inspect', '--format', template, container))
+    container = identity['id']
+    text = sql("SELECT 'version',VERSION(); SHOW GLOBAL VARIABLES WHERE Variable_name IN (" + ','.join("'" + key + "'" for key in VARIABLES) + ');', container)
     values = dict(line.split('\t', 1) for line in text.strip().splitlines())
-    files = docker('exec', CONTAINER, 'find', '/etc/mysql', '-type', 'f', '-name', '*.cnf', '-exec', 'sha256sum', '{}', '+').decode()
+    files = docker('exec', container, 'find', '/etc/mysql', '-type', 'f', '-name', '*.cnf', '-exec', 'sha256sum', '{}', '+').decode()
     hashes = {line.split(None, 1)[1]: line.split(None, 1)[0] for line in files.splitlines()}
     memory = dict(line.split(':', 1) for line in Path('/proc/meminfo').read_text().splitlines())
     return {'identity': identity, 'values': values, 'config_hashes': hashes,
@@ -75,9 +76,9 @@ def save(path, value):
     os.replace(temporary, path)
 
 
-def wait_size(expected):
+def wait_size(expected, container):
     for attempt in range(6):
-        current = observe()
+        current = observe(container)
         if int(current['values']['innodb_buffer_pool_size']) == expected:
             return current
         if attempt < 5:
@@ -87,6 +88,7 @@ def wait_size(expected):
 
 def apply(expected_id, backup):
     before = observe(); guard(before, expected_id)
+    container = before['identity']['id']
     backup.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     if backup.exists():
         raise RuntimeError('backup_already_exists')
@@ -94,13 +96,13 @@ def apply(expected_id, backup):
     save(backup, record)
     # Noclobber also rejects symlinks. The file survives a restart of this same
     # container; the Compose mount makes it survive a later recreation.
-    docker('exec', '-i', CONTAINER, 'sh', '-eu', '-c',
+    docker('exec', '-i', container, 'sh', '-eu', '-c',
            'umask 022; set -C; cat > ' + CONFIG, data=CONTENT)
     record['stage'] = 'config_written'; save(backup, record)
-    sql('SET GLOBAL innodb_buffer_pool_size = 1073741824;')
+    sql('SET GLOBAL innodb_buffer_pool_size = 1073741824;', container)
     record['stage'] = 'size_set'; save(backup, record)
-    after = wait_size(TARGET); unchanged(before, after, TARGET, True)
-    defaults = docker('exec', CONTAINER, 'my_print_defaults', '--mysqld').decode().splitlines()
+    after = wait_size(TARGET, container); unchanged(before, after, TARGET, True)
+    defaults = docker('exec', container, 'my_print_defaults', '--mysqld').decode().splitlines()
     if '--innodb_buffer_pool_size=1G' not in defaults and '--innodb-buffer-pool-size=1G' not in defaults:
         raise RuntimeError('configuration_not_loaded_by_defaults')
     record.update(stage='verified', after=after); save(backup, record)
@@ -108,7 +110,8 @@ def apply(expected_id, backup):
 
 
 def rollback(backup):
-    record = json.loads(backup.read_text()); before = record['before']; current = observe()
+    record = json.loads(backup.read_text()); before = record['before']
+    container = before['identity']['id']; current = observe(container)
     if record.get('config_sha') != CONFIG_SHA or record.get('target') != TARGET:
         raise RuntimeError('unexpected_backup')
     if record.get('stage') not in ('prepared', 'config_written', 'size_set', 'verified', 'rolled_back'):
@@ -119,10 +122,10 @@ def rollback(backup):
         raise RuntimeError('unexpected_rollback_size')
     unchanged(before, current, size, has_config)
     if size == TARGET:
-        sql('SET GLOBAL innodb_buffer_pool_size = 134217728;')
+        sql('SET GLOBAL innodb_buffer_pool_size = 134217728;', container)
     if has_config:
-        docker('exec', CONTAINER, 'rm', '--', CONFIG)
-    restored = wait_size(OLD_SIZE); unchanged(before, restored, OLD_SIZE, False)
+        docker('exec', container, 'rm', '--', CONFIG)
+    restored = wait_size(OLD_SIZE, container); unchanged(before, restored, OLD_SIZE, False)
     record.update(stage='rolled_back', restored=restored); save(backup, record)
     return {'stage': record['stage'], 'size': OLD_SIZE}
 
