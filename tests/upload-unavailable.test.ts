@@ -65,7 +65,7 @@ for (const locale of ["fr", "en"] as const) {
       assert.doesNotMatch(html, /<form\b|<input\b|type="submit"|addMedia\.(intro|guestBody|uploadSuccess)/);
       assert.match(html, /<h1\b/);
       if (!authenticated) {
-        assert.ok(html.includes(`/${locale}/connexion?next=%2F${locale}%2Fadd`), "the account link keeps the current language and return path");
+        assert.ok(html.includes("/connexion?next=%2Fadd"), "the account link uses the unique public address and keeps its return path");
       }
     });
   }

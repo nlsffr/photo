@@ -5,8 +5,12 @@ import { loadAppModule } from "./helpers/load-app-module.ts";
 
 type BeaconCall = { url: string; body: unknown };
 type FetchCall = { url: RequestInfo | URL; options?: RequestInit };
+type AudienceChoice = "accepted" | "refused" | null;
 
-function pageView(t: TestContext, beaconResult?: boolean) {
+function pageView(t: TestContext, beaconResult?: boolean, consent: {
+  rendered: AudienceChoice | undefined;
+  current: AudienceChoice;
+} = { rendered: "accepted", current: "accepted" }) {
   const beacons: BeaconCall[] = [];
   const fetches: FetchCall[] = [];
   const effects: Array<() => void> = [];
@@ -26,15 +30,22 @@ function pageView(t: TestContext, beaconResult?: boolean) {
       },
     }),
   });
-  replaceGlobal("document", { referrer: "https://www.google.com/" });
+  replaceGlobal("document", {
+    referrer: "https://www.google.com/",
+    cookie: consent.current ? `lfh_audience=${consent.current}` : "",
+  });
   replaceGlobal("fetch", async (url: RequestInfo | URL, options?: RequestInit) => {
     fetches.push({ url, options });
     return new Response(null, { status: 204 });
   });
+  // This suite tests transport after the choice hook has resolved. Keep the
+  // real synchronous cookie guard so refusal/revocation still blocks a send.
+  const { browserChoice } = loadAppModule<{ browserChoice(): AudienceChoice }>("src/components/AudienceChoice.ts");
   const { AnalyticsBeacon } = loadAppModule<{ AnalyticsBeacon: () => null }>(
     "src/components/AnalyticsBeacon.tsx",
     {
       react: { useEffect: (effect: () => void) => effects.push(effect) },
+      "./AudienceChoice": { useAudienceChoice: () => consent.rendered, browserChoice },
       "next/navigation": {
         usePathname: () => "/de/models",
         useSearchParams: () => new URLSearchParams("page=2&utm_source=telegram"),
@@ -44,6 +55,19 @@ function pageView(t: TestContext, beaconResult?: boolean) {
   AnalyticsBeacon();
   effects[0]();
   return { beacons, fetches };
+}
+
+for (const [label, rendered, current] of [
+  ["refused", "refused", "refused"],
+  ["absent", null, null],
+  ["still loading", undefined, "accepted"],
+  ["revoked before transmission", "accepted", "refused"],
+] as const) {
+  test(`page views issue neither beacon nor fetch when consent is ${label}`, (t) => {
+    const { beacons, fetches } = pageView(t, true, { rendered, current });
+    assert.equal(beacons.length, 0);
+    assert.equal(fetches.length, 0);
+  });
 }
 
 const expectedEvent = {
