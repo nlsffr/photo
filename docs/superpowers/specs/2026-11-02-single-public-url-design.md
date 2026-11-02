@@ -9,7 +9,7 @@ Le propriétaire a confirmé « Une seule URL, toutes langues » le 2 novembre 2
 - Une page a une seule URL publique : `/models?page=2`, `/creator/videos`, `/creator/123-v2`, etc. Identifiants, versions, pagination, filtres, query et fragment sont conservés.
 - La préférence `lfh_locale` valide prime sur `Accept-Language`, puis défaut `en`. Aucune détection par pays/IP ou User-Agent. Le sélecteur retient la préférence et recharge la même URL, même si elle possède un fragment.
 - Les sept langues déjà disponibles restent disponibles sur les six découvertes, profils, collections et pages médias. Les pages fonctionnelles/éditoriales gardent leur couverture EN/FR et fallback anglais. Les routes héritées non traduites telles que `/tag/:tag` restent sur leur renderer anglais actuel, sans nouveau texte.
-- Une ancienne URL à préfixe de langue reçoit308 vers son équivalent nu, query conservée, avec cookie de langue d’origine si applicable. Les doublons imbriqués de langue et les variantes préfixées de namespaces techniques ne donnent pas accès à de nouvelles routes.
+- Une ancienne URL à préfixe de langue reçoit308 vers son équivalent nu, query conservée. Cette redirection ne remplace pas le cookie de préférence : le navigateur ou le choix manuel reste prioritaire, même si un ancien résultat Google pointe sur `/en`. Les doublons imbriqués de langue et les variantes préfixées de namespaces techniques ne donnent pas accès à de nouvelles routes.
 - Canonicals, OpenGraph URLs, JSON-LD, breadcrumbs et liens publics sont nus. Aucune liste hreflang de sept adresses redirigées. Les moteurs peuvent principalement voir l’anglais sans Accept-Language ; une seule URL ne garantit pas sept résultats de langue distincts.
 
 ## Architecture choisie par l’agent
@@ -19,6 +19,8 @@ Conserver les sept layouts/renderers existants comme destinations internes de `N
 Les helpers publics `localePath`, `localizedHref`, `switchLocalePath` et `creatorCollectionPath` rendent des chemins nus ; un nouveau `internalLocalePath(locale, pathname)` conserve explicitement la construction du chemin interne. Le Proxy n’appelle jamais le helper public pour construire sa destination interne.
 
 Les API, médias binaires, `_next`, fichiers publics, robots/sitemaps et routes privées admin restent hors négociation/réécriture. Les alias `/tiktok`, `/creator/:handle`, `/photo/:id` gardent leur logique avant la réécriture. Les404/410/503, protections de retrait, versions et noindex gardent leur comportement ; une redirection historique ne republie jamais une ressource retirée.
+
+Retirer la redirection `/creator/:handle` de next.config qui s’exécute avant le Proxy : le Proxy conserve seul sa résolution validée, y compris les handles versionnés. Construire les redirections à partir d’une URL canonique clonée, en affectant pathname/search ; jamais une concaténation susceptible de devenir une destination externe. Refuser antislashs et séparateurs encodés sur les anciennes variantes.
 
 Réponses HTML/RSC négociées : `Cache-Control: private, no-store`, `Vary` ajoutant Cookie et Accept-Language sans supprimer les valeurs RSC/Next. Retirer les règles HTML `s-maxage=120` de next.config ; conserver le cache des ressources statiques, icônes et médias. Les données partagées neutres et caches explicitement clés par langue peuvent rester. Un changement manuel de langue force un rechargement document complet afin d’éviter un ancien Router Cache.
 
@@ -40,6 +42,7 @@ L’éditeur SEO conserve ses42 entrées (6 pages ×7 langues) et toutes leurs v
 - Profils/médias retirés, mauvais propriétaire, ancienne version non courante, namespaces réservés et disponibilité DB conservent leurs statuts et robots.
 - Models page2, collections page2, vidéos et photos ont canonical nu exact. Liens HTML et JSON-LD n’exposent aucun préfixe de langue. Sitemaps ne dupliquent pas les entrées ; médias restent dans les mêmes partitions.
 - Sélecteur testé dans un vrai navigateur avec query+hash, changement dans les deux sens, URL inchangée, corps/html-lang/métadonnées cohérents, persistance et liens suivants.
+- Tester Link/prefetch/retour arrière et ES→about(fallbackEN)→models(retourES), sans remplacer le cookie ES. Les aperçus de l’éditeur privé doivent choisir la langue du formulaire avant leur navigation nue.
 - Comparaison requêtes successives/concurrentes en/fr/en sur une URL avec vérification du cache/Vary. Ne pas faire de test uniquement sur des mocks pour valider le Proxy Next réel.
 - Empreintes de toutes les traductions et comparaison des valeurs SEO avant/après ; aucun changement aux cookies d’audience, données médias, retraits, bots, tarifs et clés.
 

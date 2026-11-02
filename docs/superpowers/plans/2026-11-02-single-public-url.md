@@ -33,6 +33,7 @@
 
 - [ ] Tests RED : `/fr/models?page=2`→`/models?page=2`, collections versionnées, href externes non modifiés, choix retenu et même URL après reload/hash.
 - [ ] Implémenter helpers et sélecteur boutons ; corriger les préfixes codés en dur, sans changer les textes.
+- [ ] Tester aperçu d’éditeur : le cookie suit la langue du formulaire, mais l’adresse publique reste nue.
 - [ ] Tests GREEN ciblés et diff sans dictionnaires ; commit du lot après revue.
 
 ### Lot2 — Proxy et politique de cache
@@ -43,6 +44,7 @@
 
 - [ ] Tests RED : root unique sept langues, cookie prioritaire,308ancien, API/admin/assets exclus, protections404/410/503 et alias conservés.
 - [ ] Implémenter rewrites internes, redirects publics et private/no-store+Vary non destructif ; retirer seulement cache HTML public.
+- [ ] Retirer le raccourci creator de next.config et vérifier alias versionné/retiré/DBindisponible ; redirections same-origin et préfixe historique sans remplacement du cookie.
 - [ ] Tests GREEN ciblés + build/test réel Next pour en/fr/en ; commit après revue.
 
 ### Lot3 — métadonnées, XML et éditeur
@@ -59,5 +61,6 @@
 
 - [ ] Rejouer suites concernées, TypeScript, lint, build ; comparer empreintes des traductions et valeurs SEO.
 - [ ] Parcours navigateur et requêtes HTTP sept langues/anciennesURL/query/hash/caches, sitemaps XML et protections sur candidat.
+- [ ] Parcours Link/prefetch/retourarrière et ES→aboutEN→modelsES, puis aperçu privé sans modification des textes SEO.
 - [ ] Push, CI et déploiement réversible depuis export propre ; canari validé avant promotion, contrôles publics après.
 - [ ] Consigner précisément commit/tests/publié et limites SEO sans promesse d’indexation.
