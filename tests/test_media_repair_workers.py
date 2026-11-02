@@ -41,6 +41,24 @@ class WaitingRuntime(Runtime):
         self.write('start',row['id']);time.sleep(30)
         return {'status':'restored'}
 
+class TailRuntime(Runtime):
+    """The long first job completes only after the old 100-claim boundary."""
+    def run(self,row,apply=False):
+        assert apply is True
+        self.write('start',row['id'])
+        marker=self.log.with_name('beyond-100-started')
+        if row['id']=='a':
+            deadline=time.monotonic()+8
+            while not marker.exists():
+                if time.monotonic()>=deadline:raise TimeoutError('test_dispatch_stalled')
+                time.sleep(.01)
+        else:
+            if row['id']=='p100':marker.touch()
+            time.sleep(.01)
+        self.write('finish',row['id'])
+        return {'status':'restored'}
+
+
 class WorkerTests(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.root=Path(self.tmp.name);self.clock=Clock()
@@ -51,6 +69,36 @@ class WorkerTests(unittest.TestCase):
                           max_items=4,delay=kw.pop('delay',2),clock=self.clock,sleep=self.clock.sleep,
                           runtime_factory=lambda *_:Runtime(self.root/'calls.jsonl',actions),**kw)
     def events(self):return [json.loads(x) for x in (self.root/'calls.jsonl').read_text().splitlines()]
+    def test_larger_pool_keeps_filling_slots_past_100_while_a_long_job_is_active(self):
+        plan={'version':1,'rows':[{'id':'a'}]+[{'id':f'p{i}'} for i in range(101)]}
+        log=self.root/'tail-calls.jsonl'
+        options=dict(workers=4,max_items=500,delay=2,clock=self.clock,sleep=self.clock.sleep,
+                     runtime_factory=lambda *_:TailRuntime(log))
+        result=b.run_pool(plan,'tail-digest',self.root/'tail-state',self.repair,'config',**options)
+        self.assertEqual((result['phase'],result['attempted'],result['jobs']['done']),('session_complete',102,102))
+        events=[json.loads(line) for line in log.read_text().splitlines()]
+        after_boundary=next(event['at'] for event in events if event['event']=='start' and event['id']=='p100')
+        long_finish=next(event['at'] for event in events if event['event']=='finish' and event['id']=='a')
+        self.assertLess(after_boundary,long_finish)
+        active=set();peak=0
+        for event in events:
+            if event['event']=='start':active.add(event['pid']);peak=max(peak,len(active))
+            else:active.remove(event['pid'])
+        self.assertLessEqual(peak,4);self.assertFalse(active)
+        self.assertEqual(len([event for event in events if event['event']=='start']),102)
+        self.clock.now+=2
+        self.assertEqual(b.run_pool(plan,'tail-digest',self.root/'tail-state',self.repair,'config',**options)['attempted'],0)
+        self.assertEqual(len(log.read_text().splitlines()),204)
+
+    def test_pool_cap_rejects_invalid_limits_before_starting_any_children(self):
+        for count in (0,501,True,1.5):
+            with self.subTest(count=count):
+                with self.assertRaisesRegex(b.shared.BackfillError,'run_limits_invalid'):
+                    b.run_pool(self.plan,'digest',self.root/'state',self.repair,'config',
+                               workers=4,max_items=count,delay=2,clock=self.clock,sleep=self.clock.sleep,
+                               runtime_factory=lambda *_:Runtime(self.root/'calls.jsonl'))
+        self.assertFalse((self.root/'calls.jsonl').exists())
+
     def test_priority_is_dispatched_first_without_skipping_the_rest(self):
         r=self.run_plan(priority_ids=['d'])
         starts=[e for e in self.events() if e['event']=='start']

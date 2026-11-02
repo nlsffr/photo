@@ -34,6 +34,7 @@ def load_sibling(name, filename):
 
 
 shared = load_sibling('_media_worker_shared', 'backfill-missing-video-assets.py')
+MAX_POOL_ITEMS = 500
 
 
 class SourceBackoff:
@@ -134,7 +135,7 @@ def run_pool(plan, digest, state_dir, repair, config, *, workers=3, max_items=10
              delay=2, lock_dir=None, clock=time.time, sleep=time.sleep,
              runtime_factory=None, source_backoff=None, priority_ids=None):
     if (type(workers) is not int or not 1 <= workers <= 4
-            or type(max_items) is not int or not 1 <= max_items <= shared.MAX_SESSION_ITEMS
+            or type(max_items) is not int or not 1 <= max_items <= MAX_POOL_ITEMS
             or not math.isfinite(delay) or delay < 2):
         raise shared.BackfillError('run_limits_invalid')
     rows = shared.validate_plan(plan)
