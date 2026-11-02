@@ -286,8 +286,28 @@ class State:
 
 
 def safe_reason(error, repair):
-    reason = str(error) if isinstance(error, repair.RepairError) else 'runtime_failure'
-    return reason if re.fullmatch(r'[a-z0-9_]{1,80}', reason) else 'runtime_failure'
+    if isinstance(error, repair.RepairError):
+        reason = str(error)
+        return reason if re.fullmatch(r'[a-z0-9_]{1,80}', reason) else 'runtime_failure'
+    # Dependencies are loaded by the runtime, not required for plan preparation.
+    # Inspect known exception hierarchies only; messages, URLs and SQL stay private.
+    hierarchy = {(base.__module__, base.__name__) for base in type(error).__mro__}
+    if (isinstance(error, json.JSONDecodeError)
+            or ('requests.exceptions', 'JSONDecodeError') in hierarchy):
+        return 'json_decode_error'
+    if ('requests.exceptions', 'Timeout') in hierarchy:
+        return 'request_timeout'
+    if ('requests.exceptions', 'ConnectionError') in hierarchy:
+        return 'request_connection_error'
+    if ('requests.exceptions', 'RequestException') in hierarchy:
+        return 'request_error'
+    if ('mysql.connector.errors', 'Error') in hierarchy:
+        errno = getattr(error, 'errno', None)
+        return ('database_mysql_' + str(errno)
+                if type(errno) is int and 1 <= errno <= 65535 else 'database_mysql_error')
+    if isinstance(error, TimeoutError):
+        return 'runtime_timeout'
+    return 'runtime_failure'
 
 
 def run_plan(plan, plan_digest, state_dir, repair, config, *, max_items=1, delay=1,

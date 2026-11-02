@@ -59,6 +59,58 @@ class Runtime:
     def close(self):self.closed=True
 
 
+class SafeReasonTests(unittest.TestCase):
+    @staticmethod
+    def external_error(name, module, base=Exception):
+        return type(name, (base,), {"__module__": module})
+
+    def test_request_subclasses_are_classified_without_exception_text(self):
+        request = self.external_error("RequestException", "requests.exceptions")
+        timeout = self.external_error("Timeout", "requests.exceptions", request)
+        connection = self.external_error("ConnectionError", "requests.exceptions", request)
+        cases = [
+            (self.external_error("ReadTimeout", "requests.exceptions", timeout), "request_timeout"),
+            (self.external_error("ConnectTimeout", "requests.exceptions", timeout), "request_timeout"),
+            (self.external_error("ProxyError", "requests.exceptions", connection), "request_connection_error"),
+            (self.external_error("HTTPError", "requests.exceptions", request), "request_error"),
+        ]
+        for cls, expected in cases:
+            with self.subTest(cls=cls.__name__):
+                error = cls("https://user:PRIVATE_PASSWORD@private.invalid/media?token=PRIVATE_TOKEN")
+                self.assertEqual(backfill.safe_reason(error, repair), expected)
+        # An arbitrary application's class name is not a requests type.
+        self.assertEqual(backfill.safe_reason(type("Timeout", (Exception,), {})("PRIVATE_TOKEN"), repair), "runtime_failure")
+
+    def test_json_decode_has_priority_over_request_exception_and_redacts_document(self):
+        error = json.JSONDecodeError("PRIVATE_TOKEN", "https://PRIVATE_PASSWORD@private.invalid", 0)
+        self.assertEqual(backfill.safe_reason(error, repair), "json_decode_error")
+        request = self.external_error("RequestException", "requests.exceptions")
+        error_type = self.external_error("JSONDecodeError", "requests.exceptions", request)
+        self.assertEqual(backfill.safe_reason(error_type("PRIVATE_TOKEN"), repair), "json_decode_error")
+
+    def test_mysql_errno_is_numeric_bounded_and_only_for_connector_errors(self):
+        base = self.external_error("Error", "mysql.connector.errors")
+        subclass = self.external_error("OperationalError", "mysql.connector.errors", base)
+        for errno, expected in [(1045, "database_mysql_1045"), (1205, "database_mysql_1205"),
+                                (None, "database_mysql_error"), (True, "database_mysql_error"),
+                                ("1045 PRIVATE_PASSWORD", "database_mysql_error"), (0, "database_mysql_error"),
+                                (-1, "database_mysql_error"), (65536, "database_mysql_error")]:
+            error = subclass("PRIVATE_PASSWORD at private.invalid")
+            error.errno = errno
+            self.assertEqual(backfill.safe_reason(error, repair), expected)
+        foreign = RuntimeError("PRIVATE_PASSWORD")
+        foreign.errno = 1045
+        self.assertEqual(backfill.safe_reason(foreign, repair), "runtime_failure")
+
+    def test_builtin_timeout_and_known_repair_policy_codes_remain_sanitized(self):
+        self.assertEqual(backfill.safe_reason(TimeoutError("PRIVATE_PASSWORD"), repair), "runtime_timeout")
+        for reason in backfill.SKIP_CODES | {"invalid_video", "source_http_503"}:
+            self.assertEqual(backfill.safe_reason(repair.RepairError(reason), repair), reason)
+        for reason in ["https://PRIVATE_PASSWORD@private.invalid", "PRIVATE PASSWORD", "x" * 81]:
+            self.assertEqual(backfill.safe_reason(repair.RepairError(reason), repair), "runtime_failure")
+        self.assertEqual(backfill.safe_reason(RuntimeError("PRIVATE_PASSWORD"), repair), "runtime_failure")
+
+
 class BackfillTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
@@ -161,6 +213,14 @@ class BackfillTests(unittest.TestCase):
         other=Runtime();result=self.run_plan(other,max_items=2)
         self.assertEqual(result['attempted'],0);self.assertFalse(other.calls)
         self.assertNotIn('SENSITIVE',json.dumps(result))
+        events=(self.root/'state/events.jsonl').read_text()
+        self.assertEqual(json.loads(events.splitlines()[0])['reason'],'runtime_timeout')
+        self.assertNotIn('SENSITIVE',events)
+        db=sqlite3.connect(self.root/'state/checkpoint.sqlite3')
+        try:
+            state,available_at,raw=db.execute("SELECT state,available_at,result FROM jobs WHERE id='a'").fetchone()
+        finally:db.close()
+        self.assertEqual((state,available_at,json.loads(raw)['reason']),('retry',1060,'runtime_timeout'))
         self.clock.now=1060
         result=self.run_plan(other,max_items=2)
         self.assertEqual(result['jobs']['done'],2)
