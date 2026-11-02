@@ -10,7 +10,9 @@ Le premier cas réel de tag/récent/vidéo/nonIA a expiré au budget diagnostic2
 
 ## Application par le parent après revue
 
-Mettre en pause le pilote d’inventaire, sans modifier les bots. Lire d’abord le plan avec `python3 ops/resize-mariadb-buffer-pool.py` sur le VPS. Vérifier l’ID exact, l’ancienne taille, le plafond et la mémoire fraîche. Le script utilise le secret root déjà présent dans le conteneur, sans l’écrire dans une commande ni l’afficher.
+Mettre en pause le pilote d’inventaire, sans modifier les bots. Lire d’abord le plan avec `python3 ops/resize-mariadb-buffer-pool.py` sur le VPS. Vérifier l’ID exact, l’ancienne taille, le plafond et la mémoire fraîche. Le script lit seulement `DB_ROOT_PASSWORD` dans le fichier privé existant `/opt/photo/.env.prod` (propriétaire du processus, aucune permission de groupe/autres). Le secret passe sur l’entrée standard du client, sans figurer dans les arguments ni être affiché.
+
+L’accès root a été confirmé par un unique `SELECT 1` et la lecture des privilèges avec ce secret existant, identique à deux sauvegardes historiques. Il diffère de la variable root du conteneur courant, refusée par le volume existant ; l’essai sans mot de passe a aussi été refusé. Le compte applicatif possède les droits des bases, mais pas `SUPER`. Aucun compte, mot de passe, variable d’environnement ou privilège n’a été modifié. Le client utilise `--no-defaults` pour éviter une autre source d’authentification implicite.
 
 ```sh
 python3 ops/resize-mariadb-buffer-pool.py --apply \

@@ -23,6 +23,30 @@ def state(size=module.OLD_SIZE, configured=False):
 
 
 class BufferPoolTests(unittest.TestCase):
+    def test_existing_root_credential_is_loaded_from_private_host_file_only(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'private.env'
+            path.write_text('# Existing deployment configuration\nDB_ROOT_PASSWORD="test-only-secret"\n')
+            path.chmod(0o600)
+            self.assertEqual(module.root_password(path), 'test-only-secret')
+            path.chmod(0o644)
+            with self.assertRaisesRegex(RuntimeError, 'root_credential_source_not_private'): module.root_password(path)
+
+    def test_root_password_travels_on_stdin_and_not_in_process_arguments(self):
+        with mock.patch.object(module, 'root_password', return_value='test-only-secret'), \
+             mock.patch.object(module, 'docker', return_value=b'1\n') as docker:
+            self.assertEqual(module.sql('SELECT 1;', 'a' * 64), '1\n')
+        self.assertNotIn('test-only-secret', repr(docker.call_args.args))
+        self.assertEqual(docker.call_args.kwargs['data'], b'test-only-secret\nSELECT 1;')
+        self.assertIn('--no-defaults', module.AUTH[-1])
+
+    def test_root_password_with_line_break_or_nul_is_never_sent(self):
+        for password in ('first\nsecond', 'first\rsecond', 'first\x00second'):
+            with mock.patch.object(module, 'root_password', return_value=password), \
+                 mock.patch.object(module, 'docker') as docker:
+                with self.assertRaisesRegex(RuntimeError, 'root_credential_not_single_line'): module.sql('SELECT 1;')
+                docker.assert_not_called()
+
     def test_plan_accepts_observed_online_growth_without_changing_ceiling_or_auto_min(self):
         original = state(); before = copy.deepcopy(original)
         module.guard(original, 'a' * 64)

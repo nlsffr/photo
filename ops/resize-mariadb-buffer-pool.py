@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import stat
 import subprocess
 import time
 
@@ -15,8 +16,25 @@ CONFIG = '/etc/mysql/conf.d/90-buffer-pool.cnf'
 CONTENT = b'[mysqld]\ninnodb_buffer_pool_size=1G\n'
 CONFIG_SHA = hashlib.sha256(CONTENT).hexdigest()
 VARIABLES = ('innodb_buffer_pool_size', 'innodb_buffer_pool_size_max', 'innodb_buffer_pool_size_auto_min')
-AUTH = ('sh', '-eu', '-c', 'export MYSQL_PWD="${MARIADB_ROOT_PASSWORD:-${MYSQL_ROOT_PASSWORD:-}}"; '
-        'test -n "$MYSQL_PWD"; exec mariadb --user=root --protocol=socket --connect-timeout=3 --batch --raw --skip-column-names')
+ROOT_ENV = Path('/opt/photo/.env.prod')
+AUTH = ('sh', '-eu', '-c', 'IFS= read -r MYSQL_PWD; export MYSQL_PWD; '
+        'exec mariadb --no-defaults --user=root --protocol=socket --connect-timeout=3 --batch --raw --skip-column-names')
+
+
+def root_password(path=ROOT_ENV):
+    metadata = path.lstat()
+    if (not stat.S_ISREG(metadata.st_mode) or metadata.st_uid != os.geteuid()
+            or metadata.st_mode & 0o077 or metadata.st_size > 65536):
+        raise RuntimeError('root_credential_source_not_private')
+    for line in path.read_text().splitlines():
+        key, separator, value = line.partition('=')
+        if separator and key.strip().removeprefix('export ') == 'DB_ROOT_PASSWORD':
+            value = value.strip()
+            if len(value) > 1 and value[0] in ('"', "'") and value[-1] == value[0]:
+                value = value[1:-1]
+            if value and '\x00' not in value and len(value) <= 4096:
+                return value
+    raise RuntimeError('root_credential_unavailable')
 
 
 def docker(*args, data=None):
@@ -27,7 +45,13 @@ def docker(*args, data=None):
 
 
 def sql(statement, container=CONTAINER):
-    return docker('exec', '-i', container, *AUTH, data=statement.encode()).decode()
+    # The existing volume's password was verified against this private host
+    # source. The current container's root-password environment is different.
+    password = root_password()
+    if any(character in password for character in ('\n', '\r', '\x00')):
+        raise RuntimeError('root_credential_not_single_line')
+    data = password.encode() + b'\n' + statement.encode()
+    return docker('exec', '-i', container, *AUTH, data=data).decode()
 
 
 def observe(container=CONTAINER):
