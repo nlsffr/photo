@@ -111,6 +111,96 @@ class SafeReasonTests(unittest.TestCase):
         self.assertEqual(backfill.safe_reason(RuntimeError("PRIVATE_PASSWORD"), repair), "runtime_failure")
 
 
+class RetryFairnessTests(unittest.TestCase):
+    def setUp(self):
+        self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
+        self.root=Path(self.temp.name)/'state'
+        self.rows=[{'id':value} for value in ['r0','r1']+[f'p{i}' for i in range(60)]]
+        self.state=backfill.State(self.root,self.rows,'digest')
+        self.addCleanup(lambda:self.state.close())
+        self.state.db.execute("UPDATE jobs SET state='retry' WHERE id IN ('r0','r1')")
+
+    def done(self, now=1000):
+        job=self.state.next_job(now)
+        self.assertIsNotNone(job)
+        self.state.finish(job['id'],'done',{'status':'restored'},0,0)
+        return job['id']
+
+    def debt(self):
+        return self.state.get_meta('retry_dispatch_debt','0')
+
+    def test_retry_slot_survives_multiple_sessions_and_overrides_cache_pending_priority(self):
+        self.state.prioritize([f'p{i}' for i in range(60)])
+        self.assertEqual([self.done() for _ in range(10)],[f'p{i}' for i in range(10)])
+        self.state.close()
+        self.state=backfill.State(self.root,self.rows,'digest')
+        self.state.prioritize([f'p{i}' for i in range(60)])
+        self.assertEqual([self.done() for _ in range(15)],[f'p{i}' for i in range(10,25)])
+        self.assertEqual(self.debt(),'25')
+        self.assertEqual(self.done(),'r0')
+        self.assertEqual(self.debt(),'0')
+
+    def test_poison_retry_rotates_behind_older_eligible_retry_at_next_reserved_slot(self):
+        self.state.prioritize([f'p{i}' for i in range(60)])
+        for _ in range(25):self.done()
+        job=self.state.next_job(1000)
+        self.assertEqual(job['id'],'r0')
+        self.state.finish('r0','retry',{'status':'retry','reason':'invalid_video'},1060,1060)
+        for _ in range(25):self.done(2000)
+        self.assertEqual(self.done(2000),'r1')
+
+    def test_normal_priority_retry_does_not_reset_or_avoid_the_reserved_slot(self):
+        self.state.prioritize(['r0'])
+        job=self.state.next_job(1000)
+        self.assertEqual(job['id'],'r0')
+        self.assertEqual(self.debt(),'1')
+        self.state.finish('r0','retry',{'status':'retry'},1060,1060)
+        for _ in range(24):self.done()
+        self.assertEqual(self.debt(),'25')
+        self.assertEqual(self.done(),'r1')
+
+    def test_future_retry_never_claimed_early_and_debt_stays_due_until_eligible(self):
+        self.state.set_meta('retry_dispatch_debt',25)
+        self.state.db.execute("UPDATE jobs SET available_at=1001 WHERE state='retry'")
+        self.assertEqual(self.done(1000),'p0')
+        self.assertEqual(self.debt(),'25')
+        self.assertEqual(self.done(1001),'r0')
+        self.assertEqual(self.debt(),'0')
+
+    def test_retries_alone_advance_immediately_and_unavailable_or_terminal_jobs_never_claim(self):
+        self.state.db.execute("UPDATE jobs SET state='done' WHERE id LIKE 'p%'")
+        self.assertEqual(self.done(),'r0')
+        self.state.db.execute("UPDATE jobs SET state='running' WHERE id='r1'")
+        self.state.set_meta('retry_dispatch_debt',12)
+        self.assertIsNone(self.state.next_job(1000))
+        self.assertEqual(self.debt(),'12')
+        self.state.db.execute("UPDATE jobs SET state='skipped' WHERE id='r1'")
+        self.assertIsNone(self.state.next_job(1000))
+        self.state.db.execute("UPDATE jobs SET state='pending',available_at=1001 WHERE id='p0'")
+        self.assertIsNone(self.state.next_job(1000))
+        self.assertEqual(self.done(1001),'p0')
+
+    def test_invalid_durable_debt_fails_closed_without_claiming_or_resetting(self):
+        for value in ('NaN','-1','26','1.0','',' 1','01'):
+            with self.subTest(value=value):
+                self.state.set_meta('retry_dispatch_debt',value)
+                with self.assertRaisesRegex(backfill.BackfillError,'retry_dispatch_debt_invalid'):
+                    self.state.next_job(1000)
+                self.assertEqual(self.debt(),value)
+                self.assertEqual(self.state.db.execute("SELECT COUNT(*) FROM jobs WHERE state='running'").fetchone()[0],0)
+                self.assertFalse(self.state.db.in_transaction)
+
+    def test_claim_and_counter_roll_back_together_when_counter_write_fails(self):
+        self.state.set_meta('retry_dispatch_debt',12)
+        self.state.db.execute("""CREATE TRIGGER reject_debt BEFORE INSERT ON meta
+            WHEN NEW.key='retry_dispatch_debt' BEGIN SELECT RAISE(ABORT,'injected_meta_failure'); END""")
+        with self.assertRaisesRegex(sqlite3.IntegrityError,'injected_meta_failure'):
+            self.state.next_job(1000)
+        state,attempts=self.state.db.execute("SELECT state,attempts FROM jobs WHERE id='p0'").fetchone()
+        self.assertEqual((state,attempts,self.debt()),('pending',0,'12'))
+        self.assertFalse(self.state.db.in_transaction)
+
+
 class BackfillTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)

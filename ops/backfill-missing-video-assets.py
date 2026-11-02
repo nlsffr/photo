@@ -28,6 +28,7 @@ import time
 VERSION = 1
 NETWORK_BACKOFF = 60
 MAX_SESSION_ITEMS = 100
+RETRY_DISPATCH_QUOTA = 25
 SKIP_CODES = frozenset('''excluded notice_excluded source_excluded source_unavailable
 source_http_401 source_http_403 source_http_404 source_http_410 source_refused
 candidate_changed registry_changed registry_key_changed invalid_video_key
@@ -261,10 +262,34 @@ class State:
         self.db.executemany('INSERT OR IGNORE INTO repair_priority(id) VALUES(?)', [(value,) for value in ids])
 
     def next_job(self, now):
-        row = self.db.execute("SELECT j.* FROM jobs j LEFT JOIN repair_priority p ON p.id=j.id WHERE j.state IN ('pending','retry') AND j.available_at<=? ORDER BY CASE WHEN p.id IS NULL THEN 1 ELSE 0 END,CASE j.state WHEN 'pending' THEN 0 ELSE 1 END,j.position LIMIT 1", (now,)).fetchone()
-        if row:
-            self.db.execute("UPDATE jobs SET state='running',attempts=attempts+1 WHERE id=?", (row['id'],))
-        return row
+        self.db.execute('BEGIN IMMEDIATE')
+        try:
+            raw_debt = self.get_meta('retry_dispatch_debt', '0')
+            if (not isinstance(raw_debt, str) or not re.fullmatch(r'0|[1-9][0-9]?', raw_debt)
+                    or int(raw_debt) > RETRY_DISPATCH_QUOTA):
+                raise BackfillError('retry_dispatch_debt_invalid')
+            debt = int(raw_debt)
+            row = None
+            reserved_retry = False
+            if debt >= RETRY_DISPATCH_QUOTA:
+                # Rotate retries by their deadline, not original position: a
+                # repeatedly failing old job must not monopolize every slot.
+                row = self.db.execute("SELECT * FROM jobs WHERE state='retry' AND available_at<=? ORDER BY available_at,position LIMIT 1", (now,)).fetchone()
+                reserved_retry = row is not None
+            if row is None:
+                row = self.db.execute("SELECT j.* FROM jobs j LEFT JOIN repair_priority p ON p.id=j.id WHERE j.state IN ('pending','retry') AND j.available_at<=? ORDER BY CASE WHEN p.id IS NULL THEN 1 ELSE 0 END,CASE j.state WHEN 'pending' THEN 0 ELSE 1 END,j.position LIMIT 1", (now,)).fetchone()
+            if row:
+                claimed = self.db.execute("UPDATE jobs SET state='running',attempts=attempts+1 WHERE id=? AND state=? AND available_at<=?", (row['id'], row['state'], now))
+                if claimed.rowcount != 1:
+                    raise BackfillError('job_claim_changed')
+                # Normal-priority retries count too; only a reserved slot pays
+                # the debt, which persists across bounded service sessions.
+                self.set_meta('retry_dispatch_debt', 0 if reserved_retry else min(RETRY_DISPATCH_QUOTA, debt + 1))
+            self.db.execute('COMMIT')
+            return row
+        except BaseException:
+            self.db.execute('ROLLBACK')
+            raise
 
     def finish(self, photo_id, state, result, available_at, not_before):
         self.db.execute('BEGIN IMMEDIATE')
