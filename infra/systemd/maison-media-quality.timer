@@ -1,0 +1,11 @@
+[Unit]
+Description=Maison Studio - check three public media samples every 15 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15min
+AccuracySec=30s
+Unit=maison-media-quality.service
+
+[Install]
+WantedBy=timers.target

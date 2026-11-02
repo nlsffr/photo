@@ -1,0 +1,25 @@
+[Unit]
+Description=Maison Studio - bounded public page and media checks
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+StateDirectory=maison-media-quality
+StateDirectoryMode=0700
+ExecStart=/usr/bin/python3 -B /opt/maison-media-quality/current/ops/quality-monitor.py --config /etc/maison-media-quality/config.json --output /var/lib/maison-media-quality/latest.json
+TimeoutStartSec=60
+CPUQuota=10%
+MemoryMax=128M
+TasksMax=16
+Nice=15
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/maison-media-quality
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6

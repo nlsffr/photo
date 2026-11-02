@@ -124,4 +124,49 @@ class PipelineHealthTests(unittest.TestCase):
         self.assertIn('repair_details_unavailable',row['errors'])
 
 
-if __name__ == '__main__': unittest.main()
+
+
+class QualityHealthTests(unittest.TestCase):
+    setUp = PipelineHealthTests.setUp
+    write = PipelineHealthTests.write
+    write_lines = PipelineHealthTests.write_lines
+    def quality_tool(self, report=None):
+        path=self.root/'quality.json'
+        if report is not None:self.write(path,report)
+        return health.PipelineHealth(queue_reader=lambda:self.queue,repair_roots=self.roots,
+            queue_config=self.config,proc=self.proc,clock=lambda:self.now,quality_path=path)
+
+    def quality_report(self, **changes):
+        value={'version':1,'observedAt':'1970-01-01T00:16:40Z','status':'healthy',
+               'counts':{'expected':3,'passed':3,'failed':0,'retired':0,'unknown':0},
+               'samples':[{'privateUrl':'https://PRIVATE.invalid','privateBody':'PRIVATE_PASSWORD'}]}
+        value.update(changes);return value
+
+    def test_quality_reads_only_sanitized_summary_without_network_or_repair_changes(self):
+        with patch('socket.create_connection',side_effect=AssertionError('no network')):
+            result=self.quality_tool(self.quality_report()).snapshot()
+        quality=result['quality']
+        self.assertEqual((quality['state'],quality['status'],quality['stale']),('available','healthy',False))
+        self.assertEqual(quality['counts']['passed'],3);self.assertEqual(quality['issues'],[])
+        self.assertNotIn('PRIVATE',json.dumps(quality));self.assertNotIn('samples',quality)
+        self.assertEqual(result['repairs']['video']['restoredRows'],2)
+
+    def test_stale_or_future_quality_never_replays_healthy(self):
+        for stamp in ('1969-12-31T23:46:40Z','1969-12-31T23:46:39Z','1970-01-01T00:16:46Z'):
+            quality=self.quality_tool(self.quality_report(observedAt=stamp)).snapshot()['quality']
+            self.assertTrue(quality['stale']);self.assertEqual(quality['status'],'unknown')
+            self.assertEqual(quality['counts']['passed'],0)
+
+    def test_missing_invalid_or_incomplete_quality_does_not_invent_success(self):
+        self.assertEqual(self.quality_tool().snapshot()['quality']['status'],'unknown')
+        bad=self.quality_report(counts={'expected':3,'passed':True,'failed':0,'retired':2,'unknown':0})
+        self.assertEqual(self.quality_tool(bad).snapshot()['quality']['state'],'unavailable')
+        retired=self.quality_report(status='unknown',counts={'expected':3,'passed':0,'failed':0,'retired':3,'unknown':0})
+        quality=self.quality_tool(retired).snapshot()['quality']
+        self.assertEqual((quality['status'],quality['counts']['retired']),('unknown',3))
+        self.assertIn('media_quality_incomplete',quality['issues'])
+        degraded=self.quality_report(status='degraded',counts={'expected':3,'passed':2,'failed':1,'retired':0,'unknown':0})
+        self.assertIn('media_quality_failed',self.quality_tool(degraded).snapshot()['quality']['issues'])
+
+
+if __name__ == '__main__':unittest.main()

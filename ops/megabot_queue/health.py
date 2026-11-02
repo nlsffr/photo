@@ -140,9 +140,43 @@ class RepairReader:
         return dict(row)
 
 
+def quality_snapshot(path, clock):
+    counts = {'expected':3, 'passed':0, 'failed':0, 'retired':0, 'unknown':3}
+    result = {'state':'unavailable', 'status':'unknown', 'observedAt':None,
+              'stale':True, 'counts':counts, 'issues':['media_quality_unavailable']}
+    try:
+        value, _ = read_json(path)
+        if not isinstance(value, dict) or value.get('version') != 1:
+            raise ValueError()
+        incoming = value.get('counts')
+        if (not isinstance(incoming, dict) or set(incoming) != set(counts)
+                or any(type(number) is not int or not 0 <= number <= 3 for number in incoming.values())
+                or incoming['expected'] != 3 or sum(incoming[key] for key in ('passed','failed','retired','unknown')) != 3):
+            raise ValueError()
+        expected_status = 'degraded' if incoming['failed'] else 'healthy' if incoming['passed'] == 3 else 'unknown'
+        if value.get('status') != expected_status:
+            raise ValueError()
+        stamp = value.get('observedAt')
+        if not isinstance(stamp, str) or len(stamp) > 64:
+            raise ValueError()
+        parsed = dt.datetime.fromisoformat(stamp.replace('Z','+00:00'))
+        if parsed.tzinfo is None:
+            raise ValueError()
+        age = clock() - parsed.timestamp()
+        result['observedAt'] = iso(parsed.timestamp())
+        if not -5 <= age < 1800:
+            return {**result, 'state':'stale', 'issues':['media_quality_snapshot_stale']}
+        return {**result, 'state':'available', 'status':expected_status, 'stale':False,
+                'counts':dict(incoming), 'issues':(['media_quality_failed'] if expected_status == 'degraded'
+                    else ['media_quality_incomplete'] if expected_status == 'unknown' else [])}
+    except (OSError, ValueError, TypeError, OverflowError):
+        return result
+
+
 class PipelineHealth:
-    def __init__(self, *, queue_reader, repair_roots=ROOTS, queue_config=Path('/etc/megabot-queue/config.json'), proc=Path('/proc'), clock=time.time):
+    def __init__(self, *, queue_reader, repair_roots=ROOTS, queue_config=Path('/etc/megabot-queue/config.json'), proc=Path('/proc'), clock=time.time, quality_path=Path('/var/lib/maison-media-quality/latest.json')):
         self.queue_reader, self.queue_config, self.proc, self.clock = queue_reader, Path(queue_config), Path(proc), clock
+        self.quality_path = Path(quality_path)
         self.repairs = {kind: RepairReader(repair_roots[kind], kind, clock) for kind in ('video', 'photo')}
         self.lock = threading.Lock()
 
@@ -178,4 +212,4 @@ class PipelineHealth:
             errors = list(queue['errors'])
             for kind, row in repairs.items(): errors.extend(kind + '_' + code for code in row['errors'])
             return {'version': 1, 'observedAt': iso(self.clock()), 'stale': queue['stale'] or any(row['stale'] for row in repairs.values()),
-                    'errors': errors, 'queue': queue, 'repairs': repairs}
+                    'errors': errors, 'queue': queue, 'repairs': repairs, 'quality': quality_snapshot(self.quality_path, self.clock)}
