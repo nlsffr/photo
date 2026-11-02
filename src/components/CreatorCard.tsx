@@ -8,7 +8,7 @@ import { formatCount } from "@/lib/format";
 import { VerifiedBadge } from "./VerifiedBadge";
 import { MediaImg } from "./MediaImg";
 
-export function CreatorCard({ creator, locale }: { creator: CreatorWithStats; locale?: Locale }) {
+export function CreatorCard({ creator, locale, priority = false }: { creator: CreatorWithStats; locale?: Locale; priority?: boolean }) {
   const img = creator.avatarUrl || creator.coverUrl;
   const copy = getDictionary(locale ?? "fr").creator;
 
@@ -25,6 +25,7 @@ export function CreatorCard({ creator, locale }: { creator: CreatorWithStats; lo
             fallbackSrc={creator.coverUrl}
             alt={creator.name}
             fill
+            priority={priority}
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
             className="object-cover object-top transition-transform duration-500 group-hover:scale-105"
           />

@@ -1,15 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { localePath } from "@/lib/i18n/config";
 import type { CreatorWithStats } from "@/lib/types";
 import type { Locale } from "@/lib/i18n/config";
 import type { ModelsPagePayload, ModelsSort } from "@/lib/models-pagination";
-import { appendUniqueCreators } from "@/lib/models-pagination";
+import { appendUniqueCreators, modelsPagePath, parseModelsSearch } from "@/lib/models-pagination";
 import { CreatorCard } from "./CreatorCard";
 import { useLocale } from "./LocaleProvider";
 
 type Props = {
   initialModels: CreatorWithStats[];
+  initialPage?: number;
   initialHasMore: boolean;
   initialNextOffset: number | null;
   sort: ModelsSort;
@@ -18,12 +21,19 @@ type Props = {
 
 export function ModelsGrid({
   initialModels,
+  initialPage = 1,
   initialHasMore,
   initialNextOffset,
   sort,
   locale,
 }: Props) {
-  const { t } = useLocale();
+  const { t, locale: shellLocale } = useLocale();
+  const search = parseModelsSearch({ sort, page: String(initialPage) });
+  const base = localePath(locale ?? shellLocale, "/models");
+  const previousHref = search.page > 1 ? modelsPagePath(base, { sort, page: search.page - 1 }) : null;
+  const nextPage = parseModelsSearch({ sort, page: String(search.page + 1) }).page;
+  const nextHref = initialHasMore && nextPage === search.page + 1
+    ? modelsPagePath(base, { sort, page: nextPage }) : null;
   const [models, setModels] = useState(initialModels);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [nextOffset, setNextOffset] = useState(initialNextOffset);
@@ -72,10 +82,18 @@ export function ModelsGrid({
         className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5"
         aria-busy={loading}
       >
-        {models.map((creator) => (
-          <CreatorCard key={creator.handle} creator={creator} locale={locale} />
+        {models.map((creator, index) => (
+          <CreatorCard key={creator.handle} creator={creator} locale={locale} priority={index < 2} />
         ))}
       </div>
+
+      {(previousHref || nextHref) && (
+        <nav aria-label={t("creator.paginationLabel")} className="mt-6 flex flex-wrap items-center justify-center gap-4 text-sm">
+          {previousHref && <Link href={previousHref} prefetch={false} rel="prev" className="min-h-10 content-center rounded-lg border border-[var(--color-border)] px-4 hover:bg-[var(--color-surface-2)]">{t("creator.previousPage")}</Link>}
+          <span aria-current="page" className="text-[var(--color-ink-muted)]">{t("creator.page")} {search.page}</span>
+          {nextHref && <Link href={nextHref} prefetch={false} rel="next" className="min-h-10 content-center rounded-lg border border-[var(--color-border)] px-4 hover:bg-[var(--color-surface-2)]">{t("creator.nextPage")}</Link>}
+        </nav>
+      )}
 
       <p className="sr-only" aria-live="polite">
         {announcement}

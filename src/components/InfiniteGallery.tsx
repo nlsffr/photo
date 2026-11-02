@@ -159,7 +159,7 @@ export function InfiniteGallery({ initial, params, premium = false }: Props) {
         {items.map((p, i) => (
           <Fragment key={p.id}>
             <div className="min-w-0">
-              <PhotoCard photo={p} />
+              <PhotoCard photo={p} priority={i < 2} />
             </div>
             {!premium && (i + 1) % AD_EVERY === 0 ? (
               <div className="col-span-full my-1">

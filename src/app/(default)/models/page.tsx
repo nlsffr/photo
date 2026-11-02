@@ -112,6 +112,7 @@ export default async function ModelsPage({
 
       <ModelsGrid
         key={`${sort}:${start}`}
+        initialPage={search.page}
         initialModels={models}
         initialHasMore={page.hasMore}
         initialNextOffset={page.nextOffset}

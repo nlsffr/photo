@@ -158,6 +158,7 @@ export function MediaImg({
           alt={alt}
           className={className}
           loading={priority ? "eager" : "lazy"}
+          fetchPriority={priority ? "high" : undefined}
           decoding="async"
           onError={tryNextSource}
           style={{
@@ -181,6 +182,7 @@ export function MediaImg({
         height={height}
         className={className}
         loading={priority ? "eager" : "lazy"}
+        fetchPriority={priority ? "high" : undefined}
         decoding="async"
         onError={tryNextSource}
       />
@@ -198,7 +200,8 @@ export function MediaImg({
       height={fill ? undefined : height}
       sizes={sizes}
       className={className}
-      priority={priority}
+      loading={priority ? "eager" : "lazy"}
+      fetchPriority={priority ? "high" : undefined}
       unoptimized
       onError={tryNextSource}
     />

@@ -24,9 +24,11 @@ export function PhotoCard({
   photo,
   /** Use history.replace so media→media doesn't stack back history. */
   replace = false,
+  priority = false,
 }: {
   photo: PhotoView;
   replace?: boolean;
+  priority?: boolean;
 }) {
   const { isLiked, isSaved, toggleLike, toggleSave, ready } = useInteractions();
   const { locale, dictionary } = useLocale();
@@ -106,6 +108,7 @@ export function PhotoCard({
           alt={photo.title}
           fill
           sizes={SIZES}
+          priority={priority}
           className={`pointer-events-none animate-fade-in object-cover object-center transition-opacity duration-300 ${previewVisible ? "opacity-0" : "opacity-100"}`}
         />
 

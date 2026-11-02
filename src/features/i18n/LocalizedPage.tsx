@@ -321,6 +321,7 @@ async function LocalizedModels({ locale, searchParams }: { locale: Locale; searc
       </div>
       <ModelsGrid
         key={`${sort}:${start}`}
+        initialPage={search.page}
         initialModels={page.items}
         initialHasMore={page.hasMore}
         initialNextOffset={page.nextOffset}
@@ -420,7 +421,7 @@ async function LocalizedInfluencers({ locale }: { locale: Locale }) {
       <h1 className="text-2xl font-bold tracking-tight">{copy.title} 🔥</h1>
       <p className="mb-5 text-sm text-[var(--color-ink-muted)]">{copy.description}</p>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-        {models.map((creator) => <CreatorCard key={creator.handle} creator={creator} locale={locale} />)}
+        {models.map((creator, index) => <CreatorCard key={creator.handle} creator={creator} locale={locale} priority={index < 2} />)}
       </div>
     </div>
   );
