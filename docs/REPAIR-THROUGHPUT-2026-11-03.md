@@ -44,3 +44,29 @@ exclusions and remaining jobs separately. Compare complete windows and byte
 volume as well as file counts: file-size mix and slow HTTP requests affect the
 result. A short post-deployment burst does not establish a sustained hourly
 rate or guarantee that every remaining source can be recovered.
+
+## Initial operational experiment
+
+The coordinator patch passed 119 targeted repair, checkpoint and local-cache
+tests, plus the repository CI. Both deployed repair copies passed the 19 worker
+tests before their release links changed.
+
+The six-worker pilot completed a full five-minute window with 40 completed
+repairs and 40 main-video uploads (about 0.58 GB). The first full window at eight
+had 39 repairs/uploads (about 0.94 GB), followed by a five-minute window with only
+eight and thirteen transport timeouts. File-size mix and upstream variability
+prevent attributing every difference to concurrency. The eight-worker setting
+was rolled back to six because it did not establish a sustained improvement.
+The coordinator patch remains deployed.
+
+The VPS retained CPU, memory and staging capacity during these checks. A
+separate read-only diagnostic measured runtime initialization at about 0.47 s
+and candidate validation at about 0.04 s, then encountered a connection timeout
+on the configured source API/proxy path. The exact failing network hop was not
+isolated. The Mac tunnel was established and transferred data, so it was not
+restarted without evidence of a fault.
+
+Keep six as the monitored pilot and preserve normal network backoff. Do not
+repeat a larger pool merely to increase the displayed worker count. A sustained
+1,000 repairs/hour has not been established; further changes need evidence of
+the limiting HTTP stage and a comparable measured improvement.
