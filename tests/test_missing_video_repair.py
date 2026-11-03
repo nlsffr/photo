@@ -1,7 +1,10 @@
 """Bounded asset repair: no live network, database or media are used."""
 import copy
+import hashlib
 import importlib.util
+import json
 from pathlib import Path
+import sys
 import tempfile
 import types
 import unittest
@@ -310,5 +313,114 @@ class RepairTests(unittest.TestCase):
         self.assertIs(self.runtime.request('https://cdn.leakgallery.com/file.mp4', stream=True), response)
         self.assertEqual(self.runtime.bot.session.get.call_count, 1)
         self.runtime.bot.get_proxy.assert_not_called()
+
+class RepairReuseTests(unittest.TestCase):
+    """Reuse verifies fresh private configuration/source without real clients."""
+    def setUp(self):
+        from ops.megabot_queue import adapter, supervisor
+        self.adapter, self.supervisor = adapter, supervisor
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.source = self.root/'source.py'
+        self.source.write_text('# fixture source\n')
+        self.config_path = self.root/'config.json'
+        self.config = {'source_path':str(self.source),
+                       'expected_sha256':hashlib.sha256(self.source.read_bytes()).hexdigest(),
+                       'state_dir':str(self.root/'state'),
+                       'env':{'MEGABOT_DB_HOST':'fixture-db','MEGABOT_DB_USER':'fixture-user',
+                              'MEGABOT_DB_PASSWORD':'fixture-password','MEGABOT_DB_NAME':'fixture',
+                              'S3_ENDPOINT':'https://fixture.invalid','S3_BUCKET':'fixture',
+                              'S3_ACCESS_KEY':'fixture-key','S3_SECRET_KEY':'fixture-secret'}}
+        self.save_config()
+        self.session, self.s3, self.db = Mock(), Mock(), Mock()
+        self.s3.meta.service_model.operation_model.return_value.input_shape.members = {'IfNoneMatch':object()}
+        source = types.SimpleNamespace(MegaBot=type('FixtureBot', (), {}),
+                                       requests=types.SimpleNamespace(Session=Mock(return_value=self.session)))
+        boto3 = types.ModuleType('boto3'); boto3.client = Mock(return_value=self.s3)
+        botocore = types.ModuleType('botocore'); botocore_config = types.ModuleType('botocore.config')
+        botocore_config.Config = Mock()
+        mysql = types.ModuleType('mysql'); connector = types.ModuleType('mysql.connector')
+        connector.connect = Mock(return_value=self.db); mysql.connector = connector
+        modules = {'boto3':boto3,'botocore':botocore,'botocore.config':botocore_config,
+                   'mysql':mysql,'mysql.connector':connector}
+        with patch.dict(sys.modules, modules), patch.object(sys, 'path', list(sys.path)), \
+                patch.object(adapter, 'load_source', return_value=source):
+            self.runtime = repair.Repair(str(self.config_path), self.root/'journal.jsonl')
+
+    def save_config(self):
+        self.config_path.write_text(json.dumps(self.config))
+        self.config_path.chmod(0o600)
+
+    def test_prepare_reuse_reloads_private_config_and_verifies_source_each_time(self):
+        with patch.object(self.supervisor, 'read_config', wraps=self.supervisor.read_config) as read, \
+                patch.object(self.supervisor, 'verified_source', wraps=self.supervisor.verified_source) as verify:
+            self.assertIsNone(self.runtime.prepare_reuse())
+            self.assertIsNone(self.runtime.prepare_reuse())
+        self.assertEqual(read.call_count, 2)
+        self.assertEqual(verify.call_count, 2)
+        self.assertEqual(Path(read.call_args.args[0]), self.config_path)
+        self.session.get.assert_not_called()
+
+    def test_changed_configuration_is_rejected_before_transport_or_reapproval(self):
+        self.config['env']['S3_BUCKET'] = 'different-fixture'
+        self.save_config()
+        with patch.object(self.supervisor, 'verified_source', wraps=self.supervisor.verified_source) as verify:
+            with self.assertRaisesRegex(repair.RepairError, '^runtime_configuration_changed$'):
+                self.runtime.prepare_reuse()
+        verify.assert_not_called()
+        self.session.get.assert_not_called()
+
+    def test_configuration_and_source_changed_together_cannot_replace_original_approval(self):
+        self.source.write_text('# changed fixture source\n')
+        self.config['expected_sha256'] = hashlib.sha256(self.source.read_bytes()).hexdigest()
+        self.save_config()
+        with self.assertRaisesRegex(repair.RepairError, '^runtime_configuration_changed$'):
+            self.runtime.prepare_reuse()
+        self.session.get.assert_not_called()
+
+    def test_fresh_configuration_permissions_are_checked_on_reuse(self):
+        self.config_path.chmod(0o644)
+        with self.assertRaisesRegex(self.supervisor.ConfigurationError, '^config_permissions$'):
+            self.runtime.prepare_reuse()
+        self.session.get.assert_not_called()
+
+    def test_changed_source_keeps_existing_source_changed_error(self):
+        self.source.write_text('# unapproved fixture source\n')
+        with self.assertRaisesRegex(self.supervisor.SourceChanged, '^source_changed$'):
+            self.runtime.prepare_reuse()
+        self.session.get.assert_not_called()
+
+    def test_close_closes_request_database_and_storage_clients(self):
+        self.runtime.close()
+        self.session.close.assert_called_once_with()
+        self.db.close.assert_called_once_with()
+        self.s3.close.assert_called_once_with()
+
+    def test_session_close_failure_still_closes_database_and_storage(self):
+        self.session.close.side_effect = RuntimeError('fixture_session_close_failed')
+        with self.assertRaisesRegex(RuntimeError, '^fixture_session_close_failed$'):
+            self.runtime.close()
+        self.db.close.assert_called_once_with()
+        self.s3.close.assert_called_once_with()
+
+    def test_database_close_failure_still_closes_storage(self):
+        self.db.close.side_effect = RuntimeError('fixture_db_close_failed')
+        with self.assertRaisesRegex(RuntimeError, '^fixture_db_close_failed$'):
+            self.runtime.close()
+        self.session.close.assert_called_once_with()
+        self.s3.close.assert_called_once_with()
+
+    def test_partial_runtime_cleanup_and_store_without_close_remain_supported(self):
+        runtime = repair.Repair.__new__(repair.Repair)
+        runtime.s3 = self.s3
+        runtime.close()
+        self.s3.close.assert_called_once_with()
+        runtime = repair.Repair.__new__(repair.Repair)
+        runtime.bot = types.SimpleNamespace(session=types.SimpleNamespace())
+        runtime.db = types.SimpleNamespace()
+        runtime.s3 = Store()
+        runtime.close()
+
 
 if __name__=='__main__':unittest.main()

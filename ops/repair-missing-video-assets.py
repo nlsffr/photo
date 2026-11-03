@@ -229,6 +229,8 @@ class Repair:
         import boto3
         from botocore.config import Config
         import mysql.connector
+        self._config_path = config_path
+        self._supervisor = supervisor
         self.config = supervisor.read_config(config_path); supervisor.verified_source(self.config)
         self.env = self.config['env']
         with supervisor.source_environment(self.env):
@@ -245,6 +247,13 @@ class Repair:
         self.db = mysql.connector.connect(host=self.env['MEGABOT_DB_HOST'], user=self.env['MEGABOT_DB_USER'],
             password=self.env['MEGABOT_DB_PASSWORD'], database=self.env['MEGABOT_DB_NAME'], connection_timeout=5)
         self.bucket = self.env['S3_BUCKET']; self.journal = Path(journal)
+
+    def prepare_reuse(self):
+        """Reuse clients only while their configuration and source are unchanged."""
+        current = self._supervisor.read_config(self._config_path)
+        if current != self.config:
+            raise RepairError('runtime_configuration_changed')
+        self._supervisor.verified_source(current)
 
     def log(self, event):
         self.journal.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -434,7 +443,17 @@ class Repair:
         return {'id':row['id'],'status':'restored','bytes':size,**identity, **({'codec':video_info['codec'],'mime':video_mime} if video_info else {})}
 
     def close(self):
-        self.bot.session.close(); self.db.close()
+        def close_client(client):
+            close = getattr(client, 'close', None)
+            if callable(close):
+                close()
+        try:
+            close_client(getattr(getattr(self, 'bot', None), 'session', None))
+        finally:
+            try:
+                close_client(getattr(self, 'db', None))
+            finally:
+                close_client(getattr(self, 's3', None))
 
 
 def main():

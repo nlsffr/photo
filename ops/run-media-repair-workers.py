@@ -74,40 +74,73 @@ def stop_cleanly(*_):
     raise KeyboardInterrupt
 
 
-def repair_child(sender, receiver, inherited_receivers, state, repair, config,
-                 journal, locks, expected, runtime_factory):
+def repair_child(connection, parent_connection, inherited_connections, state,
+                 repair, config, journal, locks, runtime_factory):
     # No SQLite connection, network session or API client is shared by workers.
-    receiver.close()
-    for connection in inherited_receivers:
-        connection.close()
+    parent_connection.close()
+    for inherited in inherited_connections:
+        inherited.close()
     state.close()
     os.setsid()
     signal.signal(signal.SIGTERM, stop_cleanly)
     runtime = None
-    try:
-        lock = locks/(hashlib.sha256(expected['id'].encode()).hexdigest()+'.lock')
-        with shared.file_lock(lock):
-            factory = runtime_factory or repair.Repair
-            runtime = factory(config, journal)
-            outcome = runtime.run(expected, apply=True)
-        if not isinstance(outcome, dict) or outcome.get('status') not in ('restored', 'already_present'):
-            result = {'ok': False, 'reason': 'unexpected_repair_result'}
-        else:
-            result = {'ok': True, 'status': outcome['status']}
-    except BaseException as error:
-        result = {'ok': False, 'reason': shared.safe_reason(error, repair)}
-    finally:
-        if runtime is not None:
+
+    def discard_runtime():
+        nonlocal runtime
+        previous, runtime = runtime, None
+        if previous is not None:
             try:
-                runtime.close()
+                previous.close()
             except Exception:
-                pass
+                return True
+        return False
+
     try:
-        sender.send(result)
-    except (BrokenPipeError, EOFError, OSError):
+        while True:
+            expected = connection.recv()
+            if expected is None:
+                break
+            reuse = getattr(runtime, 'prepare_reuse', None)
+            if runtime is not None and not callable(reuse) and discard_runtime():
+                connection.send({'id': expected['id'], 'ok': False,
+                                 'reason': 'runtime_cleanup_failed', 'retire': True})
+                break
+            retire = False
+            try:
+                lock = locks/(hashlib.sha256(expected['id'].encode()).hexdigest()+'.lock')
+                with shared.file_lock(lock):
+                    if runtime is None:
+                        factory = runtime_factory or repair.Repair
+                        try:
+                            runtime = factory(config, journal)
+                        except Exception:
+                            # Partially constructed clients have no close handle.
+                            retire = True
+                            raise
+                    else:
+                        reuse()
+                    outcome = runtime.run(expected, apply=True)
+                if not isinstance(outcome, dict) or outcome.get('status') not in ('restored', 'already_present'):
+                    result = {'ok': False, 'reason': 'unexpected_repair_result'}
+                else:
+                    result = {'ok': True, 'status': outcome['status']}
+            except Exception as error:
+                result = {'ok': False, 'reason': shared.safe_reason(error, repair)}
+            if not result['ok']:
+                retire = discard_runtime() or retire
+            connection.send({'id': expected['id'], 'retire': retire, **result})
+            if retire:
+                break
+    except BaseException:
+        # Includes SIGTERM while idle or active: exit, never return to recv.
+        # Unexpected failures are reported by the parent as worker_exited.
         pass
     finally:
-        sender.close()
+        try:
+            discard_runtime()
+        except BaseException:
+            pass
+        connection.close()
 
 
 def stop_children(active):
@@ -117,8 +150,12 @@ def stop_children(active):
         if process.is_alive():
             try:
                 os.killpg(process.pid, signal.SIGTERM)
-            except ProcessLookupError:
-                process.terminate()
+            except (ProcessLookupError, PermissionError):
+                # A retiring child can be between exit and join on macOS.
+                try:
+                    process.terminate()
+                except ProcessLookupError:
+                    pass
     deadline = time.monotonic()+3
     for entry in active:
         entry['process'].join(max(0, deadline-time.monotonic()))
@@ -127,10 +164,13 @@ def stop_children(active):
         if process.is_alive():
             try:
                 os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                process.kill()
+            except (ProcessLookupError, PermissionError):
+                try:
+                    process.kill()
+                except ProcessLookupError:
+                    pass
             process.join()
-        entry['receiver'].close()
+        entry['connection'].close()
         process.close()
 
 
@@ -151,7 +191,7 @@ def run_pool(plan, digest, state_dir, repair, config, *, workers=3, max_items=10
     locks = shared.private_directory(lock_dir or root/'job-locks')
     source_pause = SourceBackoff(source_backoff)
     context = multiprocessing.get_context('fork')
-    active = []
+    children = []
     attempted = 0
     counters = Counter()
     state = None
@@ -172,53 +212,75 @@ def run_pool(plan, digest, state_dir, repair, config, *, workers=3, max_items=10
                     shared.atomic_json(root/'progress.json', result)
                     return result
 
+                def busy():
+                    return sum(entry['job'] is not None for entry in children)
+
+                def finish(job, outcome):
+                    nonlocal paused
+                    pause_until = deadline()
+                    if outcome['ok']:
+                        status = outcome.get('status')
+                        if status not in ('restored', 'already_present'):
+                            outcome = {'ok': False, 'reason': 'unexpected_repair_result'}
+                    if outcome['ok']:
+                        public = {'id': job['id'], 'status': status}
+                        state.finish(job['id'], 'done', public, 0, pause_until)
+                        counters[status] += 1
+                    else:
+                        reason = outcome.get('reason')
+                        if not isinstance(reason, str) or not re.fullmatch(r'[a-z0-9_]{1,80}', reason):
+                            reason = 'runtime_failure'
+                        skipped = reason in shared.SKIP_CODES
+                        public = {'id': job['id'], 'status': 'skipped' if skipped else 'retry', 'reason': reason}
+                        available_at = 0
+                        if reason in LOCAL_RETRY_CODES:
+                            available_at = clock()+LOCAL_RETRY_BACKOFF
+                        elif not skipped:
+                            paused = True
+                            pause_until = source_pause.deadline(max(pause_until, clock()+shared.NETWORK_BACKOFF))
+                            available_at = pause_until
+                        state.finish(job['id'], public['status'], public, available_at, pause_until)
+                        counters[public['status']] += 1
+                    shared.append_event(root/'events.jsonl', public, clock())
+                    progress('paused_network' if paused else 'running', **({'not_before':pause_until} if paused else {}))
+
                 pause_until = deadline()
                 if clock() < pause_until:
                     return progress('paused', not_before=pause_until)
-                while active or (attempted < max_items and not paused):
+                while busy() or (attempted < max_items and not paused):
                     # Reap before dispatch: a completed failure must stop new work.
-                    for entry in list(active):
-                        process, receiver, job = entry['process'], entry['receiver'], entry['job']
-                        if process.is_alive():
-                            continue
-                        process.join()
+                    for entry in list(children):
+                        process, connection, job = entry['process'], entry['connection'], entry['job']
+                        outcome = None
+                        ready = False
                         try:
-                            outcome = receiver.recv() if receiver.poll() else None
+                            ready = connection.poll()
+                            if ready:
+                                outcome = connection.recv()
                         except (EOFError, OSError):
-                            outcome = None
-                        if (process.exitcode != 0 or not isinstance(outcome, dict)
-                                or type(outcome.get('ok')) is not bool):
-                            outcome = {'ok': False, 'reason': 'worker_exited'}
-                        receiver.close(); process.close(); active.remove(entry)
-                        pause_until = deadline()
-                        if outcome['ok']:
-                            status = outcome.get('status')
-                            if status not in ('restored', 'already_present'):
-                                outcome = {'ok': False, 'reason': 'unexpected_repair_result'}
-                        if outcome['ok']:
-                            public = {'id': job['id'], 'status': status}
-                            state.finish(job['id'], 'done', public, 0, pause_until)
-                            counters[status] += 1
-                        else:
-                            reason = outcome.get('reason')
-                            if not isinstance(reason, str) or not re.fullmatch(r'[a-z0-9_]{1,80}', reason):
-                                reason = 'runtime_failure'
-                            skipped = reason in shared.SKIP_CODES
-                            public = {'id': job['id'], 'status': 'skipped' if skipped else 'retry', 'reason': reason}
-                            available_at = 0
-                            if reason in LOCAL_RETRY_CODES:
-                                # A file validation failure must not pause unrelated
-                                # jobs or the other media pool. Keep it retryable.
-                                available_at = clock()+LOCAL_RETRY_BACKOFF
-                            elif not skipped:
-                                paused = True
-                                pause_until = source_pause.deadline(max(pause_until, clock()+shared.NETWORK_BACKOFF))
-                                available_at = pause_until
-                            state.finish(job['id'], public['status'], public,
-                                         available_at, pause_until)
-                            counters[public['status']] += 1
-                        shared.append_event(root/'events.jsonl', public, clock())
-                        progress('paused_network' if paused else 'running', **({'not_before':pause_until} if paused else {}))
+                            ready = True
+                        dead = not process.is_alive()
+                        if not ready and not dead:
+                            continue
+                        valid = (isinstance(outcome, dict) and job is not None
+                                 and outcome.get('id') == job['id']
+                                 and type(outcome.get('ok')) is bool
+                                 and type(outcome.get('retire', False)) is bool)
+                        retire = dead or not valid or outcome.get('retire', False)
+                        if retire:
+                            # Never make a failed worker's claim available until
+                            # that worker and any subprocesses are fully stopped.
+                            if valid and outcome.get('retire'):
+                                process.join(.1)
+                            stop_children([entry]); children.remove(entry)
+                        if job is None:
+                            if outcome is not None:
+                                raise shared.BackfillError('worker_protocol_error')
+                            continue
+                        if not valid:
+                            outcome = {'ok': False, 'reason': 'worker_exited' if outcome is None else 'worker_protocol_error'}
+                        finish(job, outcome)
+                        entry['job'] = None
                     if paused:
                         pause_until = deadline()
                         if clock() >= pause_until:
@@ -227,7 +289,7 @@ def run_pool(plan, digest, state_dir, repair, config, *, workers=3, max_items=10
                             paused = False
                             progress('running')
                         else:
-                            if active:
+                            if busy():
                                 sleep(.05)
                             continue
                     # A pause from the other media pool also drains current jobs.
@@ -235,40 +297,50 @@ def run_pool(plan, digest, state_dir, repair, config, *, workers=3, max_items=10
                     if source_pause.deadline() > clock():
                         paused = True
                         continue
-                    if attempted < max_items and len(active) < workers and clock() >= pause_until:
+                    if attempted < max_items and busy() < workers and clock() >= pause_until:
                         job = state.next_job(clock())
                         if job is None:
-                            if not active:
+                            if not busy():
                                 break
                         else:
-                            receiver, sender = context.Pipe(duplex=False)
-                            process = context.Process(target=repair_child, args=(sender, receiver,
-                                [entry['receiver'] for entry in active], state, repair, config,
-                                root/'repair.jsonl', locks, json.loads(job['expected']), runtime_factory))
-                            try:
-                                process.start()
-                            except BaseException:
-                                receiver.close(); sender.close(); process.close()
-                                raise
-                            sender.close()
-                            active.append({'process': process, 'receiver': receiver, 'job': job})
+                            entry = next((item for item in children if item['job'] is None), None)
+                            if entry is None:
+                                connection, child_connection = context.Pipe()
+                                process = context.Process(target=repair_child, args=(child_connection, connection,
+                                    [item['connection'] for item in children], state, repair, config,
+                                    root/'repair.jsonl', locks, runtime_factory))
+                                try:
+                                    process.start()
+                                except BaseException:
+                                    connection.close(); child_connection.close(); process.close()
+                                    raise
+                                child_connection.close()
+                                entry = {'process': process, 'connection': connection, 'job': None}
+                                children.append(entry)
+                            entry['job'] = job
                             attempted += 1
+                            try:
+                                entry['connection'].send(json.loads(job['expected']))
+                            except (BrokenPipeError, EOFError, OSError):
+                                stop_children([entry]); children.remove(entry)
+                                finish(job, {'ok': False, 'reason': 'worker_exited'})
+                                continue
                             # Persist launch spacing, rather than spacing completions.
                             state.set_meta('global_not_before', max(pause_until, clock()+delay))
                             progress('running')
                             continue
-                    if active or attempted < max_items:
+                    if busy() or attempted < max_items:
                         # With a free slot the next useful event is the launch
                         # deadline. Still reap failures at least once a second.
-                        waiting_for_slot = len(active) >= workers or attempted >= max_items
-                        wait = .05 if active and waiting_for_slot else min(1, max(.05, pause_until-clock()))
+                        waiting_for_slot = busy() >= workers or attempted >= max_items
+                        wait = .05 if busy() and waiting_for_slot else min(1, max(.05, pause_until-clock()))
                         sleep(wait)
                 return progress('paused_network' if paused else 'session_complete',
                                 **({'not_before':deadline()} if paused else {}))
             finally:
                 # A second termination signal must not interrupt child cleanup.
                 signal.signal(signal.SIGTERM, signal.SIG_IGN)
-                stop_children(active)
+                stop_children(children)
                 if state is not None:
                     state.close()
     finally:

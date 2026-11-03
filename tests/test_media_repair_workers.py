@@ -11,6 +11,7 @@ import tempfile
 import time
 import types
 import unittest
+from unittest.mock import patch
 
 ROOT=Path(__file__).resolve().parents[1]
 spec=importlib.util.spec_from_file_location('media_workers',ROOT/'ops/run-media-repair-workers.py')
@@ -19,7 +20,11 @@ b=importlib.util.module_from_spec(spec);spec.loader.exec_module(b)
 class RepairError(RuntimeError):pass
 
 class Clock:
-    def __init__(self):self.now=1000.
+    def __init__(self):self.value=multiprocessing.Value('d',1000.)
+    @property
+    def now(self):return self.value.value
+    @now.setter
+    def now(self,value):self.value.value=value
     def __call__(self):return self.now
     def sleep(self,seconds):self.now+=seconds;time.sleep(.01)
 
@@ -32,6 +37,7 @@ class Runtime:
         fd=os.open(self.log,os.O_WRONLY|os.O_APPEND|os.O_CREAT,0o600)
         row={'event':event,'id':photo_id,'pid':os.getpid(),'at':time.monotonic()}
         if hasattr(self,'clock'):row['virtual']=self.clock()
+        if hasattr(self,'instance'):row['instance']=self.instance
         try:os.write(fd,(json.dumps(row)+'\n').encode())
         finally:os.close(fd)
     def run(self,row,apply=False):
@@ -74,6 +80,12 @@ class CooldownRuntime(Runtime):
         self.write('start',row['id'])
         release=self.log.with_name('release-slow-child')
         if row['id']=='a' or (row['id']=='c' and self.second_failure):
+            if row['id']=='a':
+                deadline=time.monotonic()+3
+                while not any(json.loads(line)['event']=='start' and json.loads(line)['id']=='b'
+                              for line in self.log.read_text().splitlines()):
+                    if time.monotonic()>=deadline:raise TimeoutError('test_second_child_not_started')
+                    time.sleep(.005)
             time.sleep(.03)
             raise RepairError('source_http_503')
         if row['id']=='b':
@@ -97,6 +109,45 @@ class EightRuntime(Runtime):
         self.write('finish',row['id'])
         return {'status':'restored'}
 
+class ReuseRuntime(Runtime):
+    def __init__(self,log,actions=None,fail_guard=False,fail_close=False):
+        super().__init__(log,actions);self.instance=time.monotonic_ns();self.last=''
+        self.fail_guard=fail_guard;self.fail_close=fail_close
+        self.write('init','')
+    def prepare_reuse(self):
+        self.write('prepare',self.last)
+        marker=self.log.with_name('guard-failed-once')
+        if self.fail_guard and not marker.exists():
+            marker.touch();raise RepairError('source_config_changed')
+    def run(self,row,apply=False):
+        assert apply is True
+        self.last=row['id'];self.write('start',self.last);time.sleep(.03)
+        action=self.actions.get(self.last)
+        if action:raise RepairError(action)
+        self.write('finish',self.last);return {'status':'restored'}
+    def close(self):
+        self.write('close',self.last)
+        if self.fail_close and self.last=='a':raise RuntimeError('close_failed')
+
+class NoReuseRuntime(ReuseRuntime):
+    prepare_reuse=None
+
+class MixedWaitingRuntime(ReuseRuntime):
+    def run(self,row,apply=False):
+        if row['id']=='a':return super().run(row,apply)
+        assert apply is True
+        self.last=row['id'];self.write('start',self.last);time.sleep(30)
+        return {'status':'restored'}
+
+def wrong_reply_child(connection,parent,inherited,state,*_):
+    parent.close()
+    for channel in inherited:channel.close()
+    state.close();os.setsid()
+    job=connection.recv()
+    connection.send({'id':'wrong-claim','ok':True,'status':'restored'})
+    try:time.sleep(30)
+    except KeyboardInterrupt:pass
+
 
 class WorkerTests(unittest.TestCase):
     def setUp(self):
@@ -108,6 +159,117 @@ class WorkerTests(unittest.TestCase):
                           max_items=4,delay=kw.pop('delay',2),clock=self.clock,sleep=self.clock.sleep,
                           runtime_factory=lambda *_:Runtime(self.root/'calls.jsonl',actions),**kw)
     def events(self):return [json.loads(x) for x in (self.root/'calls.jsonl').read_text().splitlines()]
+    def run_reused(self,*,runtime=ReuseRuntime,actions=None,fail_guard=False,fail_close=False,clock=None):
+        return b.run_pool(self.plan,'digest',self.root/'state',self.repair,'config',workers=1,
+                          max_items=4,delay=2,clock=clock or self.clock,sleep=(clock or self.clock).sleep,
+                          runtime_factory=lambda *_:runtime(self.root/'calls.jsonl',actions,fail_guard,fail_close))
+    def test_one_child_reuses_its_own_runtime_and_checks_the_guard_before_every_later_job(self):
+        result=self.run_reused()
+        self.assertEqual(result['jobs']['done'],4)
+        events=self.events();starts=[e for e in events if e['event']=='start']
+        self.assertEqual(len({e['pid'] for e in starts}),1)
+        self.assertNotIn(os.getpid(),{e['pid'] for e in events})
+        self.assertEqual(len({e['instance'] for e in starts}),1)
+        self.assertEqual([e['event'] for e in events].count('init'),1)
+        self.assertEqual([e['event'] for e in events].count('prepare'),3)
+        self.assertEqual([e['event'] for e in events].count('close'),1)
+        self.assertEqual([e['id'] for e in starts],list('abcd'))
+    def test_a_runtime_without_a_reuse_guard_is_recreated_for_every_job(self):
+        result=self.run_reused(runtime=NoReuseRuntime)
+        self.assertEqual(result['jobs']['done'],4)
+        events=self.events();starts=[e for e in events if e['event']=='start']
+        self.assertEqual(len({e['pid'] for e in starts}),1)
+        self.assertEqual(len({e['instance'] for e in starts}),4)
+        self.assertEqual([e['event'] for e in events].count('close'),4)
+        self.assertNotIn('prepare',[e['event'] for e in events])
+    def test_parallel_reuse_keeps_each_runtime_inside_its_own_child(self):
+        self.clock=FastClock()
+        result=b.run_pool(self.plan,'digest',self.root/'state',self.repair,'config',workers=2,
+                          max_items=4,delay=2,clock=self.clock,sleep=self.clock.sleep,
+                          runtime_factory=lambda *_:ReuseRuntime(self.root/'calls.jsonl'))
+        self.assertEqual(result['jobs']['done'],4)
+        events=self.events();created=[e for e in events if e['event']=='init']
+        self.assertEqual(len(created),2)
+        self.assertEqual(len({e['instance'] for e in created}),2)
+        for pid in {e['pid'] for e in created}:
+            self.assertNotEqual(pid,os.getpid())
+            self.assertEqual(len({e['instance'] for e in events if e['pid']==pid}),1)
+        self.assertEqual([e['event'] for e in events].count('prepare'),2)
+    def test_any_job_error_discards_the_runtime_before_the_next_job(self):
+        result=self.run_reused(actions={'a':'invalid_video'})
+        self.assertEqual((result['jobs']['done'],result['jobs']['retry']),(3,1))
+        events=self.events();starts={e['id']:e for e in events if e['event']=='start'}
+        self.assertEqual(starts['a']['pid'],starts['b']['pid'])
+        self.assertNotEqual(starts['a']['instance'],starts['b']['instance'])
+        self.assertEqual(starts['b']['instance'],starts['d']['instance'])
+        self.assertLess(next(e['at'] for e in events if e['event']=='close' and e['id']=='a'),starts['b']['at'])
+    def test_guard_failure_cannot_publish_the_claim_and_reopens_a_fresh_runtime(self):
+        result=self.run_reused(fail_guard=True)
+        self.assertEqual((result['phase'],result['attempted'],result['jobs']['done'],result['jobs']['retry']),
+                         ('paused_network',2,1,1))
+        self.assertEqual([e['id'] for e in self.events() if e['event']=='start'],['a'])
+        self.clock.now=result['not_before']+2
+        resumed=self.run_reused(fail_guard=True)
+        self.assertEqual(resumed['jobs']['done'],4)
+        self.assertEqual(sorted(e['id'] for e in self.events() if e['event']=='start'),list('abcd'))
+    def test_failed_runtime_cleanup_retires_the_process_without_reusing_it(self):
+        result=self.run_reused(actions={'a':'invalid_video'},fail_close=True)
+        self.assertEqual((result['phase'],result['jobs']['done'],result['jobs']['retry']),('session_complete',3,1))
+        starts={e['id']:e for e in self.events() if e['event']=='start'}
+        self.assertNotEqual(starts['a']['pid'],starts['b']['pid'])
+        with closing(sqlite3.connect(self.root/'state/checkpoint.sqlite3')) as db:
+            available_at,raw=db.execute("SELECT available_at,result FROM jobs WHERE id='a'").fetchone()
+        event=next(json.loads(line) for line in (self.root/'state/events.jsonl').read_text().splitlines()
+                   if json.loads(line).get('reason')=='invalid_video')
+        self.assertEqual(json.loads(raw)['reason'],'invalid_video')
+        self.assertEqual(available_at,event['at']+3600)
+    def test_partial_constructor_failure_reports_retry_and_retires_the_worker(self):
+        def fail_factory(*_):
+            ReuseRuntime(self.root/'calls.jsonl')
+            raise RepairError('source_http_503')
+        parent,child=multiprocessing.get_context('fork').Pipe()
+        process=multiprocessing.get_context('fork').Process(target=b.repair_child,
+            args=(child,parent,[],types.SimpleNamespace(close=lambda:None),self.repair,'config',
+                  self.root/'repair.jsonl',self.root,fail_factory))
+        process.start();child.close()
+        try:
+            parent.send({'id':'a'})
+            self.assertTrue(parent.poll(3))
+            outcome=parent.recv();process.join(3)
+            self.assertEqual(outcome,{'id':'a','ok':False,'reason':'source_http_503','retire':True})
+            self.assertFalse(process.is_alive())
+            self.assertEqual(process.exitcode,0)
+        finally:
+            if process.is_alive():process.kill();process.join()
+            parent.close();process.close()
+    def test_idle_child_death_does_not_create_a_retry_or_duplicate_a_claim(self):
+        sleep=self.clock.sleep;killed=[]
+        def wait(seconds):
+            path=self.root/'state/checkpoint.sqlite3'
+            if not killed and path.exists():
+                with closing(sqlite3.connect(path.as_uri()+'?mode=ro',uri=True)) as db:
+                    row=db.execute("SELECT state FROM jobs WHERE id='a'").fetchone()
+                if row and row[0]=='done':
+                    pid=next(e['pid'] for e in self.events() if e['event']=='start' and e['id']=='a')
+                    try:os.kill(pid,signal.SIGKILL)
+                    except ProcessLookupError:pass
+                    killed.append(pid);time.sleep(.03)
+            sleep(seconds)
+        result=b.run_pool(self.plan,'digest',self.root/'state',self.repair,'config',workers=1,
+                          max_items=4,delay=2,clock=self.clock,sleep=wait,
+                          runtime_factory=lambda *_:ReuseRuntime(self.root/'calls.jsonl'))
+        self.assertTrue(killed)
+        self.assertEqual((result['jobs']['done'],result['jobs']['retry']),(4,0))
+        starts=[e for e in self.events() if e['event']=='start']
+        self.assertEqual(len({e['pid'] for e in starts}),2)
+        self.assertEqual(sorted(e['id'] for e in starts),list('abcd'))
+    def test_a_reply_for_another_claim_is_rejected_before_checkpoint_completion(self):
+        with patch.object(b,'repair_child',wrong_reply_child):
+            result=self.run_reused()
+        self.assertEqual((result['phase'],result['jobs']['done'],result['jobs']['retry']),('paused_network',0,1))
+        with closing(sqlite3.connect(self.root/'state/checkpoint.sqlite3')) as db:
+            raw=db.execute("SELECT result FROM jobs WHERE id='a'").fetchone()[0]
+        self.assertEqual(json.loads(raw)['reason'],'worker_protocol_error')
     def test_larger_pool_keeps_filling_slots_past_100_while_a_long_job_is_active(self):
         plan={'version':1,'rows':[{'id':'a'}]+[{'id':f'p{i}'} for i in range(101)]}
         log=self.root/'tail-calls.jsonl'
@@ -300,6 +462,39 @@ class WorkerTests(unittest.TestCase):
             for child in children:
                 with self.assertRaises(ProcessLookupError):os.kill(child,0)
             with b.shared.file_lock(self.root/'signal-state'/'driver.lock'):pass
+        finally:
+            if process.is_alive():process.kill();process.join()
+            process.close()
+    def test_sigterm_reaps_both_an_idle_worker_and_an_active_worker(self):
+        log=self.root/'mixed-signal.jsonl';state_dir=self.root/'mixed-state';clock=FastClock()
+        plan={'version':1,'rows':[{'id':x} for x in 'ab']}
+        def coordinate():
+            try:
+                b.run_pool(plan,'mixed-digest',state_dir,self.repair,'config',workers=2,max_items=2,
+                           delay=2,clock=clock,sleep=clock.sleep,
+                           runtime_factory=lambda *_:MixedWaitingRuntime(log))
+            except KeyboardInterrupt:pass
+        process=multiprocessing.get_context('fork').Process(target=coordinate);process.start()
+        children=set()
+        try:
+            deadline=time.monotonic()+5
+            while time.monotonic()<deadline:
+                events=[json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
+                starts={e['id']:e for e in events if e['event']=='start'}
+                if set(starts)==set('ab') and any(e['event']=='finish' and e['id']=='a' for e in events):
+                    with closing(sqlite3.connect((state_dir/'checkpoint.sqlite3').as_uri()+'?mode=ro',uri=True)) as db:
+                        if db.execute("SELECT state FROM jobs WHERE id='a'").fetchone()==('done',):break
+                time.sleep(.005)
+            self.assertEqual(set(starts),set('ab'))
+            self.assertEqual({e['id'] for e in events if e['event']=='finish'},{'a'})
+            children={e['pid'] for e in events}
+            self.assertEqual(len(children),2)
+            for pid in children:os.kill(pid,0)
+            os.kill(process.pid,signal.SIGTERM);process.join(5)
+            self.assertFalse(process.is_alive());self.assertEqual(process.exitcode,0)
+            for pid in children:
+                with self.assertRaises(ProcessLookupError):os.kill(pid,0)
+            with b.shared.file_lock(state_dir/'driver.lock'):pass
         finally:
             if process.is_alive():process.kill();process.join()
             process.close()
