@@ -37,6 +37,14 @@ plus dix pages et sauvegarde la progression après chaque page réussie.
 
 ## Intégrité des nouveaux fichiers
 
+Les appels API conservent leur proxy. Pour les seuls fichiers HTTPS du CDN
+`cdn.leakgallery.com` sur le port 443, le téléchargement essaie d'abord une
+connexion directe, puis deux essais via le proxy en cas d'échec. Les redirections
+sont refusées et la réponse complète doit être un HTTP 200. Le fichier temporaire
+est limité à 2 Gio et validé avant remplacement atomique ; le contrôle de taille
+utilise un transfert demandé sans compression HTTP. Les délais sont des limites
+de connexion/lecture, sans garantir une durée totale pour un gros fichier.
+
 Les nouveaux imports passent désormais par une validation du fichier téléchargé
 (signature, flux reconnu par ffprobe et dimensions ; durée positive pour une
 vidéo, sans décodage intégral de chaque image). Le booléen source est interprété explicitement : la chaîne `"false"` ne

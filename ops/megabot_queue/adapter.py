@@ -14,7 +14,7 @@ from pathlib import Path
 import random
 import re
 import time
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 from . import integrity, notices
 
@@ -37,6 +37,62 @@ class Excluded(RuntimeError):
 
 class MediaExcluded(RuntimeError):
     """A recorded withdrawal excludes this media from new publication."""
+
+
+def direct_cdn_url(url):
+    """Only the measured file CDN is eligible; API routing stays unchanged."""
+    try:
+        parsed = urlsplit(url)
+        return (isinstance(url, str) and not any(c in url for c in '\r\n\t')
+                and parsed.scheme == 'https' and parsed.hostname == 'cdn.leakgallery.com'
+                and parsed.port in (None, 443) and parsed.username is None and parsed.password is None)
+    except (TypeError, ValueError):
+        return False
+
+
+def download_cdn(bot, url, destination, *, video=None):
+    """Try direct once, then the two historical proxy attempts, without redirects."""
+    destination = Path(destination)
+    temporary = destination.with_suffix(destination.suffix + '.part')
+    limit = 2 * 1024**3  # Same maximum as integrity.validate_file, enforced before disk writes.
+    # Empty values override Requests' environment AND session proxy defaults.
+    direct = dict.fromkeys(('http', 'https', 'all', 'https://cdn.leakgallery.com',
+                            'all://cdn.leakgallery.com'), '')
+    for attempt in range(3):
+        try:
+            proxies = direct if attempt == 0 else dict(bot.get_proxy() or {})
+            if attempt and ('https' in proxies or 'all' in proxies):
+                # A stale session host-specific proxy must not override get_proxy().
+                proxies.setdefault('https://cdn.leakgallery.com', proxies.get('https', proxies.get('all')))
+            with bot.session.get(url, timeout=(5, 30) if attempt == 0 else 60,
+                                 stream=True, proxies=proxies, allow_redirects=False,
+                                 headers={'Accept-Encoding': 'identity'}) as response:
+                if response.status_code != 200 or 'Content-Range' in response.headers:
+                    continue
+                length = response.headers.get('Content-Length')
+                if length is not None:
+                    if not re.fullmatch(r'[0-9]+', length) or not 0 < int(length) <= limit:
+                        continue
+                    length = int(length)
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                size = 0
+                with temporary.open('wb') as stream:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        size += len(chunk)
+                        if size > limit or (length is not None and size > length):
+                            raise integrity.InvalidMedia('invalid_downloaded_size')
+                        stream.write(chunk)
+                if size == 0 or (length is not None and size != length):
+                    raise integrity.InvalidMedia('incomplete_download')
+                integrity.validate_file(temporary, video=video)
+                temporary.replace(destination)
+                return True
+        except Exception:
+            # Legacy exceptions may contain signed URLs; retry without logging them.
+            pass
+        finally:
+            temporary.unlink(missing_ok=True)
+    return False
 
 
 def load_source(path):
@@ -239,11 +295,15 @@ def run_profile(handle, next_page=1, empty_streak=0, checkpoint=None, *,
             return self.detail_cache[media_id]
 
         def download(self, url, destination):
-            success = super().download(url, destination)
+            main = self.current_media is not None and Path(destination).stem == self.current_media[0]
+            cdn = direct_cdn_url(url)
+            success = (download_cdn(self, url, destination, video=self.current_media[1] if main else None)
+                       if cdn else super().download(url, destination))
             if success and self.current_media is not None:
                 sid, is_video = self.current_media
                 if Path(destination).stem == sid:
-                    integrity.validate_file(destination, video=is_video)
+                    if not cdn:  # CDN transfer already validated the .part before promotion.
+                        integrity.validate_file(destination, video=is_video)
                     if is_video:
                         integrity.make_poster(destination, Path(destination).with_name(sid + '_thumb.webp'))
             return success
