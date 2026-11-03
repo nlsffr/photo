@@ -34,6 +34,8 @@ def load_sibling(name, filename):
 
 
 shared = load_sibling('_media_worker_shared', 'backfill-missing-video-assets.py')
+LOCAL_RETRY_CODES = frozenset(('invalid_video', 'download_signature_rejected'))
+LOCAL_RETRY_BACKOFF = 3600
 MAX_POOL_ITEMS = 500
 
 
@@ -202,11 +204,17 @@ def run_pool(plan, digest, state_dir, repair, config, *, workers=3, max_items=10
                                 reason = 'runtime_failure'
                             skipped = reason in shared.SKIP_CODES
                             public = {'id': job['id'], 'status': 'skipped' if skipped else 'retry', 'reason': reason}
-                            if not skipped:
+                            available_at = 0
+                            if reason in LOCAL_RETRY_CODES:
+                                # A file validation failure must not pause unrelated
+                                # jobs or the other media pool. Keep it retryable.
+                                available_at = clock()+LOCAL_RETRY_BACKOFF
+                            elif not skipped:
                                 paused = True
                                 pause_until = source_pause.deadline(max(pause_until, clock()+shared.NETWORK_BACKOFF))
+                                available_at = pause_until
                             state.finish(job['id'], public['status'], public,
-                                         0 if skipped else pause_until, pause_until)
+                                         available_at, pause_until)
                             counters[public['status']] += 1
                         shared.append_event(root/'events.jsonl', public, clock())
                         progress('paused_network' if paused else 'running', **({'not_before':pause_until} if paused else {}))
