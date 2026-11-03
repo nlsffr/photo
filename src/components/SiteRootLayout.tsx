@@ -23,6 +23,9 @@ export function SiteRootLayout({
 }) {
   return (
     <html lang={locale} className="h-full antialiased">
+      <head>
+        <meta name="Trafficstars" content="89019" />
+      </head>
       <body className="min-h-full">
         <LocaleProvider locale={locale} dictionary={dictionary}>
           <SessionProvider>
