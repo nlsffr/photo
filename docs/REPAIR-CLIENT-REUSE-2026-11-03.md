@@ -1,8 +1,9 @@
 # Repair client reuse
 
 The initial concurrency experiment is recorded in
-`REPAIR-THROUGHPUT-2026-11-03.md`. Six workers remain the operational pilot; the
-eight-worker trial was reverted after increased transport timeouts.
+`REPAIR-THROUGHPUT-2026-11-03.md`. Its eight-worker trial was reverted after
+increased transport timeouts. The subsequent client-reuse release received a
+separate eight-worker pilot, described below.
 
 A subsequent read-only measurement over the existing proxy found a reusable
 HTTP connection: two successful source metadata responses, fifteen seconds
@@ -41,3 +42,38 @@ Before activation, 138 targeted tests passed locally: 86 repair/coordinator
 tests, 36 checkpoint/backfill tests and 16 local-cache tests. The worker subset
 includes 29 tests, independently reviewed, with process affinity, busy/idle
 shutdown, failure/reset and claim-protocol coverage.
+
+## Activation and measured pilot
+
+Both immutable repair copies were activated at 22:37:43 UTC on November 3.
+The video service loaded the client-reuse code with six workers at 22:38:55
+UTC. The website application was not rebuilt or restarted. Both Linux repair
+test suites and CI run 41732149793 passed.
+
+An independently reviewed, reversible service drop-in then changed only video
+concurrency from six to eight. The new process was confirmed at 22:50:33 UTC;
+the timer remained active. The base unit and all existing source, validation,
+withdrawal and retry settings were preserved. Twelve workers were not enabled:
+their maximum simultaneous staging demand would exceed the available space
+after reserving capacity for the website and existing workloads.
+
+The complete ten-minute window ending 23:00:54 UTC recorded **95 principal
+video files uploaded, 2,238,719,531 bytes, and one transport timeout**. Posters
+were counted separately. The two disjoint five-minute segments were:
+
+| Segment | Principal files | Bytes | Transport retries |
+| --- | ---: | ---: | ---: |
+| Earlier five minutes | 76 | 1,840,780,101 | 1 |
+| Later five minutes | 19 | 397,939,430 | 0 |
+
+The journal covered both segments in full. The home page, robots file and
+sitemap returned HTTP 200; the home probe took approximately 0.43 seconds.
+Approximately 3.8 GB of memory and 23.8 GB of staging space remained available.
+
+Eight workers were retained provisionally with the existing 30-minute monitor.
+The observed cadence remains uneven. Different cohorts contain different file
+sizes and source conditions, so these samples do not isolate a causal speedup
+or establish 1,000 repairs per hour. Longer covered windows must confirm the
+useful throughput and stability; the prior six-worker configuration remains
+available for rollback. Neither an empty task queue nor a successful service
+exit proves that the whole library is available.
