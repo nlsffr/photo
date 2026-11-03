@@ -35,3 +35,15 @@ The collector validates a bounded JSON schema and passes only aggregate fields a
 5. Verify anonymous markers, durable aggregate growth, private summary through VPS/Mac relay, served UI, readiness, unchanged process identities and existing consent behavior. Keep unavailable historical periods visible as such. Do not publish account metrics, raw logs or device credentials in this public repository.
 
 References: [NGINX log module](https://nginx.org/en/docs/http/ngx_http_log_module.html), [Docker json-file logging](https://docs.docker.com/engine/logging/drivers/json-file/), [Next.js prefetching](https://nextjs.org/docs/app/guides/prefetching), [CNIL audience-measurement conditions](https://www.cnil.fr/fr/cookies-solutions-pour-les-outils-de-mesure-daudience). This design is not a claim of certification by a regulator.
+
+## Verified publication
+
+The backend was published from `c5273e52261a6ef71914bd67dc3e8bb85dd35c70`, with capture starting 3 November 2026 at 00:45:16 UTC. The independent service is active/enabled; its report is root-owned 0600 in a 0700 state directory. The app, edge and database container identities/start times stayed unchanged, the queue stayed active, and public readiness returned 200. The only existing service restarted for the UI integration was the Maison measurement collector.
+
+Maison source `22c0876` was published to VPS, Mac relay and delivery copy. Private API and relay returned the aggregate report; served HTML/JS matched the committed files. A real 1194×834 browser showed the separate card updating, with the unmeasured previous day unavailable and the current day/rolling window explicitly partial. No camera stream or device command was used. The physical iPad was not observed; a full close/reopen loads the updated web assets.
+
+Verification: 16 reader tests, 68 real isolated Nginx cases (including identical behavior for absent/accepted/refused cookie headers), eight collector tests and nine UI tests. Operator guards and rollback were separately tested. Detailed account measurements and private receipts remain outside the public repository.
+
+The first activation was safely rolled back because the new maps preceded the existing generated `map_hash_bucket_size` setting. **Load the existing removed-media maps/settings before the anonymous-page include.** The corrected order passed the actual production-context configuration test before publication. The failed installation, zero-count state and its backups were archived, not deleted. A durable activation gap covers the brief interval between reader startup and logging reload; it cannot appear as complete coverage later.
+
+Rollback remains split: restore only the three guarded Maison files/restart its measurement collector, then restore the verified old Nginx bytes in place/reload and disable only the new counter. Preserve aggregate state, archives, media, existing services, credentials and certificates. Before a future reactivation after a disabled interval, account for that interval as a coverage gap rather than assuming continuous measurement.
