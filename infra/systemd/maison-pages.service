@@ -1,0 +1,28 @@
+[Unit]
+Description=Maison Studio - anonymous served-page response totals
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+UMask=0077
+StateDirectory=maison-pages
+StateDirectoryMode=0700
+ExecStart=/usr/bin/python3 -B /opt/maison-pages/current/ops/anonymous-pages.py --container photo-edge-1 --state-dir /var/lib/maison-pages
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=10
+CPUQuota=10%
+MemoryMax=128M
+TasksMax=32
+Nice=15
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadOnlyPaths=/var/lib/docker/containers
+ReadWritePaths=/var/lib/maison-pages
+RestrictAddressFamilies=AF_UNIX
