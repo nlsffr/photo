@@ -26,3 +26,6 @@ ProtectSystem=strict
 ReadOnlyPaths=/var/lib/docker/containers
 ReadWritePaths=/var/lib/maison-pages
 RestrictAddressFamilies=AF_UNIX
+
+[Install]
+WantedBy=multi-user.target
