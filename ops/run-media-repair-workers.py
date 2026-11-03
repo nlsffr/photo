@@ -36,6 +36,7 @@ def load_sibling(name, filename):
 shared = load_sibling('_media_worker_shared', 'backfill-missing-video-assets.py')
 LOCAL_RETRY_CODES = frozenset(('invalid_video', 'download_signature_rejected'))
 LOCAL_RETRY_BACKOFF = 3600
+MAX_WORKERS = 8
 MAX_POOL_ITEMS = 500
 
 
@@ -136,7 +137,7 @@ def stop_children(active):
 def run_pool(plan, digest, state_dir, repair, config, *, workers=3, max_items=100,
              delay=2, lock_dir=None, clock=time.time, sleep=time.sleep,
              runtime_factory=None, source_backoff=None, priority_ids=None):
-    if (type(workers) is not int or not 1 <= workers <= 4
+    if (type(workers) is not int or not 1 <= workers <= MAX_WORKERS
             or type(max_items) is not int or not 1 <= max_items <= MAX_POOL_ITEMS
             or not math.isfinite(delay) or delay < 2):
         raise shared.BackfillError('run_limits_invalid')
@@ -219,9 +220,16 @@ def run_pool(plan, digest, state_dir, repair, config, *, workers=3, max_items=10
                         shared.append_event(root/'events.jsonl', public, clock())
                         progress('paused_network' if paused else 'running', **({'not_before':pause_until} if paused else {}))
                     if paused:
-                        if active:
-                            sleep(.05)
-                        continue
+                        pause_until = deadline()
+                        if clock() >= pause_until:
+                            # Resume free slots after the full shared cooldown,
+                            # even while another child is still finishing.
+                            paused = False
+                            progress('running')
+                        else:
+                            if active:
+                                sleep(.05)
+                            continue
                     # A pause from the other media pool also drains current jobs.
                     pause_until = deadline()
                     if source_pause.deadline() > clock():

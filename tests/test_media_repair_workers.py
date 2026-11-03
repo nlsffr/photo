@@ -23,11 +23,16 @@ class Clock:
     def __call__(self):return self.now
     def sleep(self,seconds):self.now+=seconds;time.sleep(.01)
 
+class FastClock(Clock):
+    def sleep(self,seconds):self.now+=max(seconds,1.);time.sleep(.001)
+
 class Runtime:
     def __init__(self,log,actions=None):self.log=Path(log);self.actions=actions or {}
     def write(self,event,photo_id):
         fd=os.open(self.log,os.O_WRONLY|os.O_APPEND|os.O_CREAT,0o600)
-        try:os.write(fd,(json.dumps({'event':event,'id':photo_id,'pid':os.getpid(),'at':time.monotonic()})+'\n').encode())
+        row={'event':event,'id':photo_id,'pid':os.getpid(),'at':time.monotonic()}
+        if hasattr(self,'clock'):row['virtual']=self.clock()
+        try:os.write(fd,(json.dumps(row)+'\n').encode())
         finally:os.close(fd)
     def run(self,row,apply=False):
         assert apply is True
@@ -57,6 +62,38 @@ class TailRuntime(Runtime):
         else:
             if row['id']=='p100':marker.touch()
             time.sleep(.01)
+        self.write('finish',row['id'])
+        return {'status':'restored'}
+
+class CooldownRuntime(Runtime):
+    """Keep one child in flight until a later dispatch releases it."""
+    def __init__(self,log,clock,second_failure=False):
+        super().__init__(log);self.clock=clock;self.second_failure=second_failure
+    def run(self,row,apply=False):
+        assert apply is True
+        self.write('start',row['id'])
+        release=self.log.with_name('release-slow-child')
+        if row['id']=='a' or (row['id']=='c' and self.second_failure):
+            time.sleep(.03)
+            raise RepairError('source_http_503')
+        if row['id']=='b':
+            deadline=time.monotonic()+3
+            while not release.exists():
+                if time.monotonic()>=deadline:raise TimeoutError('test_dispatch_stalled')
+                time.sleep(.005)
+        elif row['id']==('d' if self.second_failure else 'c'):
+            release.touch()
+        self.write('finish',row['id'])
+        return {'status':'restored'}
+
+class EightRuntime(Runtime):
+    def run(self,row,apply=False):
+        assert apply is True
+        self.write('start',row['id'])
+        deadline=time.monotonic()+3
+        while sum(json.loads(line)['event']=='start' for line in self.log.read_text().splitlines())<8:
+            if time.monotonic()>=deadline:raise TimeoutError('test_pool_not_filled')
+            time.sleep(.005)
         self.write('finish',row['id'])
         return {'status':'restored'}
 
@@ -121,6 +158,54 @@ class WorkerTests(unittest.TestCase):
         self.assertEqual((r['phase'],r['jobs']['retry'],r['jobs']['done'],r['jobs']['pending']),('paused_network',1,1,2))
         self.assertEqual(len([e for e in self.events() if e['event']=='start']),2)
         deadline=r['not_before'];self.clock.now=deadline-1;self.assertEqual(self.run_plan()['phase'],'paused')
+    def cooldown_plan(self,*,second_failure=False,extend=False):
+        self.clock=FastClock();pause=self.root/'shared'/'source-pause.json';extension={}
+        sleep=self.clock.sleep
+        def wait(seconds):
+            sleep(seconds)
+            if extend and not extension and pause.exists():
+                first=json.loads(pause.read_text())['not_before']
+                if self.clock()>=first-5:
+                    extension['until']=b.SourceBackoff(pause).deadline(self.clock()+60)
+        result=b.run_pool(self.plan,'digest',self.root/'state',self.repair,'config',workers=2,
+                          max_items=4,delay=2,clock=self.clock,sleep=wait,source_backoff=pause,
+                          runtime_factory=lambda *_:CooldownRuntime(self.root/'calls.jsonl',self.clock,second_failure))
+        with closing(sqlite3.connect(self.root/'state/checkpoint.sqlite3')) as db:
+            deadlines=dict(db.execute("SELECT id,available_at FROM jobs WHERE state='retry'"))
+        return result,deadlines,extension
+    def test_expired_network_pause_refills_a_slot_before_a_slow_child_finishes(self):
+        result,deadlines,_=self.cooldown_plan()
+        self.assertEqual((result['phase'],result['attempted'],result['jobs']['done'],result['jobs']['retry']),
+                         ('session_complete',4,3,1))
+        events=self.events();start=next(e for e in events if e['event']=='start' and e['id']=='c')
+        finish=next(e for e in events if e['event']=='finish' and e['id']=='b')
+        self.assertGreaterEqual(start['virtual'],deadlines['a'])
+        self.assertLess(start['at'],finish['at'])
+    def test_another_pool_can_extend_the_cooldown_before_dispatch_resumes(self):
+        result,_,extension=self.cooldown_plan(extend=True)
+        self.assertEqual((result['jobs']['done'],result['jobs']['retry']),(3,1))
+        start=next(e for e in self.events() if e['event']=='start' and e['id']=='c')
+        self.assertGreaterEqual(start['virtual'],extension['until'])
+    def test_a_new_network_failure_after_resume_requires_another_full_cooldown(self):
+        result,deadlines,_=self.cooldown_plan(second_failure=True)
+        self.assertEqual((result['attempted'],result['jobs']['done'],result['jobs']['retry']),(4,2,2))
+        events=self.events();starts={e['id']:e for e in events if e['event']=='start'}
+        self.assertGreaterEqual(starts['c']['virtual'],deadlines['a'])
+        self.assertGreaterEqual(starts['d']['virtual'],deadlines['c'])
+        self.assertGreaterEqual(deadlines['c'],starts['c']['virtual']+60)
+        self.assertLess(starts['d']['at'],next(e['at'] for e in events if e['event']=='finish' and e['id']=='b'))
+    def test_eight_children_are_supported_without_exceeding_the_concurrency_cap(self):
+        self.clock=FastClock();plan={'version':1,'rows':[{'id':f'item{i}'} for i in range(24)]}
+        result=b.run_pool(plan,'eight-digest',self.root/'state',self.repair,'config',workers=8,
+                          max_items=24,delay=2,clock=self.clock,sleep=self.clock.sleep,
+                          runtime_factory=lambda *_:EightRuntime(self.root/'calls.jsonl'))
+        self.assertEqual((result['attempted'],result['jobs']['done']),(24,24))
+        active=set();peak=0
+        for event in self.events():
+            if event['event']=='start':active.add(event['pid']);peak=max(peak,len(active))
+            else:active.remove(event['pid'])
+        self.assertEqual(peak,8);self.assertFalse(active)
+        self.assertEqual(len([event for event in self.events() if event['event']=='start']),24)
     def test_content_validation_retries_are_delayed_without_stalling_either_pool(self):
         for reason in ('invalid_video','download_signature_rejected'):
             with self.subTest(reason=reason),tempfile.TemporaryDirectory() as folder:
@@ -189,7 +274,7 @@ class WorkerTests(unittest.TestCase):
             with self.assertRaisesRegex(b.shared.BackfillError,'already_running'):self.run_plan()
         self.assertFalse((self.root/'calls.jsonl').exists())
     def test_invalid_limits_fail_before_starting_children(self):
-        for count in [0,5,True]:
+        for count in [0,9,12,True,1.5]:
             with self.assertRaises(b.shared.BackfillError):self.run_plan(workers=count)
         with self.assertRaises(b.shared.BackfillError):self.run_plan(delay=float('nan'))
     def test_original_running_job_recovers_only_under_exclusive_coordinator(self):
