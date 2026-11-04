@@ -10,6 +10,7 @@ const sliderWrapper='https://go.gasipedibexide.com';
 const nativeApi='https://go.lanitesasexige.com';
 const impressionPixel='https://pxl-eu.tsyndicate.com';
 const nativeHls='https://edge-hls.saawsedge.com';
+const nativeHlsSegments='https://media-hls.saawsedge.com';
 const avatarImage='https://static-proxy.strpst.com';
 const sliderVideo='https://tsvideo.sacdnssedge.com';
 const has=(values:readonly string[],origin:string)=>values.includes(origin);
@@ -58,4 +59,18 @@ test('the observed slider MP4 CDN is permitted only for media in the main page',
 test('the live-origin correction does not grant wildcard or arbitrary HTTPS access in the main page',()=>{
   for(const values of Object.values(ADS_CSP))for(const source of values)assert.ok(/^https:\/\/[a-z0-9.-]+$/.test(source),source);
   for(const unrelated of ['http://go.gasipedibexide.com','https://go.gasipedibexide.com:8443','https://sub.go.gasipedibexide.com','https://unrelated.example'])assert.equal(has(ADS_CSP.connect,unrelated),false);
+});
+
+test('the variant origin from the successful HLS master is restricted to child connections',()=>{
+  const connect=buildAdsEmbedDocument('header','mobile').csp.split(';').find(value=>value.trim().startsWith('connect-src '));
+  assert.ok(connect?.split(' ').includes(nativeHlsSegments));
+  assert.equal(has(ADS_CSP.embedConnect,nativeHlsSegments),true);
+  for(const parent of [ADS_CSP.connect,ADS_CSP.script,ADS_CSP.image,ADS_CSP.media,ADS_CSP.frame])assert.equal(has(parent,nativeHlsSegments),false);
+});
+
+test('the HLS decoder may create a blob worker only inside the advertising child',()=>{
+  const directives=buildAdsEmbedDocument('header','desktop').csp.split(';').map(value=>value.trim());
+  assert.equal(directives.find(value=>value.startsWith('worker-src ')), 'worker-src blob:');
+  assert.equal(Object.hasOwn(ADS_CSP,'worker'),false);
+  assert.doesNotMatch(directives.find(value=>value.startsWith('script-src ')) ?? '', /blob:/);
 });

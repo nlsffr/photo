@@ -9,7 +9,7 @@ export const ADS_CSP = {
   style: ["https://cdn.fozekikikiminu.com", "https://cdn.tsyndicate.com"],
   connect: CONNECT_ORIGINS,
   // NativeAdPreview's API and observed HLS requests are child-document connections only.
-  embedConnect: [...CONNECT_ORIGINS, "https://go.lanitesasexige.com", "https://edge-hls.saawsedge.com"],
+  embedConnect: [...CONNECT_ORIGINS, "https://go.lanitesasexige.com", "https://edge-hls.saawsedge.com", "https://media-hls.saawsedge.com"],
   image: ["https://pxl.tsyndicate.com", "https://pxl-eu.tsyndicate.com", "https://pxl.fozekikikiminu.com", "https://m.fozekikikiminu.com", "https://tsyndicate.com", "https://static-ah.xhcdn.com", "https://go.gasipedibexide.com", "https://static-proxy.strpst.com"],
   media: ["https://cdn.tsyndicate.com", "https://static-ah.xhcdn.com", "https://tsvideo.sacdnssedge.com"],
   frame: ["https://tsyndicate.com", "https://jssdk.fozekikikiminu.com"],
