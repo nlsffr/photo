@@ -199,20 +199,33 @@ test('feed allocates the remaining column height to its block iframe without a v
  assert.deepEqual(frame.node.props.style,{width:'100%',height:0,minHeight:0});
 });
 
-test('intensive page slots reserve280px while their registered creative dimensions stay unchanged',async t=>{
- for(const placement of ['header','footer','underVideo'])await t.test(placement,sub=>{
+test('intensive lower page slots reserve280px while their registered creative dimensions stay unchanged',async t=>{
+ for(const placement of ['footer','underVideo'])await t.test(placement,sub=>{
   const ui=harness(sub,{placement,profile:'intensive'});const frame=ui.frame(),aside=all(ui.render()).find(n=>n.type==='aside')!;
   assert.equal((aside.props.style as {minHeight:number}).minHeight,280);assert.match(String(aside.props.className),/items-center/);
-  assert.deepEqual(frame.node.props.style,placement==='header'?{width:300,height:100}:{width:300,height:250});
+  assert.deepEqual(frame.node.props.style,{width:300,height:250});
  });
 });
 
 test('the intensive desktop header uses the bounded860px frame without changing its728x90 creative',t=>{
  const ui=harness(t,{placement:'header',profile:'intensive'});ui.frame();ui.media.matches=true;ui.media.dispatchEvent(new Event('change'));
- const aside=all(ui.render()).find(n=>n.type==='aside')!;assert.deepEqual(aside.props.style,{width:'100%',maxWidth:860,minHeight:280});assert.deepEqual(ui.frame().node.props.style,{width:728,height:90});
+ const aside=all(ui.render()).find(n=>n.type==='aside')!;assert.deepEqual(aside.props.style,{width:'100%',maxWidth:860});assert.deepEqual(ui.frame().node.props.style,{width:728,height:90});
 });
 
 test('page reserve never changes pause/grid or legacy banner wrappers',async t=>{
  await t.test('pause',sub=>{const ui=harness(sub,{placement:'underVideo',profile:'intensive',context:'pause'});ui.frame();assert.equal(all(ui.render()).find(n=>n.type==='aside')?.props.style,undefined);});
  for(const profile of ['current','balanced'])await t.test(profile,sub=>{const ui=harness(sub,{placement:'header',profile});ui.frame();assert.equal(all(ui.render()).find(n=>n.type==='aside')?.props.style,undefined);});
+});
+
+
+test('intensive mobile headers follow both owned100px and250px formats instead of an unrelated page reserve',async t=>{
+ for(const [pathname,height]of [['/fr',100],['/fr/example_creator',250]] as const)await t.test(pathname,sub=>{
+  const ui=harness(sub,{placement:'header',profile:'intensive',pathname}),frame=ui.frame(),aside=all(ui.render()).find(node=>node.type==='aside')!;
+  assert.equal((aside.props.style as {minHeight?:number}|undefined)?.minHeight,undefined);assert.deepEqual(frame.node.props.style,{width:300,height});
+ });
+});
+
+test('a confirmed empty header removes its label and wrapper without another provider',t=>{
+ const ui=harness(t,{placement:'header',profile:'intensive',pathname:'/fr'});ui.frame();
+ ui.message({type:'lfh-ad-status',placement:'header',status:'empty'});assert.equal(ui.render(),null);assert.equal(ui.empties(),1);
 });
