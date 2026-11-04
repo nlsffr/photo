@@ -30,7 +30,7 @@ import { mediaThumbnailUrl } from "@/lib/media-sources";
 import { localePath, localizedHref, type Locale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { mediaPageAlternates } from "@/lib/i18n/metadata";
-import { AdSlot } from "@/components/AdSlot";
+import { MediaDetailAd, RecommendationAdCard, RelatedMediaGrid } from "@/components/MediaDetailAds";
 import { DISCOVERY_COPY } from "@/features/i18n/discovery-copy";
 
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").replace(/\/$/, "");
@@ -271,7 +271,7 @@ export async function MediaDetailPage({
         </aside>
       </div>
 
-      {photo.type === "video" && photo.videoUrl && <AdSlot placement="underVideo" className="mt-6" />}
+      <MediaDetailAd videoEligible={photo.type === "video" && Boolean(photo.videoUrl)} />
       {related.length > 0 && (
         <section className="mt-10">
           <div className="mb-3 flex items-end justify-between gap-3">
@@ -280,11 +280,12 @@ export async function MediaDetailPage({
               {ui.viewProfile}
             </Link>
           </div>
-          <div className="media-grid">
-            {related.map((p) => (
-              <PhotoCard key={p.id} photo={p} replace />
-            ))}
-          </div>
+          <RelatedMediaGrid>
+            {related.flatMap((p, index) => [
+              <PhotoCard key={p.id} photo={p} replace />,
+              ...(index === 1 && related.length >= 3 ? [<RecommendationAdCard key={`${photo.id}-recommendation-ad`} />] : []),
+            ])}
+          </RelatedMediaGrid>
         </section>
       )}
     </div>

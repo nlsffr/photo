@@ -21,6 +21,7 @@ export const AD_PROFILE_INFO: ReadonlyArray<{key:AdProfile;title:string;summary:
     'Popunder : au plus 3 fenêtres par session de 5 minutes, espacées de 5 secondes.',
     'Vidéo en pause : image ExoClick fermable ; feed TrafficStars ou ExoClick selon la disponibilité du SDK, après 5 médias, puis tous les 4, avec une promotion Premium à la deuxième insertion.',
     'Profils et Plus aimés : aucun encart inséré dans la grille. Les partenaires privés et variantes non observables du concurrent ne sont pas reproduits.',
+    'Pages photo et vidéo : un encart après les commentaires et, à partir de 3 recommandations, un encart après les 2 premières.',
     'Interstitiel : 3 clics éligibles, fermeture après 5 secondes. Aucun clic forcé ni retour arrière bloqué.',
   ]},
 ];
