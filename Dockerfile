@@ -59,6 +59,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/scripts/analytics-country-*.mjs .
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/update-country-db.mjs ./scripts/update-country-db.mjs
 COPY --from=builder --chown=nextjs:nodejs /app/ops/backfill-source-engagement.mjs ./ops/backfill-source-engagement.mjs
 COPY --from=builder --chown=nextjs:nodejs /app/ops/prepare-seo-editor.mjs ./ops/prepare-seo-editor.mjs
+COPY --from=builder --chown=nextjs:nodejs /app/ops/prepare-admin-password-reset.mjs ./ops/prepare-admin-password-reset.mjs
 COPY --from=builder --chown=nextjs:nodejs /app/ops/ads-control.mjs ./ops/ads-control.mjs
 COPY --from=builder --chown=nextjs:nodejs /app/src/lib/ads-store-core.mjs /app/src/lib/ads-registry-data.mjs ./src/lib/
 
