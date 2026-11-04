@@ -77,3 +77,9 @@ test('a disposed old load callback cannot release the ownership of a newer pendi
  let probe=false,reentered=false;const second=ui.options();second.permitted=()=>{if(probe&&!reentered){reentered=true;ui.api.mountExoclickGlobalAd(ui.options());}return true;};
  ui.api.mountExoclickGlobalAd(second);probe=true;ui.load();await flush();assert.equal(ui.events.filter(v=>v==='start').length,2);assert.equal(ui.calls.length,1);assert.equal(ui.hosts().length,1);
 });
+
+test('the verified Sticky creative iframe origin is permitted only as a frame',()=>{
+ const {ADS_CSP}=loadAppModule<{ADS_CSP:Record<string,readonly string[]>}>('src/lib/ads-csp.ts');
+ assert.ok(ADS_CSP.frame.includes('https://go.marzaent.com'));
+ for(const key of ['script','connect','image','media'])assert.equal(ADS_CSP[key].includes('https://go.marzaent.com'),false);
+});

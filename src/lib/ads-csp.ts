@@ -14,5 +14,6 @@ export const ADS_CSP = {
   embedConnect: [...CONNECT_ORIGINS, "https://go.lanitesasexige.com", "https://edge-hls.saawsedge.com", "https://media-hls.saawsedge.com"],
   image: ["https://z6v2p9a8.bkcdn.net", "https://pxl.tsyndicate.com", "https://pxl-eu.tsyndicate.com", "https://pxl.fozekikikiminu.com", "https://m.fozekikikiminu.com", "https://tsyndicate.com", "https://static-ah.xhcdn.com", "https://go.gasipedibexide.com", "https://static-proxy.strpst.com"],
   media: ["https://cdn.tsyndicate.com", "https://static-ah.xhcdn.com", "https://tsvideo.sacdnssedge.com"],
-  frame: ["https://tsyndicate.com", "https://jssdk.fozekikikiminu.com"],
+  // Exact iframe origin returned by this account’s Sticky zone API (4 November 2026).
+  frame: ["https://go.marzaent.com", "https://tsyndicate.com", "https://jssdk.fozekikikiminu.com"],
 } as const;
