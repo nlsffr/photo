@@ -2,17 +2,20 @@
 import { isAdsRegistryReady } from './ads-registry-data.mjs';
 
 const KEYS = ['header','footer','underVideo','feed','popunder','interstitial','slider'];
+const PROFILES = ['current','balanced','intensive'];
 const MAX_REVISION = 4_294_967_294;
-const COLUMNS = 'enabled, placements, revision, updated_at';
+const COLUMNS = 'enabled, placements, revision, updated_at, profile';
 const exactKeys = (value, keys) => value && typeof value === 'object' && !Array.isArray(value)
   && Object.keys(value).sort().join(',') === [...keys].sort().join(',');
 const revisionValid = value => Number.isSafeInteger(value) && value >= 0 && value <= MAX_REVISION;
 
 export function validateAdsSave(value) {
-  if (!exactKeys(value,['revision','enabled','placements']) || !revisionValid(value.revision)
+  const withProfile = value && typeof value==='object' && Object.hasOwn(value,'profile');
+  if (!exactKeys(value,withProfile ? ['revision','enabled','placements','profile'] : ['revision','enabled','placements']) || !revisionValid(value.revision)
       || typeof value.enabled !== 'boolean' || !exactKeys(value.placements,KEYS)
-      || KEYS.some(key => typeof value.placements[key] !== 'boolean')) return null;
-  return {revision:value.revision, enabled:value.enabled, placements:{...value.placements}};
+      || KEYS.some(key => typeof value.placements[key] !== 'boolean')
+      || (withProfile && !PROFILES.includes(value.profile))) return null;
+  return {revision:value.revision, enabled:value.enabled, placements:{...value.placements},...(withProfile ? {profile:value.profile} : {})};
 }
 function fromRow(row) {
   if (!row || ![0,1].includes(row.enabled)) throw new Error('unavailable');
@@ -20,9 +23,11 @@ function fromRow(row) {
   try { placements = typeof row.placements === 'string' ? JSON.parse(row.placements) : row.placements; }
   catch { throw new Error('unavailable'); }
   const value = validateAdsSave({enabled:row.enabled===1, placements, revision:Number(row.revision)});
-  if (!value) throw new Error('unavailable');
+  // SQL requires the migrated column. The undefined case supports legacy fixtures only.
+  const profile = row.profile === undefined ? 'current' : row.profile;
+  if (!value || !PROFILES.includes(profile)) throw new Error('unavailable');
   const updatedAt = row.updated_at == null ? null : new Date(row.updated_at).toISOString();
-  return {...value,updatedAt};
+  return {...value,updatedAt,profile};
 }
 export async function readAdsConfig(db) {
   if (!db) throw new Error('unavailable');
@@ -45,25 +50,26 @@ async function update(db, input, actor, masterOnly, ready) {
     if (input.revision !== current.revision) {
       await connection.rollback(); open=false; return {ok:false,error:'conflict'};
     }
-    const next={revision:input.revision,enabled:input.enabled,placements:masterOnly ? current.placements : input.placements};
+    const next={revision:input.revision,enabled:input.enabled,placements:masterOnly ? current.placements : input.placements,
+      profile:masterOnly || !Object.hasOwn(input,'profile') ? current.profile : input.profile};
     if (next.enabled && !ready(next.placements)) {
       await connection.rollback(); open=false; return {ok:false,error:'not_ready'};
     }
-    if (next.enabled===current.enabled && KEYS.every(key=>next.placements[key]===current.placements[key])) {
+    if (next.enabled===current.enabled && next.profile===current.profile && KEYS.every(key=>next.placements[key]===current.placements[key])) {
       await connection.commit(); open=false; return {ok:true,config:current};
     }
     if (current.revision===MAX_REVISION) throw new Error('unavailable');
     const now=new Date();
-    const params={revision:current.revision,enabled:Number(next.enabled),placements:JSON.stringify(next.placements),actor,now};
-    const [result]=await connection.execute(`UPDATE ad_settings SET enabled=:enabled, placements=:placements,
+    const params={revision:current.revision,enabled:Number(next.enabled),placements:JSON.stringify(next.placements),profile:next.profile,actor,now};
+    const [result]=await connection.execute(`UPDATE ad_settings SET enabled=:enabled, placements=:placements, profile=:profile,
       revision=revision+1, updated_at=:now, updated_by=:actor WHERE id=1 AND revision=:revision`,params);
     if (result.affectedRows!==1) {
       await connection.rollback(); open=false; return {ok:false,error:'conflict'};
     }
     await connection.execute(`INSERT INTO ad_settings_history
-      (previous_revision,next_revision,previous_enabled,next_enabled,previous_placements,next_placements,actor_user_id,changed_at)
-      VALUES (:revision,:nextRevision,:previousEnabled,:enabled,:previousPlacements,:placements,:actor,:now)`,
-      {...params,nextRevision:current.revision+1,previousEnabled:Number(current.enabled),previousPlacements:JSON.stringify(current.placements)});
+      (previous_revision,next_revision,previous_enabled,next_enabled,previous_placements,next_placements,previous_profile,next_profile,actor_user_id,changed_at)
+      VALUES (:revision,:nextRevision,:previousEnabled,:enabled,:previousPlacements,:placements,:previousProfile,:profile,:actor,:now)`,
+      {...params,nextRevision:current.revision+1,previousEnabled:Number(current.enabled),previousPlacements:JSON.stringify(current.placements),previousProfile:current.profile});
     await connection.commit(); open=false;
     return {ok:true,config:{...next,placements:{...next.placements},revision:current.revision+1,updatedAt:now.toISOString()}};
   } catch (error) {

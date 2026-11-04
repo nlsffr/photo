@@ -1,6 +1,8 @@
-import { emptyAdPlacements, type AdConsent, type AdsConfig, type AdsRuntime, type AdsRuntimeReason } from './ads-contract';
+import { emptyAdPlacements, isAdProfile, type AdConsent, type AdsConfig, type AdsRuntime, type AdsRuntimeReason } from './ads-contract';
 export type AdsViewer = 'guest'|'member'|'premium'|'owner'|'unknown';
 export function evaluateAdsRuntime(config:AdsConfig,consent:AdConsent,viewer:AdsViewer):AdsRuntime {
+  const profile=config.profile===undefined ? 'current' : config.profile;
+  if(!isAdProfile(profile))throw new Error('invalid_ad_profile');
   let reason:AdsRuntimeReason = 'eligible';
   if (!config.enabled) reason='disabled';
   else if (viewer==='unknown') reason='unavailable';
@@ -10,5 +12,5 @@ export function evaluateAdsRuntime(config:AdsConfig,consent:AdConsent,viewer:Ads
   else if (!Object.values(config.placements).some(Boolean)) reason='disabled';
   const effectiveEnabled=reason==='eligible';
   return {enabled:config.enabled,effectiveEnabled,revision:config.revision,needsConsent:reason==='consent_required',
-    consent,placements:effectiveEnabled ? {...config.placements} : emptyAdPlacements(),reason};
+    consent,placements:effectiveEnabled ? {...config.placements} : emptyAdPlacements(),reason,profile};
 }

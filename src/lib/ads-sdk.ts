@@ -1,4 +1,4 @@
-import type { AdPlacement } from "./ads-contract";
+import type { AdPlacement,AdProfile } from "./ads-contract";
 import type { AdSpot } from "./ads-registry";
 import { isValidAdSpot } from "./ads-registry-data.mjs";
 import type { AdDevice } from "./ads-registry";
@@ -50,16 +50,16 @@ function loadScript(file: string, permitted: () => boolean): Promise<void> {
 
 /** Called only after current server eligibility, separate consent and age checks. */
 export function mountTrafficStarsAd(options: {
-  placement: AdPlacement; spot: AdSpot; container: HTMLElement;
+  placement: AdPlacement; profile?: AdProfile; spot: AdSpot; container: HTMLElement;
   permitted: () => boolean; onStart: () => void | boolean;
 }): () => void {
-  const { placement, spot, container, permitted, onStart } = options;
+  const { placement, profile = "current", spot, container, permitted, onStart } = options;
   if (!permitted() || !isValidAdSpot(spot)) return () => {};
   let disposed = false;
   const allowed = () => !disposed && container.isConnected && permitted();
   let removeClick: (() => void) | undefined;
   let script: HTMLScriptElement | undefined;
-  const subid = `lfh_${placement}_${matchMedia("(min-width: 1024px)").matches ? "desktop" : "mobile"}`;
+  const subid = `lfh_${profile === "current" ? "" : profile+"_"}${placement}_${matchMedia("(min-width: 1024px)").matches ? "desktop" : "mobile"}`;
   const appendSpotScript = () => {
     const url = spot.scriptUrl!;
     if (!allowed() || !validSdkUrl(url)) return;

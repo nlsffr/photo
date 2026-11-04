@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
 import { ADS_REGISTRY, isValidAdSpot } from "./ads-registry-data.mjs";
 import type { AdSpot } from "./ads-registry";
+import type { AdProfile } from "./ads-contract";
+// @ts-expect-error Native Node tests require explicit suffixes.
+import { isAdProfile } from "./ads-contract.ts";
 // @ts-expect-error Native Node tests require explicit suffixes.
 import { ADS_CSP } from "./ads-csp.ts";
 
@@ -11,11 +14,12 @@ type EmbedDevice = "desktop" | "mobile";
  * SAMEORIGIN + allow-same-origin is required by this SDK's unguarded storage access.
  * This separates layout/CSP, not publisher data from the trusted SDK.
  */
-export function buildAdsEmbedDocument(placement: EmbedPlacement, device: EmbedDevice) {
+export function buildAdsEmbedDocument(placement: EmbedPlacement, device: EmbedDevice, profile:AdProfile="current") {
   if (!["header", "footer", "underVideo", "feed"].includes(placement) || !["desktop", "mobile"].includes(device)) throw new Error("invalid_ad_embed");
+  if (!isAdProfile(profile)) throw new Error("invalid_ad_profile");
   const spot = ADS_REGISTRY[placement][device] as AdSpot;
   if (!isValidAdSpot(spot) || !["banner", "feed"].includes(spot.kind)) throw new Error("ad_embed_not_ready");
-  const data = JSON.stringify({ placement, device, kind:spot.kind, spotId:spot.spotId, domain:spot.domain,
+  const data = JSON.stringify({ placement, device, profile, kind:spot.kind, spotId:spot.spotId, domain:spot.domain,
     scriptUrl:spot.scriptUrl || `https://cdn.tsyndicate.com/sdk/v1/${spot.kind === "banner" ? "ms" : "video.shorts"}.js` }).replace(/</g, "\\u003c");
   const boot = `(()=>{
 const config=${data};
@@ -24,7 +28,7 @@ const accepted=()=>{try{const value=document.cookie.split(";").map(entry=>entry.
 if(!accepted()){tell("empty");return;}
 const root=document.getElementById("lfh-ad");
 const script=document.createElement("script");script.async=true;script.defer=true;script.src=config.scriptUrl;
-script.dataset.tsSpot=config.spotId;script.dataset.tsSubid="lfh_"+config.placement+"_"+config.device;
+script.dataset.tsSpot=config.spotId;script.dataset.tsSubid="lfh_"+(config.profile==="current"?"":config.profile+"_")+config.placement+"_"+config.device;
 script.dataset.tsAutoXu="false";
 if(config.domain)script.dataset.tsDomain=config.domain;
 script.onerror=()=>tell("empty");

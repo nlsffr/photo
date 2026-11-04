@@ -13,8 +13,9 @@ test('advertising is closed until every current eligibility check succeeds', () 
   assert.equal(canServeAds({runtime,ageConfirmed:true,consent:'accepted',sessionLoading:false,premiumReady:true,isPremium:false,pathname:'/fr/models',fresh:true}),true);
 });
 test('malformed or partial runtime never enables any placement', () => {
-  for (const value of [null,{}, {...runtime, placements:{}}, {...runtime,enabled:'true'}, {...runtime,revision:-1}]) assert.equal(parseAdsRuntime(value),null);
+  for (const value of [null,{}, {...runtime, placements:{}}, {...runtime,enabled:'true'}, {...runtime,revision:-1},{...runtime,profile:'unknown'},{...runtime,profile:null}]) assert.equal(parseAdsRuntime(value),null);
   assert.deepEqual(parseAdsRuntime(runtime),runtime);
+  for(const profile of ['current','balanced','intensive'])assert.equal(parseAdsRuntime({...runtime,profile})?.profile,profile);
 });
 test('functional and private routes cannot load advertising even under language prefixes', () => {
   for (const p of ['/admin/ads','/fr/premium','/connexion','/api/ads/runtime','/confidentialite','/contact/support','/dmca','/inscription','/add','/mentions-legales']) assert.equal(isAdPagePath(p),false,p);

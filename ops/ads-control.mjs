@@ -33,7 +33,10 @@ export async function runAdsControl(value,db,actor) {
   try {
     const result=command.action==='get' ? {ok:true,config:await readAdsConfig(db)}
       : await setAdsMaster(db,{revision:command.revision,enabled:command.enabled},actor);
-    return result.ok ? {...result,ready:isAdsRegistryReady(result.config.placements),missing:missingAdsPlacements(result.config.placements)} : result;
+    if (!result.ok) return result;
+    // Maison's existing bridge deliberately accepts exactly these four fields.
+    const {revision,enabled,placements,updatedAt}=result.config;
+    return {ok:true,config:{revision,enabled,placements,updatedAt},ready:isAdsRegistryReady(placements),missing:missingAdsPlacements(placements)};
   } catch { return {ok:false,error:'unavailable'}; }
 }
 async function main() {

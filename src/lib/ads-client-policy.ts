@@ -1,6 +1,6 @@
 import type { AdConsent, AdsRuntime } from "./ads-contract";
 // @ts-expect-error Native Node tests require explicit suffixes.
-import { AD_PLACEMENT_KEYS, AD_CONSENT_COOKIE, parseAdConsent } from "./ads-contract.ts";
+import { AD_PLACEMENT_KEYS, AD_CONSENT_COOKIE, parseAdConsent, isAdProfile } from "./ads-contract.ts";
 
 export function parseBrowserAdConsent(cookieHeader: string): AdConsent {
   const value = cookieHeader.split(";").map(part => part.trim()).find(part => part.startsWith(AD_CONSENT_COOKIE + "="))?.slice(AD_CONSENT_COOKIE.length + 1);
@@ -19,6 +19,7 @@ export function parseAdsRuntime(value: unknown): AdsRuntime | null {
   if (!value || typeof value !== "object") return null;
   const v = value as AdsRuntime;
   if (typeof v.enabled !== "boolean" || typeof v.effectiveEnabled !== "boolean"
+    || (v.profile !== undefined && !isAdProfile(v.profile))
     || typeof v.needsConsent !== "boolean" || !Number.isSafeInteger(v.revision) || v.revision < 0
     || ![null, "accepted", "refused"].includes(v.consent)
     || !["disabled", "consent_required", "consent_refused", "premium", "owner", "unavailable", "eligible"].includes(v.reason)
@@ -31,6 +32,7 @@ export function canServeAds(input: {
   sessionLoading: boolean; premiumReady: boolean; isPremium: boolean; pathname: string; fresh: boolean;
 }): boolean {
   return input.runtime?.enabled === true && input.runtime.effectiveEnabled === true
+    && (input.runtime.profile === undefined || isAdProfile(input.runtime.profile))
     && input.runtime.reason === "eligible" && input.runtime.consent === "accepted"
     && input.ageConfirmed === true && input.consent === "accepted" && !input.sessionLoading
     && input.premiumReady && !input.isPremium && input.fresh && isAdPagePath(input.pathname);

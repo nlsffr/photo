@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useId, useRef, useState } from "react";
 import type { AdPlacement } from "@/lib/ads-contract";
-import { ADS_REGISTRY, type AdDevice } from "@/lib/ads-registry";
+import type { AdDevice } from "@/lib/ads-registry";
+import { adSpotFor } from "@/lib/ads-profiles";
 import { mountTrafficStarsAd } from "@/lib/ads-sdk";
 import { adsCopy } from "@/lib/ads-copy";
 import { useAds } from "./AdsProvider";
@@ -12,7 +13,7 @@ import { usePremium } from "./Premium";
 import { DISCOVERY_COPY } from "@/features/i18n/discovery-copy";
 import { getPlan } from "@/lib/premium-plans";
 
-function NetworkAdSlot({ placement, className = "", onEmpty }: { placement: AdPlacement; className?: string; onEmpty?: () => void }) {
+function NetworkAdSlot({ placement, className = "", onEmpty, loading }: { placement: AdPlacement; className?: string; onEmpty?: () => void; loading?: "eager"|"lazy" }) {
   const ads = useAds();
   const { locale } = useLocale();
   const container = useRef<HTMLDivElement>(null);
@@ -26,9 +27,11 @@ function NetworkAdSlot({ placement, className = "", onEmpty }: { placement: AdPl
   const [device, setDevice] = useState<AdDevice | null>(null);
   const id = `lfh-ad-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const eligible = ads.canServe(placement);
-  const spot = device ? ADS_REGISTRY[placement][device] : null;
+  const profile = ads.runtime?.profile ?? "current";
+  const spot = device ? adSpotFor(profile, placement, device) : null;
   const global = ["popunder", "interstitial", "slider"].includes(placement);
   const frameSrc = device ? `/api/ads/embed?placement=${placement}&device=${device}` : undefined;
+  const frameKey = `${frameSrc}:${profile}:${ads.runtime?.revision ?? 0}`;
 
   useEffect(() => {
     const media = matchMedia("(min-width: 1024px)");
@@ -40,7 +43,7 @@ function NetworkAdSlot({ placement, className = "", onEmpty }: { placement: AdPl
     window.clearTimeout(frameTimer.current);
     frameTimer.current = undefined;
     return () => { window.clearTimeout(frameTimer.current); frameTimer.current = undefined; };
-  }, [frameSrc, eligible]);
+  }, [frameKey, eligible]);
   useEffect(() => {
     if (!eligible || global) return;
     const message = (event: MessageEvent) => {
@@ -51,24 +54,24 @@ function NetworkAdSlot({ placement, className = "", onEmpty }: { placement: AdPl
     };
     window.addEventListener("message", message);
     return () => { window.removeEventListener("message", message); window.clearTimeout(frameTimer.current); };
-  }, [eligible, global, placement, frameSrc]);
+  }, [eligible, global, placement, frameKey]);
   useEffect(() => {
     const element = container.current;
     if (!eligible || !element || !spot || !global) return;
     let remove: (() => void) | undefined;
     const mount = () => {
       if (remove) return;
-      remove = mountTrafficStarsAd({ placement, spot, container:element,
+      remove = mountTrafficStarsAd({ placement, profile, spot, container:element,
         permitted:() => currentAds.current.canServe(placement), onStart:() => currentAds.current.markSdkStarted(device!) });
     };
     mount(); return () => remove?.();
-  }, [eligible, spot, placement, global, device]);
+  }, [eligible, spot, placement, global, device, profile]);
 
   if (!eligible || !spot) return null;
   if (global) return <div ref={container} id={id} hidden data-ad-placement={placement} />;
   return <aside aria-label={adsCopy[locale].label} data-ad-placement={placement} className={`mx-auto max-w-full overflow-hidden ${className}`}>
     <p className="mb-1 text-center text-[10px] uppercase tracking-wide text-[var(--color-ink-faint)]">{adsCopy[locale].label}</p>
-    <iframe key={frameSrc} ref={frame} id={id} title={adsCopy[locale].label} loading={placement === "header" ? "eager" : "lazy"}
+    <iframe key={frameKey} ref={frame} id={id} title={adsCopy[locale].label} loading={loading ?? (placement === "header" ? "eager" : "lazy")}
       src={frameSrc}
       sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
       referrerPolicy="no-referrer" className="mx-auto max-w-full border-0"
@@ -138,6 +141,6 @@ function LegacyAdSlot({
   );
 }
 
-export function AdSlot(props: { placement: AdPlacement; className?: string; onEmpty?: () => void; variant?: never; hide?: never } | { placement?: never; className?: never; onEmpty?: never; variant?: "banner" | "interstitial"; hide?: boolean }) {
-  return props.placement ? <NetworkAdSlot placement={props.placement} className={props.className} onEmpty={props.onEmpty} /> : <LegacyAdSlot variant={props.variant} hide={props.hide} />;
+export function AdSlot(props: { placement: AdPlacement; className?: string; onEmpty?: () => void; loading?: "eager"|"lazy"; variant?: never; hide?: never } | { placement?: never; className?: never; onEmpty?: never; loading?: never; variant?: "banner" | "interstitial"; hide?: boolean }) {
+  return props.placement ? <NetworkAdSlot placement={props.placement} className={props.className} onEmpty={props.onEmpty} loading={props.loading} /> : <LegacyAdSlot variant={props.variant} hide={props.hide} />;
 }

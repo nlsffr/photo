@@ -73,3 +73,20 @@ test('all registered device variants are distinct and interstitial cookie units 
     assert.equal(value.countdown,5);assert.equal(value.countClicks,3);assert.equal(value.cookieExpires*3_600_000,300_000);
   }
 });
+
+test('profile pop caps and reporting labels reach the SDK without changing its cookie identity',async t=>{
+  const {ADS_REGISTRY}=await import('../src/lib/ads-registry-data.mjs');
+  const oldDocument=Object.getOwnPropertyDescriptor(globalThis,'document'),oldMedia=Object.getOwnPropertyDescriptor(globalThis,'matchMedia');
+  t.after(()=>{for(const [key,old] of [['document',oldDocument],['matchMedia',oldMedia]] as const){if(old)Object.defineProperty(globalThis,key,old);else Reflect.deleteProperty(globalThis,key);}});
+  Object.defineProperty(globalThis,'matchMedia',{configurable:true,value:()=>({matches:true})});
+  for(const [profile,count,delay] of [['balanced',2,30],['intensive',3,5]] as const){
+    const scripts:Array<{dataset:Record<string,string>}>=[];let click:(event:{isTrusted:boolean})=>void=()=>{};
+    Object.defineProperty(globalThis,'document',{configurable:true,value:{addEventListener:(_name:string,listener:typeof click)=>{click=listener;},removeEventListener:()=>{},createElement:()=>({dataset:{},remove:()=>{}})}});
+    const container={isConnected:true,appendChild:(script:typeof scripts[number])=>scripts.push(script),replaceChildren:()=>{}} as unknown as HTMLElement;
+    const cleanup=mountTrafficStarsAd({profile,placement:'popunder',spot:{...ADS_REGISTRY.popunder.desktop,count,delay} as never,container,permitted:()=>true,onStart:()=>true});
+    assert.equal(scripts.length,0);click({isTrusted:true});assert.equal(scripts.length,1);
+    assert.equal(scripts[0].dataset.tsCount,String(count));assert.equal(scripts[0].dataset.tsDelay,String(delay));
+    assert.equal(scripts[0].dataset.tsSubid,`lfh_${profile}_popunder_desktop`);
+    assert.equal(scripts[0].dataset.tsSpot,ADS_REGISTRY.popunder.desktop.spotId);cleanup();
+  }
+});

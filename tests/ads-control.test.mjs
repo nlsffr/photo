@@ -21,3 +21,20 @@ test('operator storage failures are sanitized and invalid commands do not read s
   assert.deepEqual(await runAdsControl({action:'get',extra:true},db),{ok:false,error:'invalid_request'});assert.equal(calls,0);
   assert.deepEqual(await runAdsControl({action:'get'},db),{ok:false,error:'unavailable'});
 });
+
+test('Maison CLI outputs exactly its four legacy configuration fields while preserving the stored profile',async()=>{
+  const placements={header:true,footer:true,underVideo:true,feed:true,popunder:true,interstitial:true,slider:true};
+  let row={enabled:0,placements:JSON.stringify(placements),revision:2,updated_at:null,profile:'intensive'};
+  const db={execute:async()=>[[{...row}]],getConnection:async()=>({beginTransaction:async()=>{},commit:async()=>{},rollback:async()=>{},release:()=>{},execute:async(sql,params)=>{
+    if(sql.startsWith('SELECT'))return [[{...row}]];
+    if(sql.startsWith('UPDATE')){row={...row,enabled:params.enabled,placements:params.placements,revision:row.revision+1,updated_at:params.now,profile:params.profile??row.profile};return [{affectedRows:1}];}
+    if(sql.startsWith('INSERT'))return [{affectedRows:1}];
+    throw new Error('unexpected SQL');
+  }})};
+  for(const command of [{action:'get'},{action:'set',enabled:true,revision:2}]){
+    const result=await runAdsControl(command,db,'owner');assert.equal(result.ok,true);
+    assert.deepEqual(Object.keys(result.config).sort(),['enabled','placements','revision','updatedAt']);
+    assert.equal(Object.hasOwn(result.config,'profile'),false);assert.equal(row.profile,'intensive');
+  }
+  assert.equal(validateCommand({action:'set',enabled:false,revision:3,profile:'current'}),null);
+});

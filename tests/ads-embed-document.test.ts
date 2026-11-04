@@ -20,6 +20,18 @@ test('unrecognized embed parameters cannot become HTML or SDK input',()=>{
   for(const [placement,device] of [['<script>','desktop'],['header','mobile<script>'],['popunder','desktop']]) {
     assert.throws(()=>buildAdsEmbedDocument(placement as never,device as never));
   }
+  assert.throws(()=>buildAdsEmbedDocument('header','mobile','injected<script>' as never));
+});
+
+test('embed profiles only add a public reporting category and keep the same publisher zones and consent guard',()=>{
+  for(const profile of ['current','balanced','intensive'] as const){
+    const result=buildAdsEmbedDocument('header','mobile',profile);
+    assert.match(result.html,new RegExp(`"profile":"${profile}"`));
+    assert.match(result.html,/ac23f7ff171648cf98eaede6374b9eb5/);
+    assert.match(result.html,/lfh_ad_consent=/);assert.doesNotMatch(result.html,/unsafe-inline[^;]*script|document\.cookie\s*=/);
+    const boot=result.html.match(/<script>([\s\S]*?)<\/script>/)![1];
+    assert.ok(result.csp.includes(`'sha256-${createHash('sha256').update(boot).digest('base64')}'`));
+  }
 });
 
 test('the HTTP bootstrap does not load a SDK after consent is absent or revoked',async()=>{

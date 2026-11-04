@@ -14,7 +14,7 @@ export async function GET(request:Request) {
   try {
     const config=await getAdsRuntime();
     if(!config.enabled || !config.effectiveEnabled || !config.placements[placement as 'header'|'footer'|'underVideo'|'feed']) return deny(403);
-    const document=buildAdsEmbedDocument(placement as 'header'|'footer'|'underVideo'|'feed',device as 'desktop'|'mobile');
+    const document=buildAdsEmbedDocument(placement as 'header'|'footer'|'underVideo'|'feed',device as 'desktop'|'mobile',config.profile);
     return new Response(document.html,{headers:{...headers,'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':document.csp}});
   } catch { return deny(503); }
 }

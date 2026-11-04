@@ -15,6 +15,7 @@ import type { Photo } from "../src/lib/types";
 
 test("VideoPlayer never sends a video URL to the browser's poster attribute", () => {
   const { VideoPlayer } = loadAppModule<{ VideoPlayer: ComponentType<{ src: string; poster?: string }> }>("src/components/VideoPlayer.tsx", {
+    "./VideoPauseAd": { VideoPauseAd: () => null },
     "./LocaleProvider": { useLocale: () => ({ locale: "en", dictionary: getDictionary("en") }) },
   });
   const invalid = renderToStaticMarkup(createElement(VideoPlayer, { src: "/clip.mp4", poster: "/clip.mp4" }));
@@ -26,6 +27,7 @@ test("VideoPlayer never sends a video URL to the browser's poster attribute", ()
 
 test("relative stored thumbnails resolve to one root asset in a localized player, JSON-LD and sitemap", () => {
   const { VideoPlayer } = loadAppModule<{ VideoPlayer: ComponentType<{ src: string; poster?: string }> }>("src/components/VideoPlayer.tsx", {
+    "./VideoPauseAd": { VideoPauseAd: () => null },
     "./LocaleProvider": { useLocale: () => ({ locale: "de", dictionary: getDictionary("de") }) },
   });
   const { toMediaSitemapEntry } = loadAppModule<{ toMediaSitemapEntry: (photo: Photo, site: string) => MediaSitemapEntry }>("src/lib/sitemap-route.ts", { "server-only": {} });
@@ -68,6 +70,7 @@ test("VideoPlayer controls and engagement labels use all seven active locales", 
   for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"] as const) {
     const dictionary = getDictionary(locale);
     const { VideoPlayer } = loadAppModule<{ VideoPlayer: ComponentType<{ src: string; title: string; views: number; likes: number }> }>("src/components/VideoPlayer.tsx", {
+      "./VideoPauseAd": { VideoPauseAd: () => null },
       "./LocaleProvider": { useLocale: () => ({ locale, dictionary }) },
     });
     const markup = renderToStaticMarkup(createElement(VideoPlayer, { src: "/clip.mp4", title: "Stored title", views: 12, likes: 3 }));

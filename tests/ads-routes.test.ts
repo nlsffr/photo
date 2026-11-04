@@ -4,7 +4,7 @@ import test from 'node:test';
 import { loadAppModule } from './helpers/load-app-module.ts';
 import { validateAdsSave } from '../src/lib/ads-store-core.mjs';
 type Route={GET():Promise<Response>;PUT(request:Request):Promise<Response>;POST(request:Request):Promise<Response>};
-const config={revision:0,enabled:false,updatedAt:null,placements:{header:true,footer:true,underVideo:true,feed:true,popunder:true,interstitial:true,slider:true}};
+const config={revision:0,enabled:false,updatedAt:null,profile:'current',placements:{header:true,footer:true,underVideo:true,feed:true,popunder:true,interstitial:true,slider:true}};
 const input={revision:0,enabled:false,placements:config.placements};
 function admin(user:{id:string}|null,allowed=true,error?:string,actualOwnerCheck=false) {
   const writes:unknown[]=[];
@@ -13,7 +13,7 @@ function admin(user:{id:string}|null,allowed=true,error?:string,actualOwnerCheck
   return {writes,route:loadAppModule<Route>('src/app/api/admin/ads/route.ts',{
     '@/lib/seo-editor-access':{...access,getSeoEditorSessionUser:async()=>user,isSeoEditorId:()=>allowed},
     '@/lib/ads-access':adsAccess,
-    '@/lib/ads-store':{validateAdsSave,getAdsConfig:async()=>config,putAdsConfig:async(...args:unknown[])=>{writes.push(args);return error?{ok:false,error}:{ok:true,config};}},
+    '@/lib/ads-store':{validateAdsSave,getAdsConfig:async()=>config,putAdsConfig:async(...args:unknown[])=>{writes.push(args);return error?{ok:false,error}:{ok:true,config:{...config,profile:(args[0] as {profile?:string}).profile??config.profile}};}},
     '@/lib/ads-registry-data.mjs':{isAdsRegistryReady:()=>true,missingAdsPlacements:()=>[]},
   })};
 }
@@ -31,6 +31,24 @@ test('ads administration denies anonymous/non-owner and blocks missing/foreign O
     assert.equal((await api.route.PUT(new Request('https://ads-fixture.example/api/admin/ads',{method:'PUT',body:'{}'}))).status,403);
     const cross=request();cross.headers.set('sec-fetch-site','cross-site');assert.equal((await api.route.PUT(cross)).status,403);
     assert.equal(api.writes.length,0);
+  } finally {if(previous===undefined)delete process.env.NEXT_PUBLIC_SITE_URL;else process.env.NEXT_PUBLIC_SITE_URL=previous;}
+});
+
+test('the private settings route accepts only known profiles and keeps legacy omission intact',async()=>{
+  const previous=process.env.NEXT_PUBLIC_SITE_URL;process.env.NEXT_PUBLIC_SITE_URL='https://ads-fixture.example';
+  try {
+    const api=admin({id:'owner'});
+    assert.equal((await (await api.route.GET()).json()).config.profile,'current');
+    for(const profile of ['current','balanced','intensive']){
+      const response=await api.route.PUT(request({...input,profile}));assert.equal(response.status,200);
+      assert.equal((await response.json()).config.profile,profile);
+      assert.equal((api.writes.at(-1) as [{profile:string}])[0].profile,profile);
+    }
+    const before=api.writes.length;
+    for(const profile of ['unknown','BALANCED','',null,0,{}])assert.equal((await api.route.PUT(request({...input,profile}))).status,400);
+    assert.equal(api.writes.length,before);
+    assert.equal((await api.route.PUT(request(input))).status,200);
+    assert.equal(Object.hasOwn((api.writes.at(-1) as [object])[0],'profile'),false);
   } finally {if(previous===undefined)delete process.env.NEXT_PUBLIC_SITE_URL;else process.env.NEXT_PUBLIC_SITE_URL=previous;}
 });
 test('advertising administration requires exactly one configured owner, never a widened SEO allowlist',async()=>{

@@ -101,15 +101,16 @@ test('an unavailable first runtime never turns its pending offer into implicit c
 
 function slot(t:TestContext,placement:'header'|'footer'|'feed'){
   const environment=browser(t),hooks=hookHarness();let allowed=true,empties=0;
+  let profile:'current'|'balanced'|'intensive'='current',revision=4;
   const {AdSlot}=loadAppModule<{AdSlot:(props:{placement:string;onEmpty:()=>void})=>React.ReactElement}>('src/components/AdSlot.tsx',{
-    react:hooks.hooks,'./AdsProvider':{useAds:()=>({canServe:()=>allowed})},'./LocaleProvider':{useLocale:()=>({locale:'en'})},
+    react:hooks.hooks,'./AdsProvider':{useAds:()=>({runtime:{profile,revision},canServe:()=>allowed})},'./LocaleProvider':{useLocale:()=>({locale:'en'})},
     '@/lib/ads-registry':{ADS_REGISTRY},'@/lib/ads-sdk':{mountTrafficStarsAd:()=>{throw new Error('Inline slots cannot run a parent SDK.');}},'next/navigation':{usePathname:()=>'/'}
   });
   const outer=AdSlot({placement,onEmpty:()=>{empties++;}}),Component=outer.type as (props:Record<string,unknown>)=>React.ReactElement|null;
   const render=()=>hooks.render(()=>Component(outer.props as Record<string,unknown>));
   const frame=()=>{render();const node=all(render(),value=>value.type==='iframe')[0];assert.ok(node);const ref=node.props.ref as {current:unknown};const element={contentWindow:{}};ref.current=element;return{node,element,load:()=> (node.props.onLoad as (event:unknown)=>void)({currentTarget:element})};};
   t.after(()=>{hooks.close();environment.restore();});
-  return{...environment,render,frame,empties:()=>empties,setAllowed:(value:boolean)=>{allowed=value;}};
+  return{...environment,render,frame,empties:()=>empties,setAllowed:(value:boolean)=>{allowed=value;},setPolicy:(value:typeof profile,next:number)=>{profile=value;revision=next;}};
 }
 
 test('the visible header is eager while the lower footer keeps lazy loading',t=>{
@@ -132,4 +133,12 @@ test('revoking eligibility cancels a pending frame timeout before remounting',t=
   const ui=slot(t,'feed');ui.frame().load();ui.setAllowed(false);assert.equal(ui.render(),null);
   ui.advance(10_000);assert.equal(ui.empties(),0);
   ui.setAllowed(true);ui.frame().load();ui.advance(10_000);assert.equal(ui.empties(),1);
+});
+
+test('a saved profile revision replaces the frame and rejects filled messages from the prior profile',t=>{
+  const ui=slot(t,'feed');const first=ui.frame();first.load();
+  const filled=new Event('message');Object.assign(filled,{origin:'https://example.test',source:first.element.contentWindow,data:{type:'lfh-ad-status',placement:'feed',status:'filled'}});
+  ui.window.dispatchEvent(filled);ui.setPolicy('intensive',5);const second=ui.frame();
+  assert.notEqual(second.node.key,first.node.key);ui.window.dispatchEvent(filled);second.load();
+  ui.advance(10_000);assert.equal(ui.empties(),1);
 });

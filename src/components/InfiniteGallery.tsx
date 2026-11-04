@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState, Fragment } from "react";
 import { PhotoCard } from "./PhotoCard";
 import { AdSlot } from "./AdSlot";
 import { useAds } from "./AdsProvider";
+import { isProfileGalleryAdPosition } from '@/lib/ads-profiles';
+import type { AdDevice } from '@/lib/ads-registry';
 import type { MediaType, PhotoPage, PhotoView, SortKey } from "@/lib/types";
 import { useLocale } from "./LocaleProvider";
 
@@ -20,9 +22,6 @@ interface Props {
   premium?: boolean;
 }
 
-const FIRST_AD_AFTER = 8;
-const AD_EVERY = 16;
-
 function GalleryAdInsertion() {
   const ads = useAds();
   if (!ads.canServe("underVideo")) return null;
@@ -35,6 +34,9 @@ function GalleryAdInsertion() {
 
 export function InfiniteGallery({ initial, params, premium = false }: Props) {
   const { t } = useLocale();
+  const ads = useAds();
+  const profile = ads.runtime?.profile ?? 'current';
+  const [device,setDevice] = useState<AdDevice>('desktop');
   const [items, setItems] = useState<PhotoView[]>(initial.items);
   const [cursor, setCursor] = useState<number | null>(initial.nextCursor);
   const [errored, setErrored] = useState(false);
@@ -46,6 +48,13 @@ export function InfiniteGallery({ initial, params, premium = false }: Props) {
   const cursorRef = useRef<number | null>(initial.nextCursor);
   const generationRef = useRef(0);
   const requestRef = useRef<AbortController | null>(null);
+
+  useEffect(()=>{
+    const media=matchMedia('(min-width: 1024px)');
+    const update=()=>setDevice(media.matches?'desktop':'mobile');
+    update();media.addEventListener('change',update);
+    return ()=>media.removeEventListener('change',update);
+  },[]);
 
   useEffect(() => {
     generationRef.current += 1;
@@ -163,17 +172,13 @@ export function InfiniteGallery({ initial, params, premium = false }: Props) {
 
   return (
     <>
-      {/*
-        Grille pure de médias. Les pubs sont en col-span-full
-        pour ne plus créer de "trous" dans les colonnes.
-      */}
       <div className="media-grid">
         {items.map((p, i) => (
           <Fragment key={p.id}>
             <div className="min-w-0">
               <PhotoCard photo={p} priority={i < 2} />
             </div>
-            {!premium && i + 1 >= FIRST_AD_AFTER && (i + 1 - FIRST_AD_AFTER) % AD_EVERY === 0
+            {!premium && isProfileGalleryAdPosition(i+1,profile,device)
               ? <GalleryAdInsertion /> : null}
           </Fragment>
         ))}

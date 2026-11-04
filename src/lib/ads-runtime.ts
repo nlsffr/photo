@@ -40,6 +40,6 @@ export async function getAdsRuntime():Promise<AdsRuntime> {
     const viewer=await getAdsViewer(jar.get(SESSION_COOKIE)?.value);
     return evaluateAdsRuntime(config,consent,isAdsRegistryReady(config.placements) ? viewer : 'unknown');
   } catch {
-    return {enabled:false,effectiveEnabled:false,revision:0,needsConsent:false,consent,placements:emptyAdPlacements(),reason:'unavailable'};
+    return {enabled:false,effectiveEnabled:false,revision:0,needsConsent:false,consent,placements:emptyAdPlacements(),reason:'unavailable',profile:'current'};
   }
 }

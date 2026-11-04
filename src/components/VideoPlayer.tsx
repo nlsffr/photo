@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { formatCount, formatDuration } from "@/lib/format";
 import { mediaThumbnailUrl } from "@/lib/media-sources";
 import { useLocale } from "./LocaleProvider";
+import { VideoPauseAd } from "./VideoPauseAd";
 
 interface Props {
   src: string;
@@ -238,6 +239,8 @@ function VideoPlayerSource({
         onClick={togglePlay}
         className="absolute inset-0 h-full w-full object-contain"
       />
+
+      <VideoPauseAd video={videoRef} shell={shellRef} blocked={error || buffering} />
 
       {error && (
         <div className="absolute inset-0 z-[8] flex flex-col items-center justify-center gap-3 bg-black/80 px-4 text-center">
