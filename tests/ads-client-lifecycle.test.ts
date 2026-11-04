@@ -191,3 +191,20 @@ test('a fresh runtime restarts an undecided probe after expiry even when backgro
   assert.equal(calls,2,'Freshness renewal must retry the unresolved branch without requiring an eligibility toggle.');
   finish();await flush();assert.equal(ui.render().canServe('feed'),true);
 });
+
+test('a pending TS feed remains mounted after the old ten-second watchdog, without claiming filled',t=>{
+ const ui=slot(t,'feed');const current=ui.frame();current.load();ui.advance(8_000);
+ const pending=new Event('message');Object.assign(pending,{origin:'https://example.test',source:current.element.contentWindow,data:{type:'lfh-ad-status',placement:'feed',status:'pending'}});ui.window.dispatchEvent(pending);
+ ui.advance(22_000);assert.equal(ui.empties(),0);current.load();ui.advance(10_000);assert.equal(ui.empties(),0);
+ const empty=new Event('message');Object.assign(empty,{origin:'https://example.test',source:current.element.contentWindow,data:{type:'lfh-ad-status',placement:'feed',status:'empty'}});ui.window.dispatchEvent(empty);assert.equal(ui.empties(),1);
+});
+test('pending from a different window cannot disarm the feed watchdog',t=>{
+ const ui=slot(t,'feed');const current=ui.frame();current.load();
+ const forged=new Event('message');Object.assign(forged,{origin:'https://example.test',source:{},data:{type:'lfh-ad-status',placement:'feed',status:'pending'}});ui.window.dispatchEvent(forged);
+ ui.advance(10_000);assert.equal(ui.empties(),1);
+});
+test('a different profile revision does not inherit the prior feed pending state',t=>{
+ const ui=slot(t,'feed');const old=ui.frame();old.load();
+ const pending=new Event('message');Object.assign(pending,{origin:'https://example.test',source:old.element.contentWindow,data:{type:'lfh-ad-status',placement:'feed',status:'pending'}});ui.window.dispatchEvent(pending);
+ ui.setPolicy('balanced',5);const next=ui.frame();ui.window.dispatchEvent(pending);next.load();ui.advance(10_000);assert.equal(ui.empties(),1);
+});

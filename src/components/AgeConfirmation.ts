@@ -1,31 +1,39 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 
 const KEY = "lumen_age_ok";
 const CHANGED = "lfh:age-confirmed";
+// Shared by every hook in this document, never persisted without a working store.
+// Only an explicit confirm() can set it; an event alone grants nothing.
+let confirmedWithoutStorage = false;
 
 function readConfirmation() {
-  try { return localStorage.getItem(KEY) === "1"; }
-  catch { return false; }
+  try { return localStorage.getItem(KEY) === "1" || confirmedWithoutStorage; }
+  catch { return confirmedWithoutStorage; }
 }
 
 function subscribe(update: () => void) {
-  window.addEventListener("storage", update);
+  const storageChanged = (event: StorageEvent) => {
+    if (event.key === KEY || event.key === null) confirmedWithoutStorage = false;
+    update();
+  };
+  window.addEventListener("storage", storageChanged);
   window.addEventListener(CHANGED, update);
   return () => {
-    window.removeEventListener("storage", update);
+    window.removeEventListener("storage", storageChanged);
     window.removeEventListener(CHANGED, update);
   };
 }
 
 export function useAgeConfirmation() {
   const stored = useSyncExternalStore<boolean | undefined>(subscribe, readConfirmation, () => undefined);
-  const [confirmedInSession, setConfirmedInSession] = useState(false);
   function confirm() {
-    try { localStorage.setItem(KEY, "1"); } catch { /* Keep the choice in this session when storage is unavailable. */ }
-    setConfirmedInSession(true);
+    try {
+      localStorage.setItem(KEY, "1");
+      confirmedWithoutStorage = localStorage.getItem(KEY) !== "1";
+    } catch { confirmedWithoutStorage = true; }
     window.dispatchEvent(new Event(CHANGED));
   }
-  return { confirmed: confirmedInSession || stored, confirm };
+  return { confirmed: stored, confirm };
 }

@@ -13,7 +13,8 @@ export const ADS_CSP = {
   // NativeAdPreview's API and observed HLS requests are child-document connections only.
   embedConnect: [...CONNECT_ORIGINS, "https://go.lanitesasexige.com", "https://edge-hls.saawsedge.com", "https://media-hls.saawsedge.com"],
   image: ["https://z6v2p9a8.bkcdn.net", "https://pxl.tsyndicate.com", "https://pxl-eu.tsyndicate.com", "https://pxl.fozekikikiminu.com", "https://m.fozekikikiminu.com", "https://tsyndicate.com", "https://static-ah.xhcdn.com", "https://go.gasipedibexide.com", "https://static-proxy.strpst.com"],
-  media: ["https://cdn.tsyndicate.com", "https://static-ah.xhcdn.com", "https://tsvideo.sacdnssedge.com"],
+  // Mobile slider video origin observed in both Chromium and WebKit on 4 November 2026.
+  media: ["https://video.sacdnssedge.com", "https://cdn.tsyndicate.com", "https://static-ah.xhcdn.com", "https://tsvideo.sacdnssedge.com"],
   // Exact iframe origin returned by this account’s Sticky zone API (4 November 2026).
   frame: ["https://go.marzaent.com", "https://tsyndicate.com", "https://jssdk.fozekikikiminu.com"],
 } as const;

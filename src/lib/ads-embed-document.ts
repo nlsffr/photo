@@ -34,12 +34,35 @@ const script=document.createElement("script");script.async=true;script.defer=tru
 script.dataset.tsSpot=config.spotId;script.dataset.tsSubid="lfh_"+(config.profile==="current"?"":config.profile+"_")+config.placement+"_"+config.device;
 script.dataset.tsAutoXu="false";
 if(config.domain)script.dataset.tsDomain=config.domain;
-script.onerror=()=>tell("empty");
-if(config.kind==="feed")script.onload=()=>{if(!accepted()||typeof window.TSVideoShorts!=="function"){tell("empty");return;}window.TSVideoShorts({spot:config.spotId,containerId:root.id,inFeed:true,subid:script.dataset.tsSubid,autoXu:false});};
+script.onerror=()=>finish("empty");
+if(config.kind==="feed")script.onload=()=>{if(done||!accepted()||typeof window.TSVideoShorts!=="function"){tell("empty");return;}window.TSVideoShorts({spot:config.spotId,containerId:root.id,inFeed:true,subid:script.dataset.tsSubid,autoXu:false});};
+let done=false,timer;const watched=new Set();
+const cleanup=()=>{done=true;clearTimeout(timer);observer.disconnect();watched.forEach(scope=>["load","error","loadeddata"].forEach(name=>scope.removeEventListener(name,check,true)));};
+const finish=status=>{if(!done){cleanup();tell(status);}};
+const watch=scope=>{if(!watched.has(scope)){watched.add(scope);observer.observe(scope,{childList:true,subtree:true,attributes:true,attributeFilter:["style","src","class"]});["load","error","loadeddata"].forEach(name=>scope.addEventListener(name,check,true));}};
+const scan=(scope,depth=0)=>{
+  watch(scope);let pending=false;
+  for(const element of scope.querySelectorAll("img,video,.mn-thumb__img,iframe,canvas")){
+    if(element.clientWidth<=1||element.clientHeight<=1)continue;
+    if(element.tagName==="IMG"){
+      if(element.complete&&element.naturalWidth>1&&element.naturalHeight>1)return {filled:true};
+      if(!element.complete&&element.getAttribute("src"))pending=true;
+    }else if(element.tagName==="VIDEO"){
+      if(element.readyState>=2)return {filled:true};
+      if(element.getAttribute("src")||element.querySelector?.("source"))pending=true;
+    }else if(element.tagName==="IFRAME"){
+      try{const child=element.contentDocument;if(child&&depth<4){const result=scan(child,depth+1);if(result.filled)return result;pending=pending||result.pending||Boolean(element.getAttribute("src"));}else if(element.getAttribute("src"))pending=true;}catch{pending=true;}
+    }else if(element.tagName==="CANVAS")pending=true;
+    // NativeAdPreview assigns this background only after its detached image has loaded.
+    else if(element.style.backgroundImage&&element.style.backgroundImage.startsWith("url("))return {filled:true};
+    else pending=true;
+  }
+  return {filled:false,pending};
+};
+const check=()=>{if(done)return;if(!accepted()){finish("empty");return;}if(scan(root).filled)finish("filled");};
+const observer=new MutationObserver(check);watch(root);window.addEventListener("pagehide",cleanup,{once:true});
 root.appendChild(script);
-let filled=false;const check=()=>{if(!filled&&root.querySelector("video,iframe,canvas")){filled=true;tell("filled");}};
-const observer=new MutationObserver(check);observer.observe(root,{childList:true,subtree:true});
-setTimeout(()=>{check();if(!filled)tell("empty");observer.disconnect();},8000);
+timer=setTimeout(()=>{check();if(done)return;tell("pending");timer=setTimeout(()=>{check();if(!done)finish(scan(root).pending?"pending":"empty");},22000);},8000);
 })();`;
   const hash = createHash("sha256").update(boot).digest("base64");
   const csp = ["default-src 'none'", "base-uri 'none'", "object-src 'none'", "frame-ancestors 'self'", "form-action 'none'",

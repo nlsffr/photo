@@ -29,6 +29,7 @@ function NetworkAdSlot({ placement, className = "", onEmpty, loading, context = 
   const frame = useRef<HTMLIFrameElement>(null);
   const frameTimer = useRef<number | undefined>(undefined);
   const frameFilled = useRef(false);
+  const framePending = useRef(false);
   const failedFrame = useRef<string | null>(null);
   const sendVisibility = useRef<((element: HTMLIFrameElement) => void) | undefined>(undefined);
   const currentAds = useRef(ads);
@@ -93,6 +94,7 @@ function NetworkAdSlot({ placement, className = "", onEmpty, loading, context = 
   }, [serving, gridSized, frameKey]);
   useEffect(() => {
     frameFilled.current = false;
+    framePending.current = false;
     window.clearTimeout(frameTimer.current);
     frameTimer.current = undefined;
     return () => { window.clearTimeout(frameTimer.current); frameTimer.current = undefined; };
@@ -105,6 +107,11 @@ function NetworkAdSlot({ placement, className = "", onEmpty, loading, context = 
         || (provider === "exoclick" && event.data.nonce !== nonce)) return;
       if (event.data.status === "filled" || (provider === "exoclick" && event.data.status === "loaded")) {
         frameFilled.current = true; window.clearTimeout(frameTimer.current);
+      }
+      if (provider === "trafficstars" && placement === "feed" && event.data.status === "pending") {
+        framePending.current = true;
+        window.clearTimeout(frameTimer.current);
+        frameTimer.current = undefined;
       }
       if (event.data.status === "empty") empty();
     };
@@ -165,7 +172,7 @@ function NetworkAdSlot({ placement, className = "", onEmpty, loading, context = 
         // or reduced-motion linear ad must not be discarded before a user plays it.
         if (provider !== "trafficstars" || placement !== "feed") return;
         window.clearTimeout(frameTimer.current);
-        if (!frameFilled.current) frameTimer.current = window.setTimeout(empty, 10_000);
+        if (!frameFilled.current && !framePending.current) frameTimer.current = window.setTimeout(empty, 10_000);
       }}
       style={gridSized ? { width:spot.width, height:spot.height, transform:`scale(${gridScale})` }
         : placement === "feed" ? { width:"100%", height:"85dvh", maxHeight:"100%" } : { width:spot.width, height:spot.height }} /> : null;

@@ -150,9 +150,12 @@ export function InfiniteGallery({ initial, params, premium = false }: Props) {
     }
   }, [buildUrl, setErrored]);
 
+  // observe() emits an initial entry; cursor changes must not resubscribe
+  // while the sentinel remains visible and start another page automatically.
+  const hasMore = cursor !== null;
   useEffect(() => {
     const el = sentinelRef.current;
-    if (!el || cursor === null) return;
+    if (!el || !hasMore) return;
     const obs = new IntersectionObserver(
       (entries) => {
         if (entries[0]?.isIntersecting && !errored) void loadMore();
@@ -161,7 +164,7 @@ export function InfiniteGallery({ initial, params, premium = false }: Props) {
     );
     obs.observe(el);
     return () => obs.disconnect();
-  }, [loadMore, cursor, errored]);
+  }, [loadMore, hasMore, errored]);
 
   if (items.length === 0) {
     return (
