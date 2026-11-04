@@ -8,12 +8,15 @@ import { AUDIENCE_COOKIE, CHOICE_MAX_AGE, cookieCopy, type Choice } from "@/lib/
 import { CHOICE_CHANGED, OPEN_CHOICES, useAudienceChoice } from "./AudienceChoice";
 import { useLocale } from "./LocaleProvider";
 import { useAgeConfirmation } from "./AgeConfirmation";
+import { useAds } from "./AdsProvider";
+import { AdsConsentChoice } from "./AdsConsentChoice";
 
 export function CookieBanner() {
   const { locale, t } = useLocale();
   const pathname = usePathname();
   const choice = useAudienceChoice();
   const { confirmed: ageConfirmed, confirm: confirmAge } = useAgeConfirmation();
+  const ads = useAds();
   const [opened, setOpened] = useState(false);
   const [showChoices, setShowChoices] = useState(false);
   const detailsButton = useRef<HTMLButtonElement>(null);
@@ -39,7 +42,8 @@ export function CookieBanner() {
   if (choice === undefined || ageConfirmed === undefined) return null;
   // The privacy explanation must remain readable before any entry or cookie choice.
   if (!opened && pathname.replace(/\/$/, "").endsWith("/confidentialite")) return null;
-  if (!opened && ageConfirmed && (choice !== null || dismissed)) return null;
+  if (!opened && ageConfirmed && (choice !== null || dismissed) && !ads.needsConsent) return null;
+  const adsOnly = ageConfirmed && !opened && ads.needsConsent && choice !== null;
 
   function close() {
     setOpened(false); setDismissed(true);
@@ -72,7 +76,7 @@ export function CookieBanner() {
         <BrandLogo href={localizedHref(locale, "/")} size="sm" />
       </div>
       {!ageConfirmed && <p className="mb-4 text-xs leading-relaxed text-[var(--color-ink-muted)]"><span className="mr-1 font-bold text-[var(--color-ink)]">18+</span> {t("shell.ageGate.body")}</p>}
-      {(choice === null || ageConfirmed || showChoices) && <div className="grid">
+      {!adsOnly && (choice === null || ageConfirmed || showChoices) && <div className="grid">
         {[false, true].map((settings) => (
           <p key={String(settings)} aria-hidden={settings !== showChoices} className={`col-start-1 row-start-1 text-sm leading-relaxed text-[var(--color-ink-muted)] ${settings !== showChoices ? "invisible" : ""}`}>
             {settings ? copy.settingsBody : copy.body}{" "}
@@ -80,7 +84,7 @@ export function CookieBanner() {
           </p>
         ))}
       </div>}
-      <div className="mt-5">
+      {!adsOnly && <div className="mt-5">
         {showChoices ? (
           <div className="grid grid-cols-2 gap-3">
             <button ref={declineButton} type="button" disabled={pending} onClick={() => choose("refused")} className="min-h-12 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 text-sm font-semibold text-[var(--color-ink)] transition-colors hover:border-[var(--color-accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] disabled:cursor-wait">{copy.refuse}</button>
@@ -100,7 +104,8 @@ export function CookieBanner() {
         }} className="mx-auto mt-1 flex min-h-11 items-center justify-center rounded-full px-4 text-[0.625rem] text-[var(--color-ink-muted)] underline underline-offset-4 hover:text-[var(--color-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] disabled:cursor-wait">
           {showChoices ? copy.back : copy.manage}
         </button>
-      </div>
+      </div>}
+      {ageConfirmed && (adsOnly || showChoices) && <AdsConsentChoice onSaved={close} />}
       {error && <p role="alert" className="text-sm text-[var(--color-ink)]">{copy.error}</p>}
     </div>
     </section>

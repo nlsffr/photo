@@ -9,6 +9,8 @@ import { LocaleProvider } from "@/components/LocaleProvider";
 import { NavProgress } from "@/components/NavProgress";
 import { PremiumProvider } from "@/components/Premium";
 import { SessionProvider } from "@/components/Session";
+import { AdsProvider } from "@/components/AdsProvider";
+import { AdsOverlays } from "@/components/AdSlot";
 import type { Locale } from "@/lib/i18n/config";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 
@@ -30,6 +32,7 @@ export function SiteRootLayout({
         <LocaleProvider locale={locale} dictionary={dictionary}>
           <SessionProvider>
             <PremiumProvider>
+              <AdsProvider>
               <AnonIdentityProvider>
                 <InteractionsProvider>
                   <Suspense fallback={null}>
@@ -43,8 +46,10 @@ export function SiteRootLayout({
                     </div>
                   </AppShell>
                   <CookieBanner />
+                  <AdsOverlays />
                 </InteractionsProvider>
               </AnonIdentityProvider>
+              </AdsProvider>
             </PremiumProvider>
           </SessionProvider>
         </LocaleProvider>

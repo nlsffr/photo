@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
+import { ADS_CSP } from "./src/lib/ads-csp";
 
 const projectRoot = dirname(fileURLToPath(import.meta.url));
 
@@ -13,12 +14,13 @@ const csp = [
   "form-action 'self'",
   "frame-ancestors 'none'",
   "object-src 'none'",
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
-  "style-src 'self' 'unsafe-inline'",
-  `img-src 'self' data: blob: https://${cdnHostname} https://*.leakgallery.com`,
-  `media-src 'self' blob: https://${cdnHostname} https://*.leakgallery.com`,
+  `script-src 'self' 'unsafe-inline' ${ADS_CSP.script.join(" ")}${isDev ? " 'unsafe-eval'" : ""}`,
+  `style-src 'self' 'unsafe-inline' ${ADS_CSP.style.join(" ")}`,
+  `img-src 'self' data: blob: https://${cdnHostname} https://*.leakgallery.com ${ADS_CSP.image.join(" ")}`,
+  `media-src 'self' blob: https://${cdnHostname} https://*.leakgallery.com ${ADS_CSP.media.join(" ")}`,
   "font-src 'self'",
-  `connect-src 'self'${isDev ? " ws: http:" : ""}`,
+  `connect-src 'self' ${ADS_CSP.connect.join(" ")}${isDev ? " ws: http:" : ""}`,
+  `frame-src 'self' ${ADS_CSP.frame.join(" ")}`,
   ...(isDev ? [] : ["upgrade-insecure-requests"]),
 ].join("; ");
 
@@ -43,6 +45,8 @@ const securityHeaders = [
         },
       ]),
 ];
+const documentPolicyHeaders = securityHeaders.filter(header => ["Content-Security-Policy", "X-Frame-Options"].includes(header.key));
+const commonSecurityHeaders = securityHeaders.filter(header => !["Content-Security-Policy", "X-Frame-Options"].includes(header.key));
 
 const staticCacheHeaders = [
   {
@@ -87,7 +91,10 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     return [
-      { source: "/:path*", headers: securityHeaders },
+      { source: "/:path*", headers: commonSecurityHeaders },
+      // This exact HTTP advertising document supplies its own hashed CSP and
+      // SAMEORIGIN policy. All other paths keep the restrictive document policy.
+      { source: "/:path((?!api/ads/embed/?$).*)", headers: documentPolicyHeaders },
       { source: "/_next/static/:path*", headers: staticCacheHeaders },
       { source: "/favicon.svg", headers: staticCacheHeaders },
       { source: "/icon", headers: mediaCacheHeaders },

@@ -30,6 +30,7 @@ import { mediaThumbnailUrl } from "@/lib/media-sources";
 import { localePath, localizedHref, type Locale } from "@/lib/i18n/config";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { mediaPageAlternates } from "@/lib/i18n/metadata";
+import { AdSlot } from "@/components/AdSlot";
 import { DISCOVERY_COPY } from "@/features/i18n/discovery-copy";
 
 const SITE = (process.env.NEXT_PUBLIC_SITE_URL || "https://leakfanhub.com").replace(/\/$/, "");
@@ -270,6 +271,7 @@ export async function MediaDetailPage({
         </aside>
       </div>
 
+      {photo.type === "video" && photo.videoUrl && <AdSlot placement="underVideo" className="mt-6" />}
       {related.length > 0 && (
         <section className="mt-10">
           <div className="mb-3 flex items-end justify-between gap-3">

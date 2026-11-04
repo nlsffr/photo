@@ -9,6 +9,7 @@ import { SearchBar } from "./SearchBar";
 import { AccountMenu } from "./AccountMenu";
 import { BrandLogo } from "./BrandLogo";
 import { LanguageSwitcher, useLocale } from "./LocaleProvider";
+import { AdSlot } from "./AdSlot";
 import {
   localizedHref,
   stripLocalePrefix,
@@ -303,7 +304,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </aside>
 
         <main className={`min-w-0 flex-1 ${isFeed ? "pb-0" : "pb-[calc(4.25rem+env(safe-area-inset-bottom))] lg:pb-8"}`}>
+          {!isFeed && <AdSlot placement="header" className="my-4 px-3" />}
           {children}
+          {!isFeed && <AdSlot placement="footer" className="my-4 px-3" />}
         </main>
       </div>
 

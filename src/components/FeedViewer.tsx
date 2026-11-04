@@ -1,7 +1,7 @@
 "use client";
 
 import { LocalizedLink as Link } from "./LocalizedLink";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import type { PhotoPage, PhotoView } from "@/lib/types";
 import { formatCount } from "@/lib/format";
 import { creatorHref } from "@/lib/types";
@@ -11,6 +11,9 @@ import { MediaImg } from "./MediaImg";
 import { useLocale } from "./LocaleProvider";
 import { DISCOVERY_COPY } from "@/features/i18n/discovery-copy";
 import { mediaThumbnailUrl } from "@/lib/media-sources";
+import { AdSlot } from "./AdSlot";
+import { useAds } from "./AdsProvider";
+import { isFeedAdPosition } from "@/lib/ads-client-policy";
 
 function RailButton({
   icon,
@@ -207,6 +210,14 @@ function FeedSlide({
   );
 }
 
+function FeedAdSlide({ after }: { after: number }) {
+  const [empty, setEmpty] = useState(false);
+  if (empty) return null;
+  return <div className="flex h-full w-full snap-start snap-always items-center justify-center bg-black" data-feed-ad-after={after}>
+    <AdSlot placement="feed" className="h-full w-full" onEmpty={() => setEmpty(true)} />
+  </div>;
+}
+
 export function FeedViewer({
   initial,
   preferVideo = true,
@@ -215,6 +226,7 @@ export function FeedViewer({
   preferVideo?: boolean;
 }) {
   const { dictionary } = useLocale();
+  const ads = useAds();
   const [muted, setMuted] = useState(true);
   const [items, setItems] = useState<PhotoView[]>(initial);
   const [active, setActive] = useState(0);
@@ -356,9 +368,12 @@ export function FeedViewer({
           const preload: "auto" | "metadata" | "none" =
             dist >= 0 && dist <= 3 ? "auto" : dist === -1 ? "metadata" : "none";
           return (
-            <div key={item.id} data-feed-idx={idx} className="h-full w-full">
-              <FeedSlide item={item} muted={muted} preload={preload} />
-            </div>
+            <Fragment key={item.id}>
+              <div data-feed-idx={idx} className="h-full w-full">
+                <FeedSlide item={item} muted={muted} preload={preload} />
+              </div>
+              {ads.canServe("feed") && isFeedAdPosition(idx, items.length) && <FeedAdSlide after={idx} />}
+            </Fragment>
           );
         })}
         {cursor !== null && (
