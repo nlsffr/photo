@@ -17,5 +17,6 @@ export const ADS_CSP = {
   media: ["https://video.sacdnssedge.com", "https://cdn.tsyndicate.com", "https://static-ah.xhcdn.com", "https://tsvideo.sacdnssedge.com"],
   // Exact iframe origin returned by this account’s Sticky zone API (4 November 2026).
   // Global TrafficStars iframe blocked by the main policy in the authorized mobile flow.
-  frame: ["https://go.gasipedibexide.com", "https://go.marzaent.com", "https://tsyndicate.com", "https://jssdk.fozekikikiminu.com"],
+  // Its Go wrapper's document 302 to this Creative origin was correlated live at 21:50 UTC.
+  frame: ["https://go.gasipedibexide.com", "https://creative.gasipedibexide.com", "https://go.marzaent.com", "https://tsyndicate.com", "https://jssdk.fozekikikiminu.com"],
 } as const;
