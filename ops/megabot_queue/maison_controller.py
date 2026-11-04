@@ -224,6 +224,10 @@ class Handler(socketserver.StreamRequestHandler):
             if len(raw)>512 or not raw.endswith(b'\n'):raise ControlError('invalid_request',400)
             request=json.loads(raw)
             if request=={'op':'status'}:reply=self.server.controller.status()
+            elif isinstance(request,dict) and set(request)=={'op','request'} and request['op']=='ads':
+                from ops.megabot_queue import ads_control
+                try:reply=ads_control.request(request['request'])
+                except ads_control.AdsControlError as error:raise ControlError(error.code,error.status) from None
             elif isinstance(request,dict) and set(request)=={'op','bot','action'} and request['op']=='action':reply=self.server.controller.action(request['bot'],request['action'])
             else:raise ControlError('invalid_request',400)
         except ControlError as e:reply={'ok':False,'error':e.code,'status':e.status}
