@@ -16,5 +16,6 @@ export const ADS_CSP = {
   // Mobile slider video origin observed in both Chromium and WebKit on 4 November 2026.
   media: ["https://video.sacdnssedge.com", "https://cdn.tsyndicate.com", "https://static-ah.xhcdn.com", "https://tsvideo.sacdnssedge.com"],
   // Exact iframe origin returned by this account’s Sticky zone API (4 November 2026).
-  frame: ["https://go.marzaent.com", "https://tsyndicate.com", "https://jssdk.fozekikikiminu.com"],
+  // Global TrafficStars iframe blocked by the main policy in the authorized mobile flow.
+  frame: ["https://go.gasipedibexide.com", "https://go.marzaent.com", "https://tsyndicate.com", "https://jssdk.fozekikikiminu.com"],
 } as const;

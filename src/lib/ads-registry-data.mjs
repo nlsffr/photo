@@ -166,9 +166,9 @@ export function isValidAdSpot(spot) {
   if (spot.kind === "banner") return Number.isInteger(spot.width) && spot.width > 0 && Number.isInteger(spot.height) && spot.height > 0;
   if (spot.kind === "feed") return spot.inFeed === true;
   if (spot.kind === "popunder") return positive(spot.sessionDuration) && Number.isInteger(spot.count) && spot.count > 0
-    && positive(spot.firstDelay) && positive(spot.delay) && spot.mode === "selective" && ["all","desktop","mobile"].includes(spot.devices);
+    && Number.isInteger(spot.firstDelay) && spot.firstDelay >= 0 && positive(spot.delay) && (spot.mode === undefined || spot.mode === "selective") && ["all","desktop","mobile"].includes(spot.devices);
   if (spot.kind === "interstitial") {
-    if (!positive(spot.countdown) || !Number.isInteger(spot.countClicks) || spot.countClicks < 1 || !positive(spot.cookieExpires)) return false;
+    if (!positive(spot.countdown) || !Number.isInteger(spot.countClicks) || spot.countClicks < 0 || !positive(spot.cookieExpires)) return false;
     try { const style = new URL(spot.styleUrl); return style.protocol === "https:" && SDK_HOSTS.has(style.hostname)
       && !style.port && !style.search && !style.hash && !style.username && !style.password
       && ["/sdk/v1/interstitial.ts.css","/sdk/v1/dd.interstitial.ts.css"].includes(style.pathname); } catch { return false; }

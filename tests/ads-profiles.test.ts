@@ -40,11 +40,11 @@ test('only intensive creator mobile headers reuse the publisher owned 300x250 fo
   assert.equal(adSpotFor('intensive','header','desktop',creator),ADS_REGISTRY.header.desktop);
   assert.equal(adSpotFor('intensive','footer','desktop',creator),ADS_REGISTRY.footer.desktop);
 });
-test('pop frequency increases in supported seconds without changing the session or selective mode',()=>{
+test('pop frequency increases in supported seconds and only intensive uses native zero initial delay',()=>{
   for(const [profile,count,delay] of [['current',1,60],['balanced',2,30],['intensive',3,5]] as const) {
     const spot=adSpotFor(profile,'popunder','mobile');
     assert.equal(spot.sessionDuration,300);assert.equal(spot.count,count);assert.equal(spot.delay,delay);
-    assert.equal(spot.firstDelay,5);assert.equal(spot.mode,'selective');
+    assert.equal(spot.firstDelay,profile==='intensive'?0:5);assert.equal(spot.mode,profile==='intensive'?undefined:'selective');
     assert.equal(adSpotFor(profile,'interstitial','desktop').countdown,5);
     assert.equal(adSpotFor(profile,'interstitial','desktop').cookieExpires,5/60);
     assert.equal(adSpotFor(profile,'slider','mobile').closeButtonDelay,0);
@@ -79,5 +79,34 @@ test('intensive native-style positions apply only to home and trending, with no 
     for(const profile of ['current','balanced'] as const)for(let count=1;count<=80;count++){
       assert.equal(isProfileGalleryAdPosition(count,profile,'mobile',page),isProfileGalleryAdPosition(count,profile,'mobile'));
     }
+  }
+});
+
+test('only intensive disables the native interstitial click counter while retaining the five-minute cap and five-second close',()=>{
+  for(const device of ['desktop','mobile'] as const){
+    for(const profile of ['current','balanced','intensive'] as const){
+      const spot=adSpotFor(profile,'interstitial',device);
+      assert.equal(spot.countClicks,profile==='intensive'?0:3);
+      assert.equal(spot.countdown,5);assert.equal(spot.cookieExpires,5/60);
+      assert.equal(spot.spotId,ADS_REGISTRY.interstitial[device].spotId);
+      assert.equal(spot.scriptUrl,ADS_REGISTRY.interstitial[device].scriptUrl);
+    }
+  }
+});
+
+test('the registry accepts the native zero-click mode, without accepting negative or fractional counters',()=>{
+  for(const device of ['desktop','mobile'] as const){
+    const spot=ADS_REGISTRY.interstitial[device];assert.equal(isValidAdSpot({...spot,countClicks:0}),true);
+    for(const countClicks of [-1,.5,NaN,Infinity,'0',null])assert.equal(isValidAdSpot({...spot,countClicks}),false,String(countClicks));
+  }
+});
+
+test('native pop defaults accept only an omitted or selective mode and a nonnegative integer first delay',()=>{
+  for(const device of ['desktop','mobile'] as const){
+    const spot=ADS_REGISTRY.popunder[device];
+    assert.equal(isValidAdSpot({...spot,firstDelay:0,mode:undefined}),true);
+    assert.equal(isValidAdSpot({...spot,firstDelay:0,mode:'selective'}),true);
+    for(const mode of [null,'all','aggressive',false,0])assert.equal(isValidAdSpot({...spot,mode}),false,String(mode));
+    for(const firstDelay of [-1,.5,NaN,Infinity,'0',undefined,null])assert.equal(isValidAdSpot({...spot,firstDelay}),false,String(firstDelay));
   }
 });

@@ -84,9 +84,47 @@ test('profile pop caps and reporting labels reach the SDK without changing its c
     Object.defineProperty(globalThis,'document',{configurable:true,value:{addEventListener:(_name:string,listener:typeof click)=>{click=listener;},removeEventListener:()=>{},createElement:()=>({dataset:{},remove:()=>{}})}});
     const container={isConnected:true,appendChild:(script:typeof scripts[number])=>scripts.push(script),replaceChildren:()=>{}} as unknown as HTMLElement;
     const cleanup=mountTrafficStarsAd({profile,placement:'popunder',spot:{...ADS_REGISTRY.popunder.desktop,count,delay} as never,container,permitted:()=>true,onStart:()=>true});
-    assert.equal(scripts.length,0);click({isTrusted:true});assert.equal(scripts.length,1);
+    assert.equal(scripts.length,profile==='intensive'?1:0);click({isTrusted:true});assert.equal(scripts.length,1);
     assert.equal(scripts[0].dataset.tsCount,String(count));assert.equal(scripts[0].dataset.tsDelay,String(delay));
     assert.equal(scripts[0].dataset.tsSubid,`lfh_${profile}_popunder_desktop`);
     assert.equal(scripts[0].dataset.tsSpot,ADS_REGISTRY.popunder.desktop.spotId);cleanup();
   }
+});
+
+test('intensive popunder arms on current eligibility, without a synthetic click or a new cookie or cap',async t=>{
+  const {ADS_REGISTRY}=await import('../src/lib/ads-registry-data.mjs');
+  const oldDocument=Object.getOwnPropertyDescriptor(globalThis,'document'),oldMedia=Object.getOwnPropertyDescriptor(globalThis,'matchMedia');
+  t.after(()=>{for(const [key,old] of [['document',oldDocument],['matchMedia',oldMedia]] as const){if(old)Object.defineProperty(globalThis,key,old);else Reflect.deleteProperty(globalThis,key);}});
+  let wrapperListeners=0,starts=0;const scripts:Array<{dataset:Record<string,string>}>=[];
+  Object.defineProperty(globalThis,'document',{configurable:true,value:{addEventListener:()=>{wrapperListeners++;},removeEventListener:()=>{},createElement:()=>({dataset:{},remove:()=>{}})}});
+  Object.defineProperty(globalThis,'matchMedia',{configurable:true,value:()=>({matches:false})});
+  const container={isConnected:true,appendChild:(script:typeof scripts[number])=>scripts.push(script),replaceChildren:()=>{}} as unknown as HTMLElement;
+  const spot={...ADS_REGISTRY.popunder.mobile,count:3,delay:5,firstDelay:0,mode:undefined};
+  const cleanup=mountTrafficStarsAd({profile:'intensive',placement:'popunder',spot:spot as never,container,permitted:()=>true,onStart:()=>{starts++;return true;}});
+  assert.equal(scripts.length,1);assert.equal(wrapperListeners,0);assert.equal(starts,1);
+  assert.equal(scripts[0].dataset.tsCount,'3');assert.equal(scripts[0].dataset.tsSessionDuration,'300');assert.equal(scripts[0].dataset.tsDelay,'5');
+  assert.equal(scripts[0].dataset.tsFirstDelay,'0');assert.equal(scripts[0].dataset.tsMode,undefined);assert.equal(scripts[0].dataset.tsDevices,'mobile');
+  assert.equal(scripts[0].dataset.tsSpot,ADS_REGISTRY.popunder.mobile.spotId);assert.equal(scripts[0].dataset.tsCookieName,undefined);
+  cleanup();
+  const before=scripts.length;
+  for(const permitted of [()=>false,()=>true])mountTrafficStarsAd({profile:'intensive',placement:'popunder',spot:spot as never,container,permitted,onStart:()=>false})();
+  assert.equal(scripts.length,before);
+});
+
+test('the intensive native interstitial receives zero clicks with the unchanged close timer and cookie identity',async t=>{
+  // @ts-expect-error Native Node requires explicit suffixes.
+  const {loadAppModule}=await import('./helpers/load-app-module.ts');
+  const {adSpotFor}=loadAppModule<{adSpotFor:(profile:string,placement:string,device:string)=>Record<string,unknown>}>('src/lib/ads-profiles.ts');
+  const before={document:Object.getOwnPropertyDescriptor(globalThis,'document'),window:Object.getOwnPropertyDescriptor(globalThis,'window'),matchMedia:Object.getOwnPropertyDescriptor(globalThis,'matchMedia')};
+  t.after(()=>{for(const [key,old] of Object.entries(before)){if(old)Object.defineProperty(globalThis,key,old);else Reflect.deleteProperty(globalThis,key);}});
+  const scripts:Array<{dataset:Record<string,string>;onload?:()=>void}>=[],options:Array<Record<string,unknown>>=[];
+  Object.defineProperty(globalThis,'document',{configurable:true,value:{querySelector:()=>({}),createElement:()=>({dataset:{},remove:()=>{}}),head:{appendChild:(script:typeof scripts[number])=>scripts.push(script)}}});
+  Object.defineProperty(globalThis,'window',{configurable:true,value:{InterstitialTsAd:(value:Record<string,unknown>)=>options.push(value)}});
+  Object.defineProperty(globalThis,'matchMedia',{configurable:true,value:()=>({matches:false})});
+  const cleanup=mountTrafficStarsAd({profile:'intensive',placement:'interstitial',spot:adSpotFor('intensive','interstitial','mobile') as never,
+    container:{id:'fixture-global',isConnected:true,replaceChildren:()=>{}} as unknown as HTMLElement,permitted:()=>true,onStart:()=>true});
+  assert.equal(scripts.length,1);assert.equal(options.length,0);scripts[0].onload?.();await Promise.resolve();await Promise.resolve();
+  assert.equal(options.length,1);assert.equal(options[0].countClicks,0);assert.equal(options[0].countdown,5);
+  assert.equal(options[0].cookieName,'lfh_ts_interstitial_v1');assert.equal(options[0].cookieExpires,5/60);assert.equal(options[0].autoXu,false);
+  assert.equal(options[0].subid,'lfh_intensive_interstitial_mobile');cleanup();
 });

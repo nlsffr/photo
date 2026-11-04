@@ -18,11 +18,11 @@ export const AD_PROFILE_INFO: ReadonlyArray<{key:AdProfile;title:string;summary:
   ]},
   {key:'intensive',title:'3 · Intensif',summary:'Disposition adaptée du relevé public concurrent, avec nos propres zones TrafficStars et ExoClick.',details:[
     'Accueil et médias tendances : encarts après 2, 8, 31, 54… médias sur ordinateur et téléphone, avec nos propres formats.',
-    'Popunder : au plus 3 fenêtres par session de 5 minutes, espacées de 5 secondes.',
+    'Popunder : moteur armé dès autorisation, sans attente initiale ; au plus 3 fenêtres par session de 5 minutes, espacées de 5 secondes.',
     'Vidéo en pause : image ExoClick fermable ; feed TrafficStars ou ExoClick selon la disponibilité du SDK, après 5 médias, puis tous les 4, avec une promotion Premium à la deuxième insertion.',
     'Profils et Plus aimés : aucun encart inséré dans la grille. Les partenaires privés et variantes non observables du concurrent ne sont pas reproduits.',
     'Pages photo et vidéo : un encart après les commentaires et, à partir de 3 recommandations, un encart après les 2 premières.',
-    'Interstitiel : 3 clics éligibles, fermeture après 5 secondes. Aucun clic forcé ni retour arrière bloqué.',
+    'Interstitiel : premier lien éligible après chargement, fermeture après 5 secondes et cookie de 5 minutes à la fermeture. Aucun clic forcé ni retour arrière bloqué.',
   ]},
 ];
 
@@ -32,8 +32,13 @@ function withPopFrequency(count:number,delay:number):typeof ADS_REGISTRY {
     mobile:{...ADS_REGISTRY.popunder.mobile,count,delay},
   }};
 }
+const intensive=withPopFrequency(3,5);
+intensive.interstitial={desktop:{...ADS_REGISTRY.interstitial.desktop,countClicks:0},mobile:{...ADS_REGISTRY.interstitial.mobile,countClicks:0}};
+for(const device of ["desktop","mobile"] as const){
+  intensive.popunder[device]={...intensive.popunder[device],firstDelay:0,mode:undefined};
+}
 // Stable objects avoid remounting vendor listeners whenever the runtime is polled.
-const SPOTS:Record<AdProfile,typeof ADS_REGISTRY>={current:ADS_REGISTRY,balanced:withPopFrequency(2,30),intensive:withPopFrequency(3,5)};
+const SPOTS:Record<AdProfile,typeof ADS_REGISTRY>={current:ADS_REGISTRY,balanced:withPopFrequency(2,30),intensive};
 
 export function adSpotFor(profile:AdProfile|undefined,placement:AdPlacement,device:AdDevice,page?:AdPageContext):AdSpot {
   return SPOTS[profile??'current'][adFormatPlacementFor(profile,placement,device,page)][device];

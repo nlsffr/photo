@@ -71,19 +71,23 @@ export function mountTrafficStarsAd(options: {
     if (placement === "popunder") {
       script.dataset.tsSessionDuration = String(spot.sessionDuration ?? 300);
       script.dataset.tsCount = String(spot.count ?? 1); script.dataset.tsFirstDelay = String(spot.firstDelay ?? 5);
-      script.dataset.tsDelay = String(spot.delay ?? 60); script.dataset.tsMode = spot.mode ?? "selective";
+      script.dataset.tsDelay = String(spot.delay ?? 60);
+      if (spot.mode !== undefined) script.dataset.tsMode = spot.mode;
       if (spot.devices && spot.devices !== "all") script.dataset.tsDevices = spot.devices;
     }
     container.appendChild(script);
   };
   if (spot.kind === "banner") appendSpotScript();
   else if (spot.kind === "popunder") {
-    const click = (event: MouseEvent) => {
-      if (!event.isTrusted || !allowed()) return;
-      removeClick?.(); appendSpotScript();
-    };
-    document.addEventListener("click", click);
-    removeClick = () => document.removeEventListener("click", click);
+    if (profile === "intensive") appendSpotScript();
+    else {
+      const click = (event: MouseEvent) => {
+        if (!event.isTrusted || !allowed()) return;
+        removeClick?.(); appendSpotScript();
+      };
+      document.addEventListener("click", click);
+      removeClick = () => document.removeEventListener("click", click);
+    }
   } else {
     if (onStart() === false) return () => {};
     const file = spot.scriptUrl!;

@@ -15,7 +15,7 @@ const avatarImage='https://static-proxy.strpst.com';
 const sliderVideo='https://tsvideo.sacdnssedge.com';
 const has=(values:readonly string[],origin:string)=>values.includes(origin);
 
-test('the observed slider wrapper and its pixel have only connection and image privileges',()=>{
+test('the observed wrapper retains connection/image privileges without script/media access',()=>{
   assert.equal(has(ADS_CSP.connect,sliderWrapper),true);
   assert.equal(has(ADS_CSP.script,sliderWrapper),false);
   assert.equal(has(ADS_CSP.image,sliderWrapper),true);
