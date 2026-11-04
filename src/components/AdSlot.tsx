@@ -107,7 +107,8 @@ function LegacyAdSlot({
   const ads = useAds();
   const { locale } = useLocale();
   const copy = DISCOVERY_COPY[locale];
-  if (hide || !ready || isPremium || (variant === "banner" && ads.canServe("header"))) return null;
+  const excluded = ads.runtime?.reason === "premium" || ads.runtime?.reason === "owner";
+  if (hide || !ready || isPremium || excluded || (variant === "banner" && ads.canServe("header"))) return null;
 
   if (variant === "interstitial") {
     const monthlyPlan = getPlan("month");

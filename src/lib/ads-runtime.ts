@@ -11,7 +11,7 @@ import { isAdsRegistryReady } from './ads-registry-data.mjs';
 import { AD_CONSENT_COOKIE, emptyAdPlacements, parseAdConsent, type AdsRuntime } from './ads-contract';
 import { evaluateAdsRuntime, type AdsViewer } from './ads-runtime-policy';
 
-// Do not use isUserPremium: it catches DB errors as false and mutates expired rows.
+// Keep advertising eligibility read-only; isUserPremium also expires stale subscription rows.
 export async function getAdsViewer(token:string|undefined):Promise<AdsViewer> {
   if (!token) return 'guest';
   try {

@@ -16,6 +16,9 @@ function renderAd(locale: string, stars?: number, isPremium = false) {
       "./Premium": { usePremium: () => ({ isPremium, ready: true }) },
       "./LocaleProvider": { useLocale: () => ({ locale }) },
       "./LocalizedLink": { LocalizedLink: "a" },
+      "./AdsProvider": { useAds: () => ({ runtime: null, canServe: () => false }) },
+      "@/lib/ads-sdk": { mountTrafficStarsAd: () => {} },
+      "@/lib/ads-profiles": { adSpotFor: () => null },
       ...(stars === undefined ? {} : {
         "@/lib/premium-plans": {
           getPlan: (id: string) => {

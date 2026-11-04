@@ -7,14 +7,16 @@ import { premiumEntitlementState } from "./premium-entitlement";
 
 export async function isUserPremium(userId: string): Promise<boolean> {
   const db = getPool();
-  if (!db) return false;
+  if (!db) throw new Error("premium_status_unavailable");
   try {
     const [rows] = await db.execute<RowDataPacket[]>(
       `SELECT is_premium FROM users WHERE id = ? LIMIT 1`,
       [userId],
     );
     const u = rows[0] as { is_premium: number } | undefined;
-    if (u?.is_premium) {
+    if (!u) return false;
+    if (u.is_premium !== 0 && u.is_premium !== 1) throw new Error("premium_status_unavailable");
+    if (u.is_premium === 1) {
       const [subs] = await db.execute<RowDataPacket[]>(
         `SELECT current_period_end FROM subscriptions
          WHERE user_id = ? AND status = 'active'
@@ -39,7 +41,7 @@ export async function isUserPremium(userId: string): Promise<boolean> {
     }
     return false;
   } catch {
-    return false;
+    throw new Error("premium_status_unavailable");
   }
 }
 
