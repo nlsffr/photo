@@ -202,3 +202,12 @@ test('a SDK network error closes immediately and never waits for or reloads an a
   assert.deepEqual(fixture.messages.map(value=>value.status),['empty']);
   assert.equal(fixture.root.children.filter(value=>value.tagName==='SCRIPT').length,1);
 });
+
+test('a known native placeholder with no loaded background expires at thirty seconds',()=>{
+  const fixture=bootstrap();fixture.root.children.push(element('span',{className:'mn-thumb__img'}));
+  fixture.expire();assert.deepEqual(fixture.messages.map(value=>value.status),['pending']);
+  fixture.expire();assert.deepEqual(fixture.messages.map(value=>value.status),['pending','empty']);
+  assert.equal(fixture.disconnected,true);
+  // No retry, new SDK or manufactured impression is triggered by the deadline.
+  assert.equal(fixture.root.children.filter(value=>value.tagName==='SCRIPT').length,1);
+});
