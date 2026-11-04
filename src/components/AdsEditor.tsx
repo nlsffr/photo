@@ -4,7 +4,7 @@ import { AD_PLACEMENT_KEYS, isAdProfile, type AdPlacement, type AdProfile, type 
 import { ADS_REGISTRY, isAdsRegistryReady, missingAdsPlacements, type AdDevice } from "@/lib/ads-registry";
 import { AD_PROFILE_INFO } from "@/lib/ads-profiles";
 
-const LABELS: Record<AdPlacement, string> = { header:"Bannière en haut", footer:"Bannière en bas", underVideo:"Galeries et sous les vidéos", feed:"Dans le feed vidéo", popunder:"Popunder après un clic", interstitial:"Interstitiel", slider:"Vidéo flottante" };
+const LABELS: Record<AdPlacement, string> = { header:"Bannière en haut", footer:"Bannière en bas", underVideo:"Galeries et lecteur vidéo (préroll/pause en Intensif)", feed:"Dans le feed vidéo", popunder:"Popunder après un clic", interstitial:"Interstitiel", slider:"Vidéo flottante" };
 const samePlacements = (left:AdPlacements,right:AdPlacements) => AD_PLACEMENT_KEYS.every(key=>left[key]===right[key]);
 function parseConfig(value:unknown):AdsConfig|null {
   if(!value || typeof value!=='object' || Array.isArray(value)) return null;

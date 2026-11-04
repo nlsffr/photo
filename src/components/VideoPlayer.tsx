@@ -5,6 +5,7 @@ import { formatCount, formatDuration } from "@/lib/format";
 import { mediaThumbnailUrl } from "@/lib/media-sources";
 import { useLocale } from "./LocaleProvider";
 import { VideoPauseAd } from "./VideoPauseAd";
+import { VideoPrerollAd, type VideoPrerollControl } from "./VideoPrerollAd";
 
 interface Props {
   src: string;
@@ -15,6 +16,8 @@ interface Props {
   width?: number;
   height?: number;
   autoPlay?: boolean;
+  /** Explicit media-page opt-in; autoplay previews never run a preroll. */
+  preroll?: boolean;
   muted?: boolean;
   className?: string;
 }
@@ -43,6 +46,7 @@ function VideoPlayerSource({
   width,
   height,
   autoPlay = false,
+  preroll = false,
   muted: mutedProp = false,
   className = "",
 }: Props) {
@@ -51,6 +55,11 @@ function VideoPlayerSource({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const shellRef = useRef<HTMLDivElement | null>(null);
   const playRequest = useRef(0);
+  const prerollControl = useRef<VideoPrerollControl | null>(null);
+  const playIntent = useRef(false);
+  const pendingReload = useRef(false);
+  const pendingVideo = useRef<HTMLVideoElement | null>(null);
+  const [prerollActive, setPrerollActive] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(mutedProp);
   const [speed, setSpeed] = useState(1);
@@ -90,20 +99,54 @@ function VideoPlayerSource({
     }).catch((reason: unknown) => playFailed(reason, request, video));
   }, [playFailed]);
 
+  const requestPlayback = useCallback((reload = false) => {
+    if (!videoRef.current) return;
+    pendingVideo.current = videoRef.current;
+    playIntent.current = true;
+    pendingReload.current = reload;
+    if (preroll && !autoPlay && prerollControl.current?.request()) {
+      setPrerollActive(true);
+      return;
+    }
+    playIntent.current = false;
+    // A popunder may hide this tab during the same Play gesture.
+    if (!(preroll && !autoPlay && document.hidden)) startPlayback(reload);
+    pendingVideo.current = null;
+  }, [preroll, autoPlay, startPlayback]);
+
+  const finishPreroll = useCallback((resume: boolean) => {
+    setPrerollActive(false);
+    if (!playIntent.current) return;
+    playIntent.current = false;
+    if (resume && !document.hidden && videoRef.current === pendingVideo.current) startPlayback(pendingReload.current);
+    pendingVideo.current = null;
+  }, [startPlayback]);
+
+  const cancelPreroll = useCallback(() => {
+    playIntent.current = false;
+    pendingVideo.current = null;
+    prerollControl.current?.cancel();
+    setPrerollActive(false);
+  }, []);
+
   const togglePlay = useCallback(() => {
     const v = videoRef.current;
     if (!v || error) return;
+    if (prerollActive) {
+      cancelPreroll();
+      return;
+    }
     if (v.paused) {
-      startPlayback();
+      requestPlayback();
     } else {
       playRequest.current += 1;
       v.pause();
       setPlaying(false);
       setBuffering(false);
     }
-  }, [error, startPlayback]);
+  }, [error, prerollActive, requestPlayback, cancelPreroll]);
 
-  const retry = useCallback(() => startPlayback(true), [startPlayback]);
+  const retry = useCallback(() => requestPlayback(true), [requestPlayback]);
 
   const toggleMute = useCallback(() => {
     const v = videoRef.current;
@@ -191,7 +234,7 @@ function VideoPlayerSource({
       const request = ++playRequest.current;
       void v.play().catch((reason: unknown) => playFailed(reason, request, v));
     }
-    return () => { playRequest.current += 1; };
+    return () => { playRequest.current += 1; playIntent.current = false; };
   }, [autoPlay, playFailed]);
 
   const aspectStyle = { aspectRatio: String(ratio), maxHeight: "85vh" };
@@ -221,6 +264,7 @@ function VideoPlayerSource({
         }}
         onCanPlay={() => setBuffering(false)}
         onError={() => {
+          cancelPreroll();
           playRequest.current += 1;
           setError(true);
           setBuffering(false);
@@ -240,7 +284,8 @@ function VideoPlayerSource({
         className="absolute inset-0 h-full w-full object-contain"
       />
 
-      <VideoPauseAd video={videoRef} shell={shellRef} blocked={error || buffering} />
+      <VideoPauseAd video={videoRef} shell={shellRef} blocked={error || buffering || prerollActive} />
+      {preroll && !autoPlay && <VideoPrerollAd controller={prerollControl} shell={shellRef} onFinish={finishPreroll} />}
 
       {error && (
         <div className="absolute inset-0 z-[8] flex flex-col items-center justify-center gap-3 bg-black/80 px-4 text-center">
@@ -265,7 +310,7 @@ function VideoPlayerSource({
         </div>
       )}
 
-      {!playing && !error && !buffering && (
+      {!playing && !prerollActive && !error && !buffering && (
         <button
           type="button"
           onClick={togglePlay}
@@ -294,9 +339,9 @@ function VideoPlayerSource({
             type="button"
             onClick={togglePlay}
             className="grid h-9 w-9 place-items-center rounded-full bg-white/15 hover:bg-white/25"
-            aria-label={playing ? dictionary.feed.pause : dictionary.feed.play}
+            aria-label={playing || prerollActive ? dictionary.feed.pause : dictionary.feed.play}
           >
-            {playing ? (
+            {playing || prerollActive ? (
               <Icon d="M6 5h4v14H6zM14 5h4v14h-4z" size={16} />
             ) : (
               <Icon d="M8 5v14l11-7z" size={16} />

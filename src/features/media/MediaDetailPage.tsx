@@ -162,6 +162,7 @@ export async function MediaDetailPage({
         <div className="overflow-hidden rounded-2xl bg-black ring-1 ring-[var(--color-border)]">
           {photo.type === "video" && photo.videoUrl ? (
             <VideoPlayer
+              preroll
               src={photo.videoUrl}
               poster={thumbnail}
               title={h1}

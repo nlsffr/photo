@@ -5,7 +5,7 @@ type XmlNode={name:string;attrs:Record<string,string>;text:string;children:XmlNo
 type VastAd={kind:Kind;resource:string;mime:string;duration:number;skipAfter:number;wrapper:string|null;
   impressions:string[];errors:string[];clickThrough:string|null;clickTracking:string[];events:Record<string,string[]>};
 type XmlParser={parseFromString:(value:string,type:DOMParserSupportedType)=>Document};
-export type ExoclickVastOptions={kind:Kind;placement:string;tagUrl:string;sourceHosts:readonly string[];
+export type ExoclickVastOptions={kind:Kind;mode?:'preroll';placement:string;tagUrl:string;sourceHosts:readonly string[];
   parentOrigin:string;nonce:string;consentValue:'v2:accepted';labels:{advertisement:string;close:string;skip:string;visit:string;play:string}};
 
 /** Serialized into the fixed iframe bootstrap as well as exercised by native Node tests.
@@ -32,7 +32,7 @@ export function createVastTools(){
     const m=/^(\d{2}):(\d{2}):(\d{2}(?:\.\d{1,3})?)$/.exec(s.trim());
     return m&&+m[2]<60&&+m[3]<60?+m[1]*3600 + +m[2]*60 + +m[3]:NaN;
   };
-  const parseTree=(root:XmlNode,kind:Kind):VastAd=>{
+  const parseTree=(root:XmlNode,kind:Kind,mode?:'preroll'):VastAd=>{
     let count=0;const inspect=(n:XmlNode,depth:number)=>{if(++count>2000||depth>32)fail('vast_xml');n.children.forEach(c=>inspect(c,depth+1));};inspect(root,0);
     if(root.name!=='VAST'||!/^([34])(?:\.\d+)?$/.test(root.attrs.version??''))fail('vast_version');
     const ads=children(root,'Ad');if(ads.length!==1)fail('vast_no_ad');
@@ -57,28 +57,29 @@ export function createVastTools(){
       if(!media)fail('vast_unsupported');const offset=linear.attrs.skipoffset;
       const skip=offset?.endsWith('%')?duration*parseFloat(offset)/100:seconds(offset??'');
       return {...common,resource:publicUrl(media.text.trim())!,mime:media.attrs.type.toLowerCase(),duration,
-        skipAfter:Number.isFinite(skip)&&skip>=0?Math.min(5,skip,duration):Math.min(5,duration),
+        skipAfter:mode==='preroll'?Math.max(5,Number.isFinite(skip)&&skip>=0?Math.min(skip,duration):5)
+          :Number.isFinite(skip)&&skip>=0?Math.min(5,skip,duration):Math.min(5,duration),
         clickThrough:publicUrl(descendants(linear,'ClickThrough')[0]?.text.trim())};
     }
     const nonlinear=descendants(body,'NonLinear').find(n=>n.attrs.width==='300'&&n.attrs.height==='250');if(!nonlinear)fail('vast_unsupported');
     const image=children(nonlinear,'StaticResource').find(n=>/^image\/(?:png|jpeg|gif|webp)$/i.test(n.attrs.creativeType??'')&&publicUrl(n.text.trim()));
     if(!image)fail('vast_unsupported');return {...common,resource:publicUrl(image.text.trim())!,mime:image.attrs.creativeType.toLowerCase(),clickThrough:publicUrl(first(nonlinear,'NonLinearClickThrough')?.text.trim())};
   };
-  const parseXml=(xml:string,kind:Kind,parser:XmlParser=new DOMParser())=>{
+  const parseXml=(xml:string,kind:Kind,parser:XmlParser=new DOMParser(),mode?:'preroll')=>{
     if(xml.length>262144||/<!\s*(?:DOCTYPE|ENTITY)\b/i.test(xml))fail('vast_xml');
     const doc=parser.parseFromString(xml,'application/xml');if(!doc.documentElement||doc.getElementsByTagName('parsererror').length)fail('vast_xml');
     let count=0;const tree=(element:Element,depth:number):XmlNode=>{
       if(++count>2000||depth>32)fail('vast_xml');
       return {name:element.localName,attrs:Object.fromEntries(Array.from(element.attributes).map(a=>[a.name,a.value])),text:element.textContent??'',children:Array.from(element.children).map(c=>tree(c,depth+1))};
     };
-    return parseTree(tree(doc.documentElement,0),kind);
+    return parseTree(tree(doc.documentElement,0),kind,mode);
   };
-  const resolve=async(tagUrl:string,kind:Kind,options:{signal:AbortSignal;fetchText:(u:string,signal:AbortSignal)=>Promise<string>;parse?:(xml:string)=>VastAd})=>{
+  const resolve=async(tagUrl:string,kind:Kind,options:{signal:AbortSignal;mode?:'preroll';fetchText:(u:string,signal:AbortSignal)=>Promise<string>;parse?:(xml:string)=>VastAd})=>{
     let url=publicUrl(tagUrl);if(!url)fail('vast_url');const visited=new Set<string>();let inherited:VastAd|null=null;
     for(let depth=0;depth<=3;depth++){
       if(options.signal.aborted)fail('vast_abort');if(visited.has(url!))fail('vast_wrapper');visited.add(url!);
       const xml=await options.fetchText(url!,options.signal);if(options.signal.aborted)fail('vast_abort');
-      const ad=options.parse?options.parse(xml):parseXml(xml,kind);
+      const ad=options.parse?options.parse(xml):parseXml(xml,kind,undefined,options.mode);
       if(inherited){ad.impressions=uniq([...inherited.impressions,...ad.impressions]);ad.errors=uniq([...inherited.errors,...ad.errors]);ad.clickTracking=uniq([...inherited.clickTracking,...ad.clickTracking]);
         for(const event of Object.keys(inherited.events))ad.events[event]=uniq([...(inherited.events[event]??[]),...(ad.events[event]??[])]);}
       if(!ad.wrapper)return ad;inherited=ad;url=ad.wrapper;
@@ -111,6 +112,8 @@ export function createVastTools(){
 }
 
 function runVastFrame(config:ExoclickVastOptions,tools:ReturnType<typeof createVastTools>){
+  const preroll=config.mode==='preroll';
+  let activated=!preroll,lifetime:ReturnType<typeof setTimeout>|null=null;
   let parentVisible=false,closed=false,generation=0,loading=false,mounted=false,ad:VastAd|null=null,resumeAt=0;
   let cleanup=()=>{};
   let phase:AbortController|null=null,deadline:ReturnType<typeof setTimeout>|null=null,filled=false;
@@ -118,8 +121,8 @@ function runVastFrame(config:ExoclickVastOptions,tools:ReturnType<typeof createV
   const requests=new Set<AbortController>();
   const root=document.getElementById('lfh-vast')!;
   const accepted=()=>{try{return document.cookie.split(';').some(p=>{const [name,...value]=p.trim().split('=');return name==='lfh_ad_consent'&&decodeURIComponent(value.join('='))===config.consentValue;});}catch{return false;}};
-  const allowed=()=>!closed&&parentVisible&&!document.hidden&&accepted();
-  const tell=(status:string)=>parent.postMessage({type:'lfh-ad-status',placement:config.placement,nonce:config.nonce,status},config.parentOrigin);
+  const allowed=()=>!closed&&activated&&parentVisible&&!document.hidden&&accepted();
+  const tell=(status:string)=>parent.postMessage({type:'lfh-ad-status',placement:config.placement,nonce:config.nonce,...(preroll?{context:'preroll'}:{}),status},config.parentOrigin);
   const outbound=(raw:string)=>{const value=tools.publicUrl(raw);return value&&new URL(value).origin!==config.parentOrigin?value:null;};
   const track=(raw:string,event?:string)=>{
     if(!allowed())return;
@@ -133,11 +136,14 @@ function runVastFrame(config:ExoclickVastOptions,tools:ReturnType<typeof createV
     if(video){if(Number.isFinite(video.currentTime))resumeAt=video.currentTime;video.pause();video.removeAttribute('src');video.load();}
     image?.removeAttribute('src');root.hidden=true;tracker?.setActive(false);for(const request of requests)request.abort();requests.clear();};
   const finish=(event:string)=>{
-    if(closed)return;tracker?.close(event);closed=true;stop();cleanup();root.replaceChildren();tell('empty');
+    if(closed)return;tracker?.close(event);closed=true;if(lifetime!==null)clearTimeout(lifetime);lifetime=null;
+    stop();cleanup();root.replaceChildren();tell(preroll&&event==='complete'?'ended':preroll&&event==='skip'?'skipped':'empty');
   };
   const failed=()=>{tracker?.error('405');finish('');};
   const button=(label:string,action:()=>void)=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.setAttribute('aria-label',label);b.addEventListener('click',event=>{event.stopPropagation();action();});return b;};
-  const announce=()=>{if(!filled&&allowed()&&tracker?.impressed()){filled=true;tell('filled');}};
+  const announce=()=>{if(!filled&&allowed()&&tracker?.impressed()){
+    filled=true;if(preroll){if(lifetime!==null)clearTimeout(lifetime);lifetime=setTimeout(failed,125000);}tell('filled');
+  }};
   const play=()=>{if(allowed()&&video){void video.play().catch(()=>{/* Native controls and the explicit play button remain usable. */});}};
   const show=()=>{
     if(!allowed())return;root.hidden=false;tracker?.setActive(true);
@@ -158,7 +164,7 @@ function runVastFrame(config:ExoclickVastOptions,tools:ReturnType<typeof createV
   const mount=(value:VastAd)=>{
     if(!allowed())return;ad=value;tracker=tools.createTracker(value,track);root.replaceChildren();
     const title=document.createElement('p');title.textContent=config.labels.advertisement;root.appendChild(title);
-    const close=button(config.labels.close,()=>finish(value.kind==='linear'?'closeLinear':'close'));close.dataset.close='';root.appendChild(close);
+    if(!preroll){const close=button(config.labels.close,()=>finish(value.kind==='linear'?'closeLinear':'close'));close.dataset.close='';root.appendChild(close);}
     const holder=document.createElement('div');root.appendChild(holder);
     let link:HTMLAnchorElement|null=null;
     const click=outbound(value.clickThrough??'');if(click){link=document.createElement('a');link.href=click;link.target='_blank';link.rel='noopener noreferrer nofollow';link.referrerPolicy='no-referrer';link.setAttribute('aria-label',config.labels.visit);link.addEventListener('click',event=>{if(!event.isTrusted||!allowed()||!tracker?.impressed())event.preventDefault();else tracker.click();});}
@@ -167,14 +173,24 @@ function runVastFrame(config:ExoclickVastOptions,tools:ReturnType<typeof createV
       image.addEventListener('load',()=>{requestAnimationFrame(()=>{if(allowed()){tracker?.imageReady();announce();}});});image.addEventListener('error',failed);
       if(link)link.className='creative-link';(link??holder).appendChild(image);if(link)holder.appendChild(link);
     }else{
-      video=document.createElement('video');video.width=640;video.height=360;video.muted=true;video.playsInline=true;video.controls=true;video.preload='none';video.crossOrigin='anonymous';video.setAttribute('aria-label',config.labels.advertisement);holder.appendChild(video);
-      const skip=button(config.labels.skip,()=>{if(tracker&&tracker.watched()>=value.skipAfter)finish('skip');});skip.disabled=true;root.appendChild(skip);
+      let played=false;
+      video=document.createElement('video');video.width=640;video.height=360;video.muted=true;video.playsInline=true;video.controls=!preroll;
+      if(preroll)video.autoplay=!matchMedia('(prefers-reduced-motion: reduce)').matches;
+      video.preload='none';video.crossOrigin='anonymous';video.setAttribute('aria-label',config.labels.advertisement);holder.appendChild(video);
+      const skip=button(config.labels.skip,()=>{if(tracker&&tracker.watched()>=value.skipAfter)finish('skip');});
+      const updateSkip=()=>{const remaining=Math.max(0,value.skipAfter-(tracker?.watched()??0));skip.disabled=remaining>0;
+        if(preroll){skip.textContent=remaining>0?`${config.labels.skip} (${Math.ceil(remaining)})`:config.labels.skip;skip.setAttribute('aria-label',skip.textContent);}};
+      if(preroll)updateSkip();else skip.disabled=true;root.appendChild(skip);
       const playable=button(config.labels.play,play);root.appendChild(playable);
       if(link){link.textContent=config.labels.visit;root.appendChild(link);}
-      video.addEventListener('timeupdate',()=>{if(!video||!allowed()||video.paused||video.ended||video.readyState<2)return;tracker?.progress(video.currentTime,video.duration,video.seeking);skip.disabled=(tracker?.watched()??0)<value.skipAfter;announce();});
-      video.addEventListener('pause',()=>tracker?.event('pause'));video.addEventListener('playing',()=>{if(video&&allowed()){tracker?.progress(video.currentTime,video.duration,video.seeking);tracker?.event('resume');}});
+      video.addEventListener('timeupdate',()=>{if(!video||!allowed()||video.paused||video.ended||video.readyState<2||(preroll&&!played))return;tracker?.progress(video.currentTime,video.duration,video.seeking);updateSkip();announce();});
+      video.addEventListener('pause',()=>{if(preroll&&video?.ended)return;tracker?.event('pause');if(preroll)tracker?.setActive(false);});
+      video.addEventListener('playing',()=>{if(video&&allowed()){
+        if(preroll){if(video.paused||video.ended||video.readyState<2)return;played=true;tracker?.setActive(true);}
+        tracker?.progress(video.currentTime,video.duration,video.seeking);tracker?.event('resume');
+      }});
       video.addEventListener('volumechange',()=>tracker?.event(video?.muted?'mute':'unmute'));
-      video.addEventListener('ended',()=>{if(allowed()){tracker?.complete();finish('complete');}});video.addEventListener('error',failed);
+      video.addEventListener('ended',()=>{if(allowed()&&(!preroll||(played&&video?.ended&&video.readyState>=2))){tracker?.complete();finish('complete');}});video.addEventListener('error',failed);
       video.addEventListener('loadedmetadata',()=>{if(video&&allowed()&&resumeAt>0)video.currentTime=Math.min(resumeAt,video.duration);});
       video.addEventListener('loadeddata',()=>{if(allowed()&&!matchMedia('(prefers-reduced-motion: reduce)').matches)play();});
     }
@@ -185,17 +201,20 @@ function runVastFrame(config:ExoclickVastOptions,tools:ReturnType<typeof createV
     loading=true;const mine=++generation,controller=new AbortController();phase=controller;
     deadline=setTimeout(()=>controller.abort(),10000);
     try{
-      const value=await tools.resolve(config.tagUrl,config.kind,{signal:controller.signal,fetchText:async(url,signal)=>new TextDecoder('utf-8',{fatal:true}).decode(await read(url,262144,signal))});
+      const value=await tools.resolve(config.tagUrl,config.kind,{signal:controller.signal,mode:config.mode,fetchText:async(url,signal)=>new TextDecoder('utf-8',{fatal:true}).decode(await read(url,262144,signal))});
       if(!allowed()||mine!==generation||controller.signal.aborted)return;
       if(!outbound(value.resource))throw new Error('vast_url');mounted=true;mount(value);
     }catch{if(mine===generation&&allowed())failed();}
     finally{if(mine===generation){loading=false;phase=null;if(deadline!==null)clearTimeout(deadline);deadline=null;}}
   };
-  const refresh=()=>{if(!accepted()){finish('');return;}if(allowed()){if(mounted&&ad)show();else void load();}else stop();};
+  const refresh=()=>{if(!accepted()||(preroll&&activated&&(!parentVisible||document.hidden))){finish('');return;}if(allowed()){if(mounted&&ad)show();else void load();}else stop();};
   const message=(event:MessageEvent)=>{
     if(event.source!==parent||event.origin!==config.parentOrigin||!event.data||event.data.type!=='lfh-ad-visibility'
       ||event.data.placement!==config.placement||event.data.nonce!==config.nonce||typeof event.data.visible!=='boolean')return;
-    if(parentVisible===event.data.visible)return;parentVisible=event.data.visible;refresh();
+    if(preroll&&(event.data.context!=='preroll'||event.data.activated!==true))return;
+    if(parentVisible===event.data.visible)return;parentVisible=event.data.visible;
+    if(preroll&&parentVisible&&!activated){activated=true;lifetime=setTimeout(failed,12000);}
+    refresh();
   };
   addEventListener('message',message);document.addEventListener('visibilitychange',refresh);
   const pagehide=()=>finish('');addEventListener('pagehide',pagehide,{once:true});
@@ -215,6 +234,7 @@ export function buildExoclickVastDocument(options:ExoclickVastOptions){
   const validParent=()=>{try{const url=new URL(options.parentOrigin);return url.origin===options.parentOrigin&&!url.username&&!url.password
     &&(options.parentOrigin==='https://leakfanhub.com'||(url.protocol==='http:'&&['127.0.0.1','localhost'].includes(url.hostname)));}catch{return false;}};
   if(!['linear','nonlinear'].includes(options.kind)||!tag||!validParent()
+    ||(options.mode!==undefined&&(options.mode!=='preroll'||options.kind!=='linear'||options.placement!=='underVideo'))
     ||!Array.isArray(options.sourceHosts)||!options.sourceHosts.length||!options.sourceHosts.every(h=>tools.publicUrl('https://'+h+'/')&&new URL('https://'+h+'/').hostname===h)
     ||!options.sourceHosts.includes(new URL(tag).hostname)||options.consentValue!=='v2:accepted'||typeof options.placement!=='string'||!/^[a-z][a-zA-Z]{0,31}$/.test(options.placement)
     ||typeof options.nonce!=='string'||!/^[-A-Za-z0-9_]{1,100}$/.test(options.nonce)
@@ -223,5 +243,7 @@ export function buildExoclickVastDocument(options:ExoclickVastOptions){
   const boot=`(${runVastFrame.toString()})(${data},(${createVastTools.toString()})());`;
   const hash=createHash('sha256').update(boot).digest('base64');
   const csp=["default-src 'none'","base-uri 'none'","object-src 'none'","frame-ancestors 'self'","form-action 'none'",`script-src 'sha256-${hash}'`,"style-src 'unsafe-inline'","connect-src https:","img-src https:","media-src https:","frame-src 'none'"].join('; ');
-  return {csp,html:`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Advertisement</title><style>html,body{margin:0;background:transparent;color:white;font:14px system-ui}#lfh-vast{text-align:center;position:relative}#lfh-vast[hidden]{display:none}p{position:absolute;top:0;left:0;z-index:1;margin:0;padding:4px;background:#000b;max-width:calc(100% - 52px)}button,a{min-height:44px;min-width:44px;padding:8px;box-sizing:border-box}button{cursor:pointer}button[data-close]{position:absolute;right:0;top:0;z-index:2}a{display:inline-block;color:inherit}.creative-link{display:block;padding:0;min-height:0;min-width:0}video{display:block;max-width:100%;height:auto;max-height:75dvh;margin:auto}img{display:block;max-width:100%;height:auto;margin:auto}.nonlinear{width:300px;height:250px;object-fit:contain}</style></head><body><section id="lfh-vast" hidden></section><script>${boot}</script></body></html>`};
+  const scheme=options.mode==='preroll'?'<meta name="color-scheme" content="dark">':'';
+  const schemeStyle=options.mode==='preroll'?'html{color-scheme:dark}':'';
+  return {csp,html:`<!doctype html><html lang="en"><head><meta charset="utf-8">${scheme}<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Advertisement</title><style>${schemeStyle}html,body{margin:0;background:transparent;color:white;font:14px system-ui}#lfh-vast{text-align:center;position:relative}#lfh-vast[hidden]{display:none}p{position:absolute;top:0;left:0;z-index:1;margin:0;padding:4px;background:#000b;max-width:calc(100% - 52px)}button,a{min-height:44px;min-width:44px;padding:8px;box-sizing:border-box}button{cursor:pointer}button[data-close]{position:absolute;right:0;top:0;z-index:2}a{display:inline-block;color:inherit}.creative-link{display:block;padding:0;min-height:0;min-width:0}video{display:block;max-width:100%;height:auto;max-height:75dvh;margin:auto}img{display:block;max-width:100%;height:auto;margin:auto}.nonlinear{width:300px;height:250px;object-fit:contain}</style></head><body><section id="lfh-vast" hidden></section><script>${boot}</script></body></html>`};
 }

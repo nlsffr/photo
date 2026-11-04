@@ -19,7 +19,8 @@ export const AD_PROFILE_INFO: ReadonlyArray<{key:AdProfile;title:string;summary:
   {key:'intensive',title:'3 · Intensif',summary:'Disposition adaptée du relevé public concurrent, avec nos propres zones TrafficStars et ExoClick.',details:[
     'Accueil et médias tendances : encarts après 2, 8, 31, 54… médias sur ordinateur et téléphone, avec nos propres formats.',
     'Popunder : moteur armé dès autorisation, sans attente initiale ; au plus 3 fenêtres par session de 5 minutes, espacées de 5 secondes.',
-    'Vidéo en pause : image ExoClick fermable ; feed TrafficStars ou ExoClick selon la disponibilité du SDK, après 5 médias, puis tous les 4, avec une promotion Premium à la deuxième insertion.',
+    'Avant la vidéo : préroll ExoClick dédié, passage possible à partir de 5 secondes, selon le délai VAST, et fréquence de zone de 5 minutes. En pause : image ExoClick séparée et fermable.',
+    'Feed TrafficStars ou ExoClick selon la disponibilité du SDK, après 5 médias, puis tous les 4, avec une promotion Premium à la deuxième insertion.',
     'Profils et Plus aimés : aucun encart inséré dans la grille. Les partenaires privés et variantes non observables du concurrent ne sont pas reproduits.',
     'Pages photo et vidéo : un encart après les commentaires et, à partir de 3 recommandations, un encart après les 2 premières.',
     'Interstitiel : premier lien éligible après chargement, fermeture après 5 secondes et cookie de 5 minutes à la fermeture. Aucun clic forcé ni retour arrière bloqué.',
