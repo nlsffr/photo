@@ -106,8 +106,11 @@ export function AdsProvider({ children }: { children: React.ReactNode }) {
     } catch { return choice === "refused"; }
   }, [confirmed]);
 
-  const consentAvailable = runtime?.enabled === true && ["eligible", "consent_required", "consent_refused"].includes(runtime.reason)
-    && confirmed === true && !loading && ready && !isPremium && isAdPagePath(pathname);
+  // Explain both purposes in the entry panel before the age-confirmation click.
+  // Serving ads remains separately gated by confirmed === true in canServeAds.
+  const consentAvailable = receivedContext === sessionContext && fresh && runtime?.enabled === true
+    && ["eligible", "consent_required", "consent_refused"].includes(runtime.reason)
+    && !loading && ready && !isPremium && isAdPagePath(pathname);
   return <Context.Provider value={{ runtime, consent, consentAvailable, needsConsent:consentAvailable && consent === null,
     canServe:placement => allowed && runtime?.placements[placement] === true && browserAdConsent() === "accepted",
     markSdkStarted:device => sdkGuard.current.start(device, runtime?.revision ?? -1), choose }}>

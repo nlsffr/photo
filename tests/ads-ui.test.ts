@@ -5,6 +5,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { ADS_REGISTRY } from '../src/lib/ads-registry-data.mjs';
 // @ts-expect-error Native Node requires explicit suffixes.
 import { loadAppModule } from './helpers/load-app-module.ts';
+// @ts-expect-error Native Node requires explicit suffixes.
+import { createAdSdkGuard } from '../src/lib/ads-sdk.ts';
 
 const hooks={...React,useState:(value:unknown)=>[value,()=>{}],useRef:(value:unknown)=>({current:value}),useId:()=>'sample',useEffect:()=>{}};
 const locale={locale:'en',t:(key:string)=>key};
@@ -37,11 +39,35 @@ test('OFF keeps the existing entry dialog without adding advertising consent',()
   assert.equal((html.match(/<section/g)||[]).length,1);
   assert.match(html,/By clicking/); assert.doesNotMatch(html,/TrafficStars/);
 });
-test('advertising choice uses the same single dialog after age confirmation',()=>{
+test('advertising purposes are merged into the entry panel before age confirmation',()=>{
+  const html=cookieBanner(true,false,null);
+  assert.equal((html.match(/<section/g)||[]).length,1);
+  assert.match(html,/TrafficStars/);assert.match(html,/Decline all/);
+  assert.doesNotMatch(html,/<iframe|<script/);
+});
+test('a legacy analytics choice receives one merged panel without implicit ad acceptance',()=>{
   const html=cookieBanner(true,true,'accepted');
   assert.equal((html.match(/<section/g)||[]).length,1);
-  assert.match(html,/TrafficStars/); assert.match(html,/Decline advertising cookies/);
-  assert.doesNotMatch(html,/By clicking/); assert.doesNotMatch(html,/<iframe|<script/);
+  assert.match(html,/TrafficStars/);assert.match(html,/Decline all/);
+  assert.doesNotMatch(html,/Ads and advertising cookies/);assert.doesNotMatch(html,/<iframe|<script/);
+});
+
+test('fresh eligible runtime can explain consent before age but cannot serve any placement',()=>{
+  const runtime={enabled:true,effectiveEnabled:false,revision:4,needsConsent:true,consent:null,
+    placements:{header:false,footer:false,underVideo:false,feed:false,popunder:false,interstitial:false,slider:false},reason:'consent_required'};
+  for(const [fresh,context,available] of [[true,'false:guest:true:false',true],[false,'false:guest:true:false',false],[true,'old-session',false]] as const){
+    const initial=[runtime,1000,fresh,context,null];let cursor=0;
+    type Snapshot={consentAvailable:boolean;canServe:(placement:string)=>boolean};
+    const {AdsProvider}=loadAppModule<{AdsProvider:(props:{children:React.ReactNode})=>React.ReactElement<{value:Snapshot}>}>('src/components/AdsProvider.tsx',{
+      react:{...React,useState:()=>[initial[cursor++],()=>{}],useRef:(value:unknown)=>({current:value}),useEffect:()=>{},useCallback:(value:unknown)=>value},
+      '@/lib/ads-sdk':{createAdSdkGuard},
+      'next/navigation':{usePathname:()=>'/en'},'./AgeConfirmation':{useAgeConfirmation:()=>({confirmed:false})},
+      './Session':{useSession:()=>({loading:false,user:null})},'./Premium':{usePremium:()=>({ready:true,isPremium:false})}
+    });
+    const value=AdsProvider({children:null}).props.value;
+    assert.equal(value.consentAvailable,available);
+    for(const placement of ['header','footer','underVideo','feed','popunder','interstitial','slider'])assert.equal(value.canServe(placement),false);
+  }
 });
 
 test('eligible inline advertising uses a same-origin HTTP frame rather than a parent SDK',()=>{
