@@ -45,7 +45,9 @@ export async function smoke(origin = "http://localhost:3000", canonical = "https
     assert.equal(tags(html, "html")[0]?.lang, entry.locale, `${entry.path} document language`);
     assert.ok(/<h1\b/i.test(html), `${entry.path} has a heading`);
     const links = tags(html, "link");
-    assert.equal(links.find(link => link.rel === "canonical")?.href, entry.canonical, `${entry.path} self canonical`);
+    // URL.origin serializes a bare root without '/', while URL.href includes it.
+    // They designate the same canonical resource; other path/host differences still fail.
+    assert.equal(new URL(links.find(link => link.rel === "canonical")?.href).href, entry.canonical, `${entry.path} self canonical`);
     const alternates = Object.fromEntries(links.filter(link => link.hreflang).map(link => [link.hreflang, new URL(link.href).href]));
     assert.deepEqual(alternates, entry.languages, `${entry.path} reciprocal alternates`);
     const metadata = tags(html, "meta");
@@ -57,7 +59,7 @@ export async function smoke(origin = "http://localhost:3000", canonical = "https
   }
   const { response: sitemapResponse, html: sitemap } = await page("/sitemaps/static");
   assert.equal(sitemapResponse.status, 200);
-  const entries = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map(match => match[1]);
+  const entries = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map(match => new URL(match[1]).href);
   assert.equal(entries.length, 80, "72 discovery addresses and8 bare editorial addresses");
   assert.equal(new Set(entries).size, 80);
   for (const entry of plan) assert.ok(entries.includes(entry.canonical), entry.canonical);
