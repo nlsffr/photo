@@ -6,13 +6,13 @@ import {loadAppModule} from './helpers/load-app-module.ts';
 type Route={GET:(request:Request)=>Promise<Response>};
 const placements={header:true,footer:true,underVideo:true,feed:true,popunder:true,interstitial:true,slider:true};
 const eligible={enabled:true,effectiveEnabled:true,reason:'eligible',consent:'accepted',profile:'intensive',revision:25,placements};
-const fixtureSpot={kind:'linear',zoneId:900001,tagUrl:'https://s.magsrv.com/v1/vast.php?idz=900001',sourceHosts:['s.magsrv.com']};
+const fixtureSpot={kind:'linear',zoneId:900001,tagUrl:'https://roll.example.com/own-fixture/vast',sourceHosts:['roll.example.com']};
 function setup({cookie='v2%3Aaccepted',runtime={},broken=false,missing=false}:{cookie?:string|null;runtime?:Record<string,unknown>;broken?:boolean;missing?:boolean}={}){
  let reads=0;const documents:Array<Record<string,unknown>>=[];
  const route=loadAppModule<Route>('src/app/api/ads/preroll/route.ts',{
   'next/headers':{cookies:async()=>({get:(key:string)=>key==='lfh_ad_consent'&&cookie!==null?{value:cookie}:undefined})},
   '@/lib/ads-runtime':{getAdsRuntime:async()=>{reads++;if(broken)throw Error('private backend detail');return{...eligible,...runtime};}},
-  '@/lib/exoclick-preroll-registry':{getExoclickPrerollSpot:()=>missing?null:fixtureSpot},
+  '@/lib/trafficstars-roll-registry':{getTrafficStarsRollSpot:()=>missing?null:fixtureSpot},
   '@/lib/exoclick-vast':{buildExoclickVastDocument:(options:Record<string,unknown>)=>{documents.push(options);return{html:'<!doctype html><title>Fixture preroll</title>',csp:"default-src 'none';frame-ancestors 'self'"};}},
  });return{...route,reads:()=>reads,documents};
 }

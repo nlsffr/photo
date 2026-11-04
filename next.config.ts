@@ -94,7 +94,7 @@ const nextConfig: NextConfig = {
       { source: "/:path*", headers: commonSecurityHeaders },
       // These exact HTTP advertising documents supply their own hashed CSP and
       // SAMEORIGIN policy. All other paths keep the restrictive document policy.
-      { source: "/:path((?!api/ads/(?:embed|exoclick|preroll)/?$).*)", headers: documentPolicyHeaders },
+      { source: "/:path((?!api/ads/(?:embed|exoclick|preroll|postroll)/?$).*)", headers: documentPolicyHeaders },
       { source: "/_next/static/:path*", headers: staticCacheHeaders },
       { source: "/favicon.svg", headers: staticCacheHeaders },
       { source: "/icon", headers: mediaCacheHeaders },

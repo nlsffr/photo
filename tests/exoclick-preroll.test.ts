@@ -21,13 +21,16 @@ test('the internal preroll mode is restricted to a linear underVideo document an
  const result=buildExoclickVastDocument(config);
  assert.match(result.csp,/script-src 'sha256-/);assert.doesNotMatch(result.csp,/unsafe-eval|script-src[^;]*unsafe-inline/);
  assert.match(result.html,/<meta name="color-scheme" content="dark">/);assert.match(result.html,/html\{color-scheme:dark\}/);
- for(const override of [{mode:'unknown'},{mode:null},{kind:'nonlinear'},{placement:'feed'}])assert.throws(()=>buildExoclickVastDocument({...config,...override} as ExoclickVastOptions));
+ for(const mode of ['preroll','postroll'] as const){
+  assert.doesNotThrow(()=>buildExoclickVastDocument({...config,mode}));
+  for(const override of [{mode:'unknown'},{mode:null},{kind:'nonlinear'},{placement:'feed'}])assert.throws(()=>buildExoclickVastDocument({...config,mode,...override} as ExoclickVastOptions));
+ }
 });
 
 test('preroll respects a longer VAST skip threshold and a five-second minimum while legacy feed stays unchanged',()=>{
  const tools=createVastTools();
  for(const [offset,expected]of [['00:00:00',5],['00:00:03',5],['00:00:05',5],['00:00:10',10],['50%',7.5]] as const){
-  assert.equal(tools.parseTree(creative(offset),'linear','preroll').skipAfter,expected,offset);
+  for(const mode of ['preroll','postroll'] as const)assert.equal(tools.parseTree(creative(offset),'linear',mode).skipAfter,expected,mode+'/'+offset);
   assert.equal(tools.parseTree(creative(offset),'linear').skipAfter,Math.min(5,offset==='50%'?7.5:Number(offset.slice(-2))),`legacy/${offset}`);
  }
 });
@@ -47,7 +50,7 @@ class ElementFixture extends EventTarget{
  emit(name:string){this.dispatchEvent(new Event(name));}
  click(){if(!this.disabled)this.emit('click');}
 }
-function frameFixture({cookie='lfh_ad_consent=v2%3Aaccepted',mode='preroll' as 'preroll'|'legacy',tree=creative(),pending=false,playBlocked=false}={}){
+function frameFixture({cookie='lfh_ad_consent=v2%3Aaccepted',mode='preroll' as 'preroll'|'postroll'|'legacy',tree=creative(),pending=false,playBlocked=false,fetchError=false}={}){
  let clock=0,timerId=0,resolveXml:((value:Response)=>void)|undefined;
  const timers=new Map<number,{at:number;fn:()=>void;interval:number}>();
  const schedule=(fn:()=>void,ms:number,interval=0)=>{const id=++timerId;timers.set(id,{at:clock+ms,fn,interval});return id;};
@@ -60,16 +63,16 @@ function frameFixture({cookie='lfh_ad_consent=v2%3Aaccepted',mode='preroll' as '
  const document={cookie,hidden:false,getElementById:()=>root,createElement:(tag:string)=>{const e=new ElementFixture(tag);if(tag==='video'&&playBlocked)e.play=()=>Promise.reject(Error('autoplay blocked'));elements.push(e);return e;},addEventListener:(name:string,fn:(e:unknown)=>void)=>listeners.set('doc:'+name,fn),removeEventListener:(name:string)=>listeners.delete('doc:'+name)};
  const adapt=(n:Tree):unknown=>({localName:n.name,attributes:Object.entries(n.attrs).map(([name,value])=>({name,value})),textContent:n.text,children:n.children.map(adapt)});
  class DOMParserFixture{parseFromString(){return{documentElement:adapt(tree),getElementsByTagName:()=>[]};}}
- const preroll=mode==='preroll';
- const current={...config,mode:preroll?'preroll' as const:undefined,placement:preroll?'underVideo':'feed'};
+ const preroll=mode!=='legacy';
+ const current={...config,mode:preroll?mode:undefined,placement:preroll?'underVideo':'feed'};
  const script=buildExoclickVastDocument(current).html.match(/<script>([\s\S]*?)<\/script>/)![1];
  runInNewContext(script,{URL,AbortController,TextDecoder,Uint8Array,document,parent,DOMParser:DOMParserFixture,
   matchMedia:()=>({matches:false}),requestAnimationFrame:(fn:()=>void)=>fn(),
   setTimeout:(fn:()=>void,ms:number)=>schedule(fn,ms),clearTimeout:(id:number)=>timers.delete(id),setInterval:(fn:()=>void,ms:number)=>schedule(fn,ms,ms),clearInterval:(id:number)=>timers.delete(id),
   addEventListener:(name:string,fn:(e:unknown)=>void)=>listeners.set(name,fn),removeEventListener:(name:string)=>listeners.delete(name),
-  fetch:(url:string,options:{signal?:AbortSignal})=>{requests.push({url,signal:options.signal});if(url===config.tagUrl&&pending)return new Promise<Response>(resolve=>{resolveXml=resolve;});return Promise.resolve(new Response('<fixture/>'));},
+  fetch:(url:string,options:{signal?:AbortSignal})=>{requests.push({url,signal:options.signal});if(url===config.tagUrl&&fetchError)return Promise.reject(new TypeError('CORS denied'));if(url===config.tagUrl&&pending)return new Promise<Response>(resolve=>{resolveXml=resolve;});return Promise.resolve(new Response('<fixture/>'));},
  });
- const base={type:'lfh-ad-visibility',placement:current.placement,nonce:config.nonce,visible:true,...(preroll?{context:'preroll',activated:true}:{})};
+ const base={type:'lfh-ad-visibility',placement:current.placement,nonce:config.nonce,visible:true,...(preroll?{context:mode,activated:true}:{})};
  const message=(data:unknown=base,origin:string=config.parentOrigin,source:unknown=parent)=>listeners.get('message')?.({data,origin,source});
  const settle=()=>new Promise<void>(resolve=>setImmediate(resolve));
  return{root,elements,parent,document,requests,messages,listeners,timers,base,message,advance,settle,
@@ -158,4 +161,46 @@ test('empty or failed VAST releases the preroll and the unmodified feed still us
  const close=feed.elements.find(e=>e.dataset.close!==undefined);assert.ok(close);assert.equal(feed.video().controls,true);close.click();assert.deepEqual(feed.messages.map(m=>m.status),['empty']);assert.equal(feed.messages[0].context,undefined);
  const zeroFeed=frameFixture({mode:'legacy',tree:creative('00:00:00')});zeroFeed.message();await zeroFeed.settle();assert.equal(zeroFeed.skip().disabled,true);
  zeroFeed.video().currentTime=1;zeroFeed.video().emit('timeupdate');assert.equal(zeroFeed.skip().disabled,false);zeroFeed.close();
+});
+
+
+test('postroll requires its own activated context and preserves real-progress skip, tracking and unique terminal semantics',async()=>{
+ const ui=frameFixture({mode:'postroll',tree:creative('00:00:07')});
+ assert.equal(ui.requests.length,0);
+ for(const override of [{context:'preroll'},{context:undefined},{activated:undefined},{activated:false},{visible:false},{nonce:'other'}])ui.message({...ui.base,...override});
+ ui.message(ui.base,'https://evil.example.com');ui.message(ui.base,undefined,{});assert.equal(ui.requests.length,0);
+ ui.message();await ui.settle();assert.equal(ui.requests.filter(r=>r.url===config.tagUrl).length,1);
+ assert.equal(ui.elements.some(e=>e.dataset.close!==undefined),false);assert.equal(ui.video().controls,false);
+ const video=ui.video(),skip=ui.skip();
+ ui.advance(5000);assert.equal(skip.disabled,true);assert.equal(ui.messages.length,0);
+ for(let i=1;i<=6;i++){video.currentTime=i;video.emit('timeupdate');}
+ assert.equal(skip.disabled,true);assert.equal(skip.textContent,'Skip (1)');
+ video.currentTime=7;video.emit('timeupdate');assert.equal(skip.disabled,false);skip.click();skip.click();
+ assert.deepEqual(ui.messages.map(m=>m.status),['filled','skipped']);assert.ok(ui.messages.every(m=>m.context==='postroll'));
+ assert.equal(ui.requests.filter(r=>r.url.endsWith('/impression')).length,1);assert.equal(ui.requests.filter(r=>r.url.endsWith('/skip')).length,1);
+ assert.equal(ui.listeners.size,0);assert.equal(ui.timers.size,0);
+});
+
+test('postroll empty, CORS failure, stalled setup, revocation and hiding fail open once without fabricated progress',async()=>{
+ const empty=frameFixture({mode:'postroll',tree:node('VAST',[],'',{version:'3.0'})});empty.message();await empty.settle();
+ assert.deepEqual(empty.messages.map(m=>m.status),['empty']);assert.equal(empty.messages[0].context,'postroll');
+ const cors=frameFixture({mode:'postroll',fetchError:true});cors.message();await cors.settle();
+ assert.deepEqual(cors.messages.map(m=>m.status),['empty']);assert.equal(cors.elements.length,0);assert.equal(cors.requests.length,1);
+ const setup=frameFixture({mode:'postroll',pending:true});setup.message();setup.advance(12000);
+ assert.deepEqual(setup.messages.map(m=>m.status),['empty']);assert.equal(setup.requests[0].signal?.aborted,true);
+ setup.respond();await setup.settle();assert.equal(setup.elements.length,0);
+ for(const operation of ['hide','revoke'] as const){
+  const ui=frameFixture({mode:'postroll'});ui.message();await ui.settle();ui[operation]();ui.message();
+  assert.deepEqual(ui.messages.map(m=>m.status),['empty']);assert.equal(ui.requests.filter(r=>r.url===config.tagUrl).length,1);
+  assert.equal(ui.requests.some(r=>/\/(?:impression|skip|complete)$/.test(r.url)),false);assert.equal(ui.listeners.size,0);
+ }
+});
+
+
+test('postroll publishes ended only at a genuine native end and never fabricates a second completion',async()=>{
+ const ui=frameFixture({mode:'postroll'});ui.message();await ui.settle();const video=ui.video();
+ for(let i=1;i<=15;i++){video.currentTime=i;video.emit('timeupdate');}
+ video.ended=true;video.paused=true;video.emit('pause');video.emit('ended');video.emit('ended');
+ assert.deepEqual(ui.messages.map(m=>m.status),['filled','ended']);assert.ok(ui.messages.every(m=>m.context==='postroll'));
+ assert.equal(ui.requests.filter(r=>r.url.endsWith('/complete')).length,1);assert.equal(ui.listeners.size,0);
 });

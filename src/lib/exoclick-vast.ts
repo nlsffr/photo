@@ -5,7 +5,7 @@ type XmlNode={name:string;attrs:Record<string,string>;text:string;children:XmlNo
 type VastAd={kind:Kind;resource:string;mime:string;duration:number;skipAfter:number;wrapper:string|null;
   impressions:string[];errors:string[];clickThrough:string|null;clickTracking:string[];events:Record<string,string[]>};
 type XmlParser={parseFromString:(value:string,type:DOMParserSupportedType)=>Document};
-export type ExoclickVastOptions={kind:Kind;mode?:'preroll';placement:string;tagUrl:string;sourceHosts:readonly string[];
+export type ExoclickVastOptions={kind:Kind;mode?:'preroll'|'postroll';placement:string;tagUrl:string;sourceHosts:readonly string[];
   parentOrigin:string;nonce:string;consentValue:'v2:accepted';labels:{advertisement:string;close:string;skip:string;visit:string;play:string}};
 
 /** Serialized into the fixed iframe bootstrap as well as exercised by native Node tests.
@@ -32,7 +32,7 @@ export function createVastTools(){
     const m=/^(\d{2}):(\d{2}):(\d{2}(?:\.\d{1,3})?)$/.exec(s.trim());
     return m&&+m[2]<60&&+m[3]<60?+m[1]*3600 + +m[2]*60 + +m[3]:NaN;
   };
-  const parseTree=(root:XmlNode,kind:Kind,mode?:'preroll'):VastAd=>{
+  const parseTree=(root:XmlNode,kind:Kind,mode?:'preroll'|'postroll'):VastAd=>{
     let count=0;const inspect=(n:XmlNode,depth:number)=>{if(++count>2000||depth>32)fail('vast_xml');n.children.forEach(c=>inspect(c,depth+1));};inspect(root,0);
     if(root.name!=='VAST'||!/^([34])(?:\.\d+)?$/.test(root.attrs.version??''))fail('vast_version');
     const ads=children(root,'Ad');if(ads.length!==1)fail('vast_no_ad');
@@ -57,7 +57,7 @@ export function createVastTools(){
       if(!media)fail('vast_unsupported');const offset=linear.attrs.skipoffset;
       const skip=offset?.endsWith('%')?duration*parseFloat(offset)/100:seconds(offset??'');
       return {...common,resource:publicUrl(media.text.trim())!,mime:media.attrs.type.toLowerCase(),duration,
-        skipAfter:mode==='preroll'?Math.max(5,Number.isFinite(skip)&&skip>=0?Math.min(skip,duration):5)
+        skipAfter:(mode==='preroll'||mode==='postroll')?Math.max(5,Number.isFinite(skip)&&skip>=0?Math.min(skip,duration):5)
           :Number.isFinite(skip)&&skip>=0?Math.min(5,skip,duration):Math.min(5,duration),
         clickThrough:publicUrl(descendants(linear,'ClickThrough')[0]?.text.trim())};
     }
@@ -65,7 +65,7 @@ export function createVastTools(){
     const image=children(nonlinear,'StaticResource').find(n=>/^image\/(?:png|jpeg|gif|webp)$/i.test(n.attrs.creativeType??'')&&publicUrl(n.text.trim()));
     if(!image)fail('vast_unsupported');return {...common,resource:publicUrl(image.text.trim())!,mime:image.attrs.creativeType.toLowerCase(),clickThrough:publicUrl(first(nonlinear,'NonLinearClickThrough')?.text.trim())};
   };
-  const parseXml=(xml:string,kind:Kind,parser:XmlParser=new DOMParser(),mode?:'preroll')=>{
+  const parseXml=(xml:string,kind:Kind,parser:XmlParser=new DOMParser(),mode?:'preroll'|'postroll')=>{
     if(xml.length>262144||/<!\s*(?:DOCTYPE|ENTITY)\b/i.test(xml))fail('vast_xml');
     const doc=parser.parseFromString(xml,'application/xml');if(!doc.documentElement||doc.getElementsByTagName('parsererror').length)fail('vast_xml');
     let count=0;const tree=(element:Element,depth:number):XmlNode=>{
@@ -74,7 +74,7 @@ export function createVastTools(){
     };
     return parseTree(tree(doc.documentElement,0),kind,mode);
   };
-  const resolve=async(tagUrl:string,kind:Kind,options:{signal:AbortSignal;mode?:'preroll';fetchText:(u:string,signal:AbortSignal)=>Promise<string>;parse?:(xml:string)=>VastAd})=>{
+  const resolve=async(tagUrl:string,kind:Kind,options:{signal:AbortSignal;mode?:'preroll'|'postroll';fetchText:(u:string,signal:AbortSignal)=>Promise<string>;parse?:(xml:string)=>VastAd})=>{
     let url=publicUrl(tagUrl);if(!url)fail('vast_url');const visited=new Set<string>();let inherited:VastAd|null=null;
     for(let depth=0;depth<=3;depth++){
       if(options.signal.aborted)fail('vast_abort');if(visited.has(url!))fail('vast_wrapper');visited.add(url!);
@@ -112,7 +112,7 @@ export function createVastTools(){
 }
 
 function runVastFrame(config:ExoclickVastOptions,tools:ReturnType<typeof createVastTools>){
-  const preroll=config.mode==='preroll';
+  const preroll=config.mode==='preroll'||config.mode==='postroll';
   let activated=!preroll,lifetime:ReturnType<typeof setTimeout>|null=null;
   let parentVisible=false,closed=false,generation=0,loading=false,mounted=false,ad:VastAd|null=null,resumeAt=0;
   let cleanup=()=>{};
@@ -122,7 +122,7 @@ function runVastFrame(config:ExoclickVastOptions,tools:ReturnType<typeof createV
   const root=document.getElementById('lfh-vast')!;
   const accepted=()=>{try{return document.cookie.split(';').some(p=>{const [name,...value]=p.trim().split('=');return name==='lfh_ad_consent'&&decodeURIComponent(value.join('='))===config.consentValue;});}catch{return false;}};
   const allowed=()=>!closed&&activated&&parentVisible&&!document.hidden&&accepted();
-  const tell=(status:string)=>parent.postMessage({type:'lfh-ad-status',placement:config.placement,nonce:config.nonce,...(preroll?{context:'preroll'}:{}),status},config.parentOrigin);
+  const tell=(status:string)=>parent.postMessage({type:'lfh-ad-status',placement:config.placement,nonce:config.nonce,...(preroll?{context:config.mode}:{}),status},config.parentOrigin);
   const outbound=(raw:string)=>{const value=tools.publicUrl(raw);return value&&new URL(value).origin!==config.parentOrigin?value:null;};
   const track=(raw:string,event?:string)=>{
     if(!allowed())return;
@@ -211,7 +211,7 @@ function runVastFrame(config:ExoclickVastOptions,tools:ReturnType<typeof createV
   const message=(event:MessageEvent)=>{
     if(event.source!==parent||event.origin!==config.parentOrigin||!event.data||event.data.type!=='lfh-ad-visibility'
       ||event.data.placement!==config.placement||event.data.nonce!==config.nonce||typeof event.data.visible!=='boolean')return;
-    if(preroll&&(event.data.context!=='preroll'||event.data.activated!==true))return;
+    if(preroll&&(event.data.context!==config.mode||event.data.activated!==true))return;
     if(parentVisible===event.data.visible)return;parentVisible=event.data.visible;
     if(preroll&&parentVisible&&!activated){activated=true;lifetime=setTimeout(failed,12000);}
     refresh();
@@ -234,7 +234,7 @@ export function buildExoclickVastDocument(options:ExoclickVastOptions){
   const validParent=()=>{try{const url=new URL(options.parentOrigin);return url.origin===options.parentOrigin&&!url.username&&!url.password
     &&(options.parentOrigin==='https://leakfanhub.com'||(url.protocol==='http:'&&['127.0.0.1','localhost'].includes(url.hostname)));}catch{return false;}};
   if(!['linear','nonlinear'].includes(options.kind)||!tag||!validParent()
-    ||(options.mode!==undefined&&(options.mode!=='preroll'||options.kind!=='linear'||options.placement!=='underVideo'))
+    ||(options.mode!==undefined&&(!['preroll','postroll'].includes(options.mode)||options.kind!=='linear'||options.placement!=='underVideo'))
     ||!Array.isArray(options.sourceHosts)||!options.sourceHosts.length||!options.sourceHosts.every(h=>tools.publicUrl('https://'+h+'/')&&new URL('https://'+h+'/').hostname===h)
     ||!options.sourceHosts.includes(new URL(tag).hostname)||options.consentValue!=='v2:accepted'||typeof options.placement!=='string'||!/^[a-z][a-zA-Z]{0,31}$/.test(options.placement)
     ||typeof options.nonce!=='string'||!/^[-A-Za-z0-9_]{1,100}$/.test(options.nonce)
@@ -243,10 +243,11 @@ export function buildExoclickVastDocument(options:ExoclickVastOptions){
   const boot=`(${runVastFrame.toString()})(${data},(${createVastTools.toString()})());`;
   const hash=createHash('sha256').update(boot).digest('base64');
   const csp=["default-src 'none'","base-uri 'none'","object-src 'none'","frame-ancestors 'self'","form-action 'none'",`script-src 'sha256-${hash}'`,"style-src 'unsafe-inline'","connect-src https:","img-src https:","media-src https:","frame-src 'none'"].join('; ');
-  const scheme=options.mode==='preroll'?'<meta name="color-scheme" content="dark">':'';
-  const schemeStyle=options.mode==='preroll'?'html{color-scheme:dark}':'';
+  const roll=options.mode==='preroll'||options.mode==='postroll';
+  const scheme=roll?'<meta name="color-scheme" content="dark">':'';
+  const schemeStyle=roll?'html{color-scheme:dark}':'';
   // A media-page iframe can be only 219px tall on a phone. The preroll's
   // controls must overlay its contained video rather than extend its height.
-  const prerollStyle=options.mode==='preroll'?'html,body,#lfh-vast{width:100%;height:100%;overflow:hidden}#lfh-vast>div{position:absolute;inset:0}#lfh-vast video{width:100%;height:100%;max-height:none;object-fit:contain;background:#000}#lfh-vast>button,#lfh-vast>a{position:absolute;z-index:2;max-width:calc(50% - 16px);margin:0;border:1px solid #777;border-radius:8px;background:#111e;color:inherit;font:inherit;line-height:1.2;text-align:center;overflow-wrap:anywhere}#lfh-vast>button:first-of-type{right:8px;bottom:8px}#lfh-vast>button:nth-of-type(2){left:8px;bottom:8px}#lfh-vast>a{right:8px;top:8px}#lfh-vast>p{box-sizing:border-box;max-width:calc(50% - 16px);font-size:12px}':'';
+  const prerollStyle=roll?'html,body,#lfh-vast{width:100%;height:100%;overflow:hidden}#lfh-vast>div{position:absolute;inset:0}#lfh-vast video{width:100%;height:100%;max-height:none;object-fit:contain;background:#000}#lfh-vast>button,#lfh-vast>a{position:absolute;z-index:2;max-width:calc(50% - 16px);margin:0;border:1px solid #777;border-radius:8px;background:#111e;color:inherit;font:inherit;line-height:1.2;text-align:center;overflow-wrap:anywhere}#lfh-vast>button:first-of-type{right:8px;bottom:8px}#lfh-vast>button:nth-of-type(2){left:8px;bottom:8px}#lfh-vast>a{right:8px;top:8px}#lfh-vast>p{box-sizing:border-box;max-width:calc(50% - 16px);font-size:12px}':'';
   return {csp,html:`<!doctype html><html lang="en"><head><meta charset="utf-8">${scheme}<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Advertisement</title><style>${schemeStyle}html,body{margin:0;background:transparent;color:white;font:14px system-ui}#lfh-vast{text-align:center;position:relative}#lfh-vast[hidden]{display:none}p{position:absolute;top:0;left:0;z-index:1;margin:0;padding:4px;background:#000b;max-width:calc(100% - 52px)}button,a{min-height:44px;min-width:44px;padding:8px;box-sizing:border-box}button{cursor:pointer}button[data-close]{position:absolute;right:0;top:0;z-index:2}a{display:inline-block;color:inherit}.creative-link{display:block;padding:0;min-height:0;min-width:0}video{display:block;max-width:100%;height:auto;max-height:75dvh;margin:auto}img{display:block;max-width:100%;height:auto;margin:auto}.nonlinear{width:300px;height:250px;object-fit:contain}${prerollStyle}</style></head><body><section id="lfh-vast" hidden></section><script>${boot}</script></body></html>`};
 }
