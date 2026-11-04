@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { AD_PLACEMENT_KEYS, type AdPlacement, type AdsConfig, type AdPlacements } from "@/lib/ads-contract";
 import { ADS_REGISTRY, isAdsRegistryReady, missingAdsPlacements, type AdDevice } from "@/lib/ads-registry";
 
-const LABELS: Record<AdPlacement, string> = { header:"Bannière en haut", footer:"Bannière en bas", underVideo:"Sous la vidéo", feed:"Dans le feed vidéo", popunder:"Popunder après un clic", interstitial:"Interstitiel", slider:"Vidéo flottante" };
+const LABELS: Record<AdPlacement, string> = { header:"Bannière en haut", footer:"Bannière en bas", underVideo:"Galeries et sous les vidéos", feed:"Dans le feed vidéo", popunder:"Popunder après un clic", interstitial:"Interstitiel", slider:"Vidéo flottante" };
 const samePlacements = (left:AdPlacements,right:AdPlacements) => AD_PLACEMENT_KEYS.every(key=>left[key]===right[key]);
 function parseConfig(value:unknown):AdsConfig|null {
   if(!value || typeof value!=='object' || Array.isArray(value)) return null;

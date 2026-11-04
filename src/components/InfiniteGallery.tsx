@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, Fragment } from "react";
 import { PhotoCard } from "./PhotoCard";
 import { AdSlot } from "./AdSlot";
+import { useAds } from "./AdsProvider";
 import type { MediaType, PhotoPage, PhotoView, SortKey } from "@/lib/types";
 import { useLocale } from "./LocaleProvider";
 
@@ -19,7 +20,18 @@ interface Props {
   premium?: boolean;
 }
 
-const AD_EVERY = 24;
+const FIRST_AD_AFTER = 8;
+const AD_EVERY = 16;
+
+function GalleryAdInsertion() {
+  const ads = useAds();
+  if (!ads.canServe("underVideo")) return null;
+  return (
+    <div className="col-span-full my-1">
+      <AdSlot placement="underVideo" />
+    </div>
+  );
+}
 
 export function InfiniteGallery({ initial, params, premium = false }: Props) {
   const { t } = useLocale();
@@ -161,11 +173,8 @@ export function InfiniteGallery({ initial, params, premium = false }: Props) {
             <div className="min-w-0">
               <PhotoCard photo={p} priority={i < 2} />
             </div>
-            {!premium && (i + 1) % AD_EVERY === 0 ? (
-              <div className="col-span-full my-1">
-                <AdSlot variant="interstitial" />
-              </div>
-            ) : null}
+            {!premium && i + 1 >= FIRST_AD_AFTER && (i + 1 - FIRST_AD_AFTER) % AD_EVERY === 0
+              ? <GalleryAdInsertion /> : null}
           </Fragment>
         ))}
       </div>
