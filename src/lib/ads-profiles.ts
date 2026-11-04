@@ -23,7 +23,7 @@ export const AD_PROFILE_INFO: ReadonlyArray<{key:AdProfile;title:string;summary:
     'Feed TrafficStars ou ExoClick selon la disponibilité du SDK, après 5 médias, puis tous les 4, avec une promotion Premium à la deuxième insertion.',
     'Profils et Plus aimés : aucun encart inséré dans la grille. Les partenaires privés et variantes non observables du concurrent ne sont pas reproduits.',
     'Pages photo et vidéo : un encart après les commentaires et, à partir de 3 recommandations, un encart après les 2 premières.',
-    'Interstitiel : premier lien éligible après chargement, fermeture après 5 secondes et cookie de 5 minutes à la fermeture. Aucun clic forcé ni retour arrière bloqué.',
+    'Interstitiel : premier lien éligible après chargement, fermeture automatique après 20 secondes et cookie de 5 minutes à la fermeture. Aucun clic forcé ni retour arrière bloqué.',
   ]},
 ];
 
@@ -34,7 +34,7 @@ function withPopFrequency(count:number,delay:number):typeof ADS_REGISTRY {
   }};
 }
 const intensive=withPopFrequency(3,5);
-intensive.interstitial={desktop:{...ADS_REGISTRY.interstitial.desktop,countClicks:0},mobile:{...ADS_REGISTRY.interstitial.mobile,countClicks:0}};
+intensive.interstitial={desktop:{...ADS_REGISTRY.interstitial.desktop,countClicks:0,countdown:20},mobile:{...ADS_REGISTRY.interstitial.mobile,countClicks:0,countdown:20}};
 for(const device of ["desktop","mobile"] as const){
   intensive.popunder[device]={...intensive.popunder[device],firstDelay:0,mode:undefined};
 }

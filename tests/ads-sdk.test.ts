@@ -111,7 +111,7 @@ test('intensive popunder arms on current eligibility, without a synthetic click 
   assert.equal(scripts.length,before);
 });
 
-test('the intensive native interstitial receives zero clicks with the unchanged close timer and cookie identity',async t=>{
+test('the intensive native interstitial receives its twenty-second automatic close without changing click or cookie identity',async t=>{
   // @ts-expect-error Native Node requires explicit suffixes.
   const {loadAppModule}=await import('./helpers/load-app-module.ts');
   const {adSpotFor}=loadAppModule<{adSpotFor:(profile:string,placement:string,device:string)=>Record<string,unknown>}>('src/lib/ads-profiles.ts');
@@ -124,7 +124,7 @@ test('the intensive native interstitial receives zero clicks with the unchanged 
   const cleanup=mountTrafficStarsAd({profile:'intensive',placement:'interstitial',spot:adSpotFor('intensive','interstitial','mobile') as never,
     container:{id:'fixture-global',isConnected:true,replaceChildren:()=>{}} as unknown as HTMLElement,permitted:()=>true,onStart:()=>true});
   assert.equal(scripts.length,1);assert.equal(options.length,0);scripts[0].onload?.();await Promise.resolve();await Promise.resolve();
-  assert.equal(options.length,1);assert.equal(options[0].countClicks,0);assert.equal(options[0].countdown,5);
+  assert.equal(options.length,1);assert.equal(options[0].countClicks,0);assert.equal(options[0].countdown,20);
   assert.equal(options[0].cookieName,'lfh_ts_interstitial_v1');assert.equal(options[0].cookieExpires,5/60);assert.equal(options[0].autoXu,false);
   assert.equal(options[0].subid,'lfh_intensive_interstitial_mobile');cleanup();
 });

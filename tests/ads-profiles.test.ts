@@ -45,7 +45,7 @@ test('stored vendor frequency templates stay unchanged and only intensive uses n
     const spot=adSpotFor(profile,'popunder','mobile');
     assert.equal(spot.sessionDuration,300);assert.equal(spot.count,count);assert.equal(spot.delay,delay);
     assert.equal(spot.firstDelay,profile==='intensive'?0:5);assert.equal(spot.mode,profile==='intensive'?undefined:'selective');
-    assert.equal(adSpotFor(profile,'interstitial','desktop').countdown,5);
+    assert.equal(adSpotFor(profile,'interstitial','desktop').countdown,profile==='intensive'?20:5);
     assert.equal(adSpotFor(profile,'interstitial','desktop').cookieExpires,5/60);
     assert.equal(adSpotFor(profile,'slider','mobile').closeButtonDelay,0);
   }
@@ -82,12 +82,12 @@ test('intensive native-style positions apply only to home and trending, with no 
   }
 });
 
-test('only intensive disables the native interstitial click counter while retaining the five-minute cap and five-second close',()=>{
+test('only intensive uses the native twenty-second automatic close while retaining its click counter and five-minute cap',()=>{
   for(const device of ['desktop','mobile'] as const){
     for(const profile of ['current','balanced','intensive'] as const){
       const spot=adSpotFor(profile,'interstitial',device);
       assert.equal(spot.countClicks,profile==='intensive'?0:3);
-      assert.equal(spot.countdown,5);assert.equal(spot.cookieExpires,5/60);
+      assert.equal(spot.countdown,profile==='intensive'?20:5);assert.equal(spot.cookieExpires,5/60);
       assert.equal(spot.spotId,ADS_REGISTRY.interstitial[device].spotId);
       assert.equal(spot.scriptUrl,ADS_REGISTRY.interstitial[device].scriptUrl);
     }
