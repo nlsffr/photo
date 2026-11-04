@@ -37,7 +37,30 @@ test("each profile chooses exactly one provider and preserves the existing Traff
 test("feed alternation is deterministic from its stable zero-based slot ordinal", () => {
   const choice = (profile: "current" | "balanced" | "intensive", ordinal: number) => selectAdProvider({ profile, placement: "feed", device: "mobile", ordinal });
   assert.deepEqual(Array.from({ length: 6 }, (_, ordinal) => choice("balanced", ordinal)), ["trafficstars", "exoclick", "trafficstars", "exoclick", "trafficstars", "exoclick"]);
-  for (const ordinal of [0, 1, 1000000]) { assert.equal(choice("current", ordinal), "trafficstars"); assert.equal(choice("intensive", ordinal), "exoclick"); }
+  for (const ordinal of [0, 1, 1000000]) { assert.equal(choice("current", ordinal), "trafficstars"); assert.equal(choice("intensive", ordinal), "trafficstars"); }
+});
+
+test('only intensive has an explicit standard/alternative feed branch and an undecided state remains closed',()=>{
+  for(const device of ['desktop','mobile'] as const)for(const mediation of ['standard','alternative'] as const){
+    assert.equal(selectAdProvider({profile:'intensive',placement:'feed',device,ordinal:0,mediation}),mediation==='standard'?'trafficstars':'exoclick');
+    assert.equal(selectAdProvider({profile:'intensive',placement:'underVideo',device,context:'pause',mediation}),'exoclick');
+    assert.equal(selectAdProvider({profile:'intensive',placement:'header',device,mediation}),'trafficstars');
+  }
+  for(const profile of ['current','balanced'] as const)for(const mediation of ['standard','alternative'] as const){
+    assert.equal(selectAdProvider({profile,placement:'feed',device:'mobile',ordinal:0,mediation}),null);
+  }
+  for(const mediation of [null,'unknown',true,0])assert.equal(selectAdProvider({profile:'intensive',placement:'feed',device:'mobile',ordinal:0,mediation} as never),null);
+});
+
+test('intensive alternative selects Exo interstitial and slider, while popunder remains TrafficStars',()=>{
+  for(const device of ['desktop','mobile'] as const){
+    for(const placement of ['interstitial','slider'] as const){
+      assert.equal(selectAdProvider({profile:'intensive',placement,device,mediation:'standard'}),'trafficstars');
+      assert.equal(selectAdProvider({profile:'intensive',placement,device,mediation:'alternative'}),'exoclick');
+      assert.equal(getExoclickSpot(placement,device),null,'Globals have no HTTP iframe/registry route.');
+    }
+    assert.equal(selectAdProvider({profile:'intensive',placement:'popunder',device,mediation:'alternative'}),'trafficstars');
+  }
 });
 
 test("only intensive's paused video selects the nonlinear Exo zone; invalid or ambiguous selections fail closed", () => {

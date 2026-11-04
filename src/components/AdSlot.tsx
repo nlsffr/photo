@@ -3,8 +3,11 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { AdPlacement } from "@/lib/ads-contract";
 import type { AdDevice } from "@/lib/ads-registry";
 import { adSpotFor } from "@/lib/ads-profiles";
+import { resolveAdPageContext } from "@/lib/ads-page-context";
+import { stripLocalePrefix } from "@/lib/i18n/config";
 import { selectAdProvider, type AdSlotContext } from "@/lib/ads-provider-plan";
 import { getExoclickSpot } from "@/lib/exoclick-registry";
+import { getExoclickGlobalSpot, mountExoclickGlobalAd } from "@/lib/exoclick-global";
 import { mountTrafficStarsAd } from "@/lib/ads-sdk";
 import { adsCopy } from "@/lib/ads-copy";
 import { useAds } from "./AdsProvider";
@@ -15,13 +18,14 @@ import { usePremium } from "./Premium";
 import { DISCOVERY_COPY } from "@/features/i18n/discovery-copy";
 import { getPlan } from "@/lib/premium-plans";
 
-type NetworkSlotProps = { placement: AdPlacement; className?: string; onEmpty?: () => void; loading?: "eager"|"lazy"; context?: AdSlotContext; ordinal?: number };
+type NetworkSlotProps = { placement: AdPlacement; className?: string; onEmpty?: () => void; loading?: "eager"|"lazy"; context?: AdSlotContext; ordinal?: number; layout?: "grid" };
 
-function NetworkAdSlot({ placement, className = "", onEmpty, loading, context = "page", ordinal = 0 }: NetworkSlotProps) {
+function NetworkAdSlot({ placement, className = "", onEmpty, loading, context = "page", ordinal = 0, layout }: NetworkSlotProps) {
   const ads = useAds();
   const { locale } = useLocale();
   const path = usePathname();
   const container = useRef<HTMLDivElement>(null);
+  const gridContainer = useRef<HTMLElement>(null);
   const frame = useRef<HTMLIFrameElement>(null);
   const frameTimer = useRef<number | undefined>(undefined);
   const frameFilled = useRef(false);
@@ -32,24 +36,35 @@ function NetworkAdSlot({ placement, className = "", onEmpty, loading, context = 
   const emptyHandler = useRef(onEmpty);
   useEffect(() => { emptyHandler.current = onEmpty; }, [onEmpty]);
   const [device, setDevice] = useState<AdDevice | null>(null);
+  const [gridWidth, setGridWidth] = useState<number | null>(null);
   const [failedKey, setFailedKey] = useState<string | null>(null);
   const id = `lfh-ad-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const eligible = ads.canServe(placement);
   const profile = ads.runtime?.profile ?? "current";
   const revision = ads.runtime?.revision ?? 0;
   const global = ["popunder", "interstitial", "slider"].includes(placement);
-  const provider = device ? selectAdProvider({profile, placement, device, context, ...(placement === "feed" ? {ordinal} : {})}) : null;
-  const trafficSpot = device ? adSpotFor(profile, placement, device) : null;
+  const mediation = profile === "intensive" ? ads.mediation : undefined;
+  const provider = device ? selectAdProvider({profile, placement, device, context, ...(placement === "feed" ? {ordinal} : {}),
+    ...(profile === "intensive" ? {mediation} : {})}) : null;
+  const pageContext = resolveAdPageContext(path);
+  const trafficSpot = device ? adSpotFor(profile, placement, device, pageContext ?? undefined) : null;
   const exoSpot = device && provider === "exoclick" ? getExoclickSpot(placement, device, context) : null;
+  const globalExoSpot = global && device && provider === "exoclick" ? getExoclickGlobalSpot(placement, device) : null;
   const spot = provider === "exoclick" ? exoSpot : trafficSpot;
   // Correlation only, never a credential. React's ID is unique to this mounted slot.
-  const nonce = `${id.slice(0, 40)}-${profile}-${revision}-${device}-${context}-${ordinal}-${locale}`;
+  const nonce = `${id.slice(0, profile === "intensive" ? 24 : 40)}-${profile}-${revision}-${device}-${context}-${ordinal}-${locale}${profile === "intensive" ? `-${mediation ?? "standard"}` : ""}`;
   const exoQuery = new URLSearchParams({placement, device: device ?? "mobile", context, profile, nonce, path, locale});
   if (placement === "feed") exoQuery.set("ordinal", String(ordinal));
+  if (profile === "intensive" && mediation) exoQuery.set("mediation", mediation);
   const frameSrc = !device || !provider ? undefined : provider === "exoclick"
-    ? `/api/ads/exoclick?${exoQuery}` : `/api/ads/embed?placement=${placement}&device=${device}${placement === "feed" ? `&ordinal=${ordinal}` : ""}`;
+    ? `/api/ads/exoclick?${exoQuery}` : `/api/ads/embed?placement=${placement}&device=${device}${placement === "feed" ? `&ordinal=${ordinal}` : ""}${profile === "intensive" ? `&path=${encodeURIComponent(path)}${mediation ? `&mediation=${mediation}` : ""}` : ""}`;
   const frameKey = `${frameSrc}:${profile}:${revision}`;
   const serving = eligible && failedKey !== frameKey;
+  const gridSized = profile === "intensive" && layout === "grid" && placement === "underVideo" && spot?.kind === "banner"
+    && typeof spot.width === "number" && spot.width > 0 && typeof spot.height === "number" && spot.height > 0;
+  const gridReady = typeof gridWidth === "number" && Number.isFinite(gridWidth) && gridWidth > 0;
+  const gridScale = gridSized && gridReady ? Math.min(1, gridWidth! / (spot.width as number)) : 1;
+  const footerWrapper = profile === "intensive" && placement === "footer" && device === "desktop";
   const empty = useCallback(() => {
     if (failedFrame.current === frameKey) return;
     failedFrame.current = frameKey;
@@ -63,6 +78,19 @@ function NetworkAdSlot({ placement, className = "", onEmpty, loading, context = 
     const update = () => setDevice(media.matches ? "desktop" : "mobile"); update();
     media.addEventListener("change", update); return () => media.removeEventListener("change", update);
   }, []);
+  useEffect(() => {
+    const element = gridContainer.current;
+    if (!serving || !gridSized || !element) return;
+    const update = () => {
+      const width = element.getBoundingClientRect().width;
+      if (Number.isFinite(width) && width > 0) setGridWidth(previous => previous === width ? previous : width);
+    };
+    update();
+    const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(update);
+    observer?.observe(element);
+    if (!observer) window.addEventListener("resize", update);
+    return () => { observer?.disconnect(); if (!observer) window.removeEventListener("resize", update); };
+  }, [serving, gridSized, frameKey]);
   useEffect(() => {
     frameFilled.current = false;
     window.clearTimeout(frameTimer.current);
@@ -109,24 +137,27 @@ function NetworkAdSlot({ placement, className = "", onEmpty, loading, context = 
   }, [serving, global, provider, placement, nonce, frameKey]);
   useEffect(() => {
     const element = container.current;
-    if (!eligible || !element || !trafficSpot || !global) return;
-    let remove: (() => void) | undefined;
-    const mount = () => {
-      if (remove) return;
-      remove = mountTrafficStarsAd({ placement, profile, spot: trafficSpot, container:element,
-        permitted:() => currentAds.current.canServe(placement), onStart:() => currentAds.current.markSdkStarted(device!) });
+    if (!serving || !element || !global || !device || !provider) return;
+    const permission = {
+      permitted: () => currentAds.current.canServe(placement),
+      onStart: () => currentAds.current.markSdkStarted(device),
     };
-    mount(); return () => remove?.();
-  }, [eligible, trafficSpot, placement, global, device, profile]);
+    if (provider === "exoclick") {
+      if (!globalExoSpot) return;
+      return mountExoclickGlobalAd({ placement, spot: globalExoSpot, container: element, ...permission });
+    }
+    if (!trafficSpot) return;
+    return mountTrafficStarsAd({ placement, profile, spot: trafficSpot, container: element, ...permission });
+  }, [serving, trafficSpot, globalExoSpot, provider, mediation, placement, global, device, profile, revision]);
 
-  if (!serving || !spot || !provider) return null;
-  if (global) return <div ref={container} id={id} hidden data-ad-placement={placement} />;
-  return <aside aria-label={adsCopy[locale].label} data-ad-placement={placement} data-ad-provider={provider} className={`mx-auto max-w-full overflow-hidden ${className}`}>
-    <p className="mb-1 text-center text-[10px] uppercase tracking-wide text-[var(--color-ink-faint)]">{adsCopy[locale].label}</p>
-    <iframe key={frameKey} ref={frame} id={id} title={adsCopy[locale].label} loading={loading ?? (placement === "header" ? "eager" : "lazy")}
+  if (!serving || !provider) return null;
+  if (global) return (provider === "exoclick" ? globalExoSpot : trafficSpot)
+    ? <div ref={container} id={id} hidden data-ad-placement={placement} data-ad-provider={provider} /> : null;
+  if (!spot) return null;
+  const iframe = !gridSized || gridReady ? <iframe key={frameKey} ref={frame} id={id} title={adsCopy[locale].label} loading={loading ?? (placement === "header" ? "eager" : "lazy")}
       src={frameSrc}
       sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-      referrerPolicy="no-referrer" className="mx-auto max-w-full border-0"
+      referrerPolicy="no-referrer" className={gridSized ? "absolute left-0 top-0 block origin-top-left border-0" : "mx-auto max-w-full border-0"}
       onLoad={event => {
         if (event.currentTarget !== frame.current) return;
         sendVisibility.current?.(event.currentTarget);
@@ -136,14 +167,22 @@ function NetworkAdSlot({ placement, className = "", onEmpty, loading, context = 
         window.clearTimeout(frameTimer.current);
         if (!frameFilled.current) frameTimer.current = window.setTimeout(empty, 10_000);
       }}
-      style={placement === "feed" ? { width:"100%", height:"85dvh", maxHeight:"100%" } : { width:spot.width, height:spot.height }} />
+      style={gridSized ? { width:spot.width, height:spot.height, transform:`scale(${gridScale})` }
+        : placement === "feed" ? { width:"100%", height:"85dvh", maxHeight:"100%" } : { width:spot.width, height:spot.height }} /> : null;
+  return <aside ref={gridSized ? gridContainer : undefined} aria-label={adsCopy[locale].label} data-ad-placement={placement} data-ad-provider={provider}
+    className={`mx-auto ${gridSized ? "flex w-full min-w-0 flex-col" : "max-w-full overflow-hidden"}${footerWrapper ? " flex flex-col items-center justify-center" : ""} ${className}`}
+    style={gridSized ? {aspectRatio:"0.6"} : footerWrapper ? {width:"100%",maxWidth:860,minHeight:250} : undefined}>
+    <p className="mb-1 text-center text-[10px] uppercase tracking-wide text-[var(--color-ink-faint)]">{adsCopy[locale].label}</p>
+    {gridSized ? <div className="grid min-h-0 flex-1 place-items-center">
+      <div data-ad-grid-frame className="relative mx-auto w-full" style={{maxWidth:spot.width,aspectRatio:`${spot.width} / ${spot.height}`,overflow:"clip"}}>{iframe}</div>
+    </div> : iframe}
   </aside>;
 }
 
 export function AdsOverlays() {
   const ads = useAds();
   const path = usePathname();
-  const feed = /(?:^|\/)(?:feed|tiktok)(?:\/|$)/.test(path);
+  const feed = /^\/(?:feed|tiktok)(?:\/|$)/.test(stripLocalePrefix(path).pathname);
   if (!["popunder", "interstitial", "slider"].some(key => ads.canServe(key as AdPlacement))) return null;
   return <>
     <style>{`.ts-im-container{bottom:calc(5rem + env(safe-area-inset-bottom))!important;${feed ? "left:1rem!important;right:auto!important;" : "right:1rem!important;"}transform:none!important;max-width:calc(100vw - 2rem)!important;z-index:45!important}.ts-im-button-close{min-width:44px;min-height:44px}@media(min-width:1024px){.ts-im-container{bottom:1rem!important;right:1rem!important;left:auto!important}}`}</style>
@@ -198,6 +237,6 @@ function LegacyAdSlot({
   );
 }
 
-export function AdSlot(props: NetworkSlotProps & { variant?: never; hide?: never } | { placement?: never; className?: never; onEmpty?: never; loading?: never; context?: never; ordinal?: never; variant?: "banner" | "interstitial"; hide?: boolean }) {
-  return props.placement ? <NetworkAdSlot placement={props.placement} className={props.className} onEmpty={props.onEmpty} loading={props.loading} context={props.context} ordinal={props.ordinal} /> : <LegacyAdSlot variant={props.variant} hide={props.hide} />;
+export function AdSlot(props: NetworkSlotProps & { variant?: never; hide?: never } | { placement?: never; className?: never; onEmpty?: never; loading?: never; context?: never; ordinal?: never; layout?: never; variant?: "banner" | "interstitial"; hide?: boolean }) {
+  return props.placement ? <NetworkAdSlot placement={props.placement} className={props.className} onEmpty={props.onEmpty} loading={props.loading} context={props.context} ordinal={props.ordinal} layout={props.layout} /> : <LegacyAdSlot variant={props.variant} hide={props.hide} />;
 }

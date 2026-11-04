@@ -12,6 +12,8 @@ import { getDictionary } from "../src/lib/i18n/dictionaries.ts";
 const dictionary = getDictionary("en");
 const locale = { useLocale: () => ({ locale: "en", dictionary, t: (key: string) => key }) };
 const boundaries: Record<string, unknown> = {
+  'next/navigation': {usePathname: () => '/'},
+  './AdsProvider': {useAds: () => ({canServe: () => false})},
   "./LocaleProvider": locale,
   "./Interactions": { useInteractions: () => ({ ready: false, isLiked: () => false, isSaved: () => false }) },
   "./AdSlot": { AdSlot: () => null },

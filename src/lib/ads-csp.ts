@@ -3,14 +3,16 @@
  */
 const CONNECT_ORIGINS = ["https://tsyndicate.com", "https://fozekikikiminu.com", "https://cdn.fozekikikiminu.com", "https://cdn.tsyndicate.com", "https://pxl.tsyndicate.com", "https://pxl.fozekikikiminu.com", "https://jssdk.fozekikikiminu.com", "https://jssdk.tsyndicate.com", "https://jssdk.juneworewyjyna.com", "https://m.fozekikikiminu.com",
   // Slider SDK follow-up XHR after this site's VAST response (live CSP observation).
-  "https://go.gasipedibexide.com"] as const;
+  "https://go.gasipedibexide.com",
+  // Official generic Exo engine, static source retrieved 2026-11-04.
+  "https://s.pemsrv.com"] as const;
 export const ADS_CSP = {
-  script: ["https://cdn.fozekikikiminu.com", "https://cdn.tsyndicate.com", "https://jssdk.fozekikikiminu.com", "https://jssdk.tsyndicate.com", "https://jssdk.juneworewyjyna.com"],
+  script: ["https://a.pemsrv.com", "https://cdn.fozekikikiminu.com", "https://cdn.tsyndicate.com", "https://jssdk.fozekikikiminu.com", "https://jssdk.tsyndicate.com", "https://jssdk.juneworewyjyna.com"],
   style: ["https://cdn.fozekikikiminu.com", "https://cdn.tsyndicate.com"],
   connect: CONNECT_ORIGINS,
   // NativeAdPreview's API and observed HLS requests are child-document connections only.
   embedConnect: [...CONNECT_ORIGINS, "https://go.lanitesasexige.com", "https://edge-hls.saawsedge.com", "https://media-hls.saawsedge.com"],
-  image: ["https://pxl.tsyndicate.com", "https://pxl-eu.tsyndicate.com", "https://pxl.fozekikikiminu.com", "https://m.fozekikikiminu.com", "https://tsyndicate.com", "https://static-ah.xhcdn.com", "https://go.gasipedibexide.com", "https://static-proxy.strpst.com"],
+  image: ["https://z6v2p9a8.bkcdn.net", "https://pxl.tsyndicate.com", "https://pxl-eu.tsyndicate.com", "https://pxl.fozekikikiminu.com", "https://m.fozekikikiminu.com", "https://tsyndicate.com", "https://static-ah.xhcdn.com", "https://go.gasipedibexide.com", "https://static-proxy.strpst.com"],
   media: ["https://cdn.tsyndicate.com", "https://static-ah.xhcdn.com", "https://tsvideo.sacdnssedge.com"],
   frame: ["https://tsyndicate.com", "https://jssdk.fozekikikiminu.com"],
 } as const;

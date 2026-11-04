@@ -6,6 +6,8 @@ import type { AdProfile } from "./ads-contract";
 import { AD_CONSENT_VERSION, isAdProfile } from "./ads-contract.ts";
 // @ts-expect-error Native Node tests require explicit suffixes.
 import { ADS_CSP } from "./ads-csp.ts";
+// @ts-expect-error Native Node requires explicit suffixes.
+import { adFormatPlacementFor, type AdPageContext } from './ads-page-context.ts';
 
 type EmbedPlacement = "header" | "footer" | "underVideo" | "feed";
 type EmbedDevice = "desktop" | "mobile";
@@ -14,10 +16,10 @@ type EmbedDevice = "desktop" | "mobile";
  * SAMEORIGIN + allow-same-origin is required by this SDK's unguarded storage access.
  * This separates layout/CSP, not publisher data from the trusted SDK.
  */
-export function buildAdsEmbedDocument(placement: EmbedPlacement, device: EmbedDevice, profile:AdProfile="current") {
+export function buildAdsEmbedDocument(placement: EmbedPlacement, device: EmbedDevice, profile:AdProfile="current", page?:AdPageContext) {
   if (!["header", "footer", "underVideo", "feed"].includes(placement) || !["desktop", "mobile"].includes(device)) throw new Error("invalid_ad_embed");
   if (!isAdProfile(profile)) throw new Error("invalid_ad_profile");
-  const spot = ADS_REGISTRY[placement][device] as AdSpot;
+  const spot = ADS_REGISTRY[adFormatPlacementFor(profile,placement,device,page)][device] as AdSpot;
   if (!isValidAdSpot(spot) || !["banner", "feed"].includes(spot.kind)) throw new Error("ad_embed_not_ready");
   const data = JSON.stringify({ placement, device, profile, kind:spot.kind, spotId:spot.spotId, domain:spot.domain,
     consentValue: `${AD_CONSENT_VERSION}:accepted`,

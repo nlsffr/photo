@@ -25,6 +25,7 @@ type NavItem = {
 };
 
 type NavSection = { titleKey?: string; items: NavItem[] };
+const isFeedPath = (pathname: string) => /^\/(?:feed|tiktok)(?:\/|$)/.test(pathname);
 
 const I = (d: string) => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -39,7 +40,7 @@ const SECTIONS: NavSection[] = [
       { href: "/", labelKey: "home", icon: I("M3 11l9-8 9 8M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"), active: (p) => p === "/" },
       { href: "/recherche", labelKey: "search", icon: I("M21 21l-4.35-4.35M11 11m-7 0a7 7 0 1 0 14 0a7 7 0 1 0-14 0"), active: (p) => p.startsWith("/recherche") },
       { href: "/models", labelKey: "models", icon: I("M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"), active: (p) => p.startsWith("/models") },
-      { href: "/feed", labelKey: "feed", icon: I("M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM10 8l6 4-6 4z"), active: (p) => p.startsWith("/feed") || p.startsWith("/tiktok") },
+      { href: "/feed", labelKey: "feed", icon: I("M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM10 8l6 4-6 4z"), active: isFeedPath },
       { href: "/trending-medias", labelKey: "trending", icon: I("M5 17l6-6 4 4 8-8M21 7v6h-6"), active: (p) => p.startsWith("/trending-medias") },
       { href: "/most-liked", labelKey: "mostLiked", icon: I("M12 21s-7.5-4.6-10-9.3C.4 8.4 2 5 5.4 5c2 0 3.3 1.1 4.6 2.6C11.3 6.1 12.6 5 14.6 5 18 5 19.6 8.4 22 11.7 19.5 16.4 12 21 12 21Z"), active: (p) => p.startsWith("/most-liked") },
       { href: "/random/medias", labelKey: "random", icon: I("M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"), active: (p) => p.startsWith("/random") },
@@ -121,7 +122,7 @@ function NavContent({ onNavigate }: { onNavigate?: () => void }) {
 const TABS: { href: string; labelKey: string; icon: "home" | "models" | "feed" | "search" | "login"; active: (p: string) => boolean }[] = [
   { href: "/", labelKey: "home", icon: "home", active: (p) => p === "/" },
   { href: "/models", labelKey: "models", icon: "models", active: (p) => p.startsWith("/models") },
-  { href: "/feed", labelKey: "feed", icon: "feed", active: (p) => p.startsWith("/feed") },
+  { href: "/feed", labelKey: "feed", icon: "feed", active: isFeedPath },
   { href: "/recherche", labelKey: "search", icon: "search", active: (p) => p.startsWith("/recherche") },
   { href: "/connexion", labelKey: "login", icon: "login", active: (p) => p.startsWith("/connexion") || p.startsWith("/inscription") },
 ];
@@ -217,7 +218,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { locale, t } = useLocale();
   const [openPath, setOpenPath] = useState<string | null>(null);
   const open = openPath === pathname;
-  const isFeed = routePath.startsWith("/feed") || routePath.startsWith("/tiktok");
+  const isFeed = isFeedPath(routePath);
 
   useEffect(() => {
     if (openPath === null || openPath === pathname) return;

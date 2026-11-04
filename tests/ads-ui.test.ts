@@ -27,7 +27,7 @@ function cookieBanner(enabled:boolean,age:boolean,choice:null|'accepted'){
   const ads={consentAvailable:enabled,consentOffered:enabled,needsConsent:enabled,consent:null,choose:async()=>true};
   const {CookieBanner}=loadAppModule<{CookieBanner:React.ComponentType}>('src/components/CookieBanner.tsx',{
     react:hooks,'next/navigation':{usePathname:()=>'/'} ,'next/link':(p:React.ComponentProps<'a'>)=>React.createElement('a',p),
-    './BrandLogo':{BrandLogo:()=>null},'./LocaleProvider':{useLocale:()=>locale},
+    './BrandLogo':{BrandLogo:()=>null},'./LocaleProvider':{useLocale:()=>locale,LanguageSwitcher:()=>null},
     './AudienceChoice':{useAudienceChoice:()=>choice,CHOICE_CHANGED:'changed',OPEN_CHOICES:'open'},
     './AgeConfirmation':{useAgeConfirmation:()=>({confirmed:age,confirm:()=>{}})},'./AdsProvider':{useAds:()=>ads}
   });
@@ -42,13 +42,13 @@ test('OFF keeps the existing entry dialog without adding advertising consent',()
 test('advertising purposes are merged into the entry panel before age confirmation',()=>{
   const html=cookieBanner(true,false,null);
   assert.equal((html.match(/<section/g)||[]).length,1);
-  assert.match(html,/TrafficStars/);assert.match(html,/Decline all/);
+  assert.match(html,/TrafficStars/);assert.match(html,/Cookie choices/);assert.match(html,/decline all/i);
   assert.doesNotMatch(html,/<iframe|<script/);
 });
 test('a legacy analytics choice receives one merged panel without implicit ad acceptance',()=>{
   const html=cookieBanner(true,true,'accepted');
   assert.equal((html.match(/<section/g)||[]).length,1);
-  assert.match(html,/TrafficStars/);assert.match(html,/Decline all/);
+  assert.match(html,/TrafficStars/);assert.match(html,/Cookie choices/);assert.match(html,/decline all/i);
   assert.doesNotMatch(html,/Ads and advertising cookies/);assert.doesNotMatch(html,/<iframe|<script/);
 });
 

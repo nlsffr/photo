@@ -7,6 +7,8 @@ import { canServeAds, isAdPagePath, parseAdsRuntime, parseBrowserAdConsent } fro
 import { useAgeConfirmation } from "./AgeConfirmation";
 import { useSession } from "./Session";
 import { usePremium } from "./Premium";
+import {probeAdMediation} from "@/lib/ads-mediation";
+import type {AdMediation} from "@/lib/ads-provider-plan";
 import { createAdSdkGuard } from "@/lib/ads-sdk";
 import { isAdsRegistryReady, type AdDevice } from "@/lib/ads-registry";
 
@@ -21,6 +23,7 @@ export function browserAdConsent(): AdConsent {
 
 type AdsContext = {
   runtime: AdsRuntime | null;
+  mediation: AdMediation | null;
   consent: AdConsent;
   consentAvailable: boolean;
   consentOffered: boolean;
@@ -30,7 +33,7 @@ type AdsContext = {
   choose: (choice: Exclude<AdConsent, null>) => Promise<boolean>;
 };
 const Context = createContext<AdsContext | null>(null);
-const CLOSED: AdsContext = { runtime:null, consent:null, consentAvailable:false, consentOffered:false, needsConsent:false, canServe:()=>false, markSdkStarted:()=>false, choose:async()=>false };
+const CLOSED: AdsContext = { runtime:null, mediation:null, consent:null, consentAvailable:false, consentOffered:false, needsConsent:false, canServe:()=>false, markSdkStarted:()=>false, choose:async()=>false };
 
 export function AdsProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -43,6 +46,7 @@ export function AdsProvider({ children }: { children: React.ReactNode }) {
   const [receivedContext, setReceivedContext] = useState("");
   const [consent, setConsent] = useState<AdConsent>(null);
   const [resolution, setResolution] = useState<"pending"|"ready"|"unavailable">("pending");
+  const [mediationChoice,setMediationChoice] = useState<{context:string;value:AdMediation}|null>(null);
   const requestNumber = useRef(0);
   const controller = useRef<AbortController | null>(null);
   const lastValid = useRef<{runtime:AdsRuntime;receivedAt:number;context:string}|null>(null);
@@ -103,6 +107,20 @@ export function AdsProvider({ children }: { children: React.ReactNode }) {
   const runtimeFresh = receivedContext === sessionContext && fresh && receivedAt > 0;
   const allowed = canServeAds({ runtime, ageConfirmed:confirmed, consent, sessionLoading:loading,
     premiumReady:ready, isPremium, pathname, fresh:runtimeFresh });
+  const eligibleNow = useRef<()=>boolean>(()=>false);
+  useEffect(() => {
+    eligibleNow.current = () => allowed && browserAdConsent() === "accepted" && Date.now() < receivedAt + RUNTIME_MAX_AGE_MS;
+    return () => { eligibleNow.current = () => false; };
+  }, [allowed,receivedAt]);
+  const mediation = runtime?.profile === "intensive" ? (mediationChoice?.context === sessionContext ? mediationChoice.value : null) : "standard";
+  useEffect(() => {
+    if (!allowed || runtime?.profile !== "intensive" || mediationChoice?.context === sessionContext) return;
+    const abort = new AbortController();
+    void probeAdMediation(() => eligibleNow.current(), abort.signal).then(value => {
+      if (value && !abort.signal.aborted && eligibleNow.current()) setMediationChoice({context:sessionContext,value});
+    });
+    return () => abort.abort();
+  }, [allowed,runtime?.profile,sessionContext,mediationChoice,receivedAt]);
   useEffect(() => {
     const media = matchMedia("(min-width: 1024px)");
     const check = () => { sdkGuard.current.check(allowed, runtime?.revision ?? -1, media.matches ? "desktop" : "mobile"); };
@@ -137,8 +155,8 @@ export function AdsProvider({ children }: { children: React.ReactNode }) {
   const consentOffered = CONFIGURED && isAdPagePath(pathname) && !(ready && isPremium)
     && (currentResolution === "pending" || (runtimeFresh && runtime?.enabled === true
       && ["eligible", "consent_required", "consent_refused"].includes(runtime.reason)));
-  return <Context.Provider value={{ runtime, consent, consentAvailable, consentOffered, needsConsent:consentOffered && consent === null,
-    canServe:placement => allowed && Date.now() < receivedAt + RUNTIME_MAX_AGE_MS
+  return <Context.Provider value={{ runtime, mediation, consent, consentAvailable, consentOffered, needsConsent:consentOffered && consent === null,
+    canServe:placement => allowed && mediation !== null && Date.now() < receivedAt + RUNTIME_MAX_AGE_MS
       && runtime?.placements[placement] === true && browserAdConsent() === "accepted",
     markSdkStarted:device => sdkGuard.current.start(device, runtime?.revision ?? -1), choose }}>
     {children}

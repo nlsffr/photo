@@ -34,6 +34,15 @@ test('embed profiles only add a public reporting category and keep the same publ
   }
 });
 
+test('server bootstrap uses the same contextual 300x250 creator header format as the client',()=>{
+  const page={kind:'creator',pathname:'/sample-v23/photos',collection:'photos'} as const;
+  const result=buildAdsEmbedDocument('header','mobile','intensive',page);
+  assert.match(result.html,/"placement":"header"/);
+  assert.match(result.html,/8b7c10f34a5249bfaadd4a85fca7308e/);
+  assert.doesNotMatch(result.html,/ac23f7ff171648cf98eaede6374b9eb5/);
+  for(const profile of ['current','balanced'] as const)assert.match(buildAdsEmbedDocument('header','mobile',profile,page).html,/ac23f7ff171648cf98eaede6374b9eb5/);
+});
+
 test('the HTTP bootstrap does not load a SDK after consent is absent or revoked',async()=>{
   const {runInNewContext}=await import('node:vm');
   const script=buildAdsEmbedDocument('header','desktop').html.match(/<script>([\s\S]*?)<\/script>/)![1];

@@ -1,13 +1,12 @@
 import { cookies } from "next/headers";
 import { getAdsRuntime } from "@/lib/ads-runtime";
 import { AD_CONSENT_COOKIE, isAdProfile, parseAdConsent, type AdPlacement } from "@/lib/ads-contract";
-import { selectAdProvider, type AdSlotContext } from "@/lib/ads-provider-plan";
+import { isAdMediation, selectAdProvider, type AdSlotContext } from "@/lib/ads-provider-plan";
 import { getExoclickSpot } from "@/lib/exoclick-registry";
 import { buildExoclickBannerDocument } from "@/lib/exoclick-banner";
 import { buildExoclickVastDocument } from "@/lib/exoclick-vast";
-import { isAdPagePath } from "@/lib/ads-client-policy";
-import { isLocale, isSystemPath, resolveLocalizedPage, stripLocalePrefix, supportedLocaleForPath, type Locale } from "@/lib/i18n/config";
-import { normalizeTagSlug } from "@/lib/seo-policy";
+import { isAdSlotForPage, resolveAdPageContext } from "@/lib/ads-page-context";
+import { isLocale, type Locale } from "@/lib/i18n/config";
 import { adsCopy } from "@/lib/ads-copy";
 
 export const runtime = "nodejs";
@@ -46,19 +45,6 @@ function parentOrigin(request: Request, url: URL): string | null {
     || !/^(?:127\.0\.0\.1|localhost)(?::[0-9]{1,5})?$/.test(host)) return null;
   try { const local = new URL("http://" + host); return allowedOrigin(local) ? local.origin : null; } catch { return null; }
 }
-function validPath(path: string, locale: Locale, placement: string, context: AdSlotContext): boolean {
-  if (!path.startsWith("/") || path.startsWith("//") || path.length > 1024 || /[\u0000-\u0020\u007f?#\\]/.test(path)
-    || /%(?:2f|5c)/i.test(path) || new URL(path, "https://leakfanhub.com").pathname !== path) return false;
-  try { if (path.split("/").some(part => [".", ".."].includes(decodeURIComponent(part)))) return false; } catch { return false; }
-  const { pathname } = stripLocalePrefix(path);
-  if (stripLocalePrefix(pathname).locale || isSystemPath(pathname) || !isAdPagePath(path)) return false;
-  const route = resolveLocalizedPage(supportedLocaleForPath(locale, pathname), pathname);
-  const tag = /^\/tag\/([^/]+)$/.exec(pathname);
-  if (!route && !(tag && normalizeTagSlug(tag[1]) === tag[1])) return false;
-  if (context === "pause") return placement === "underVideo" && route?.kind === "media";
-  return placement === "feed" ? pathname === "/feed" : pathname !== "/feed";
-}
-
 /** Own registry only. All creative/VAST requests happen later inside the gated document. */
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -66,13 +52,15 @@ export async function GET(request: Request) {
   if (!origin || ["cross-site", "same-site"].includes(request.headers.get("sec-fetch-site") ?? "")
     || (request.headers.has("origin") && request.headers.get("origin") !== origin)) return deny(403);
   const pairs = [...url.searchParams], values = Object.fromEntries(pairs);
+  const page = resolveAdPageContext(values.path);
   if (url.hash || url.search.length > 4096 || new Set(pairs.map(([key]) => key)).size !== pairs.length
-    || REQUIRED.some(key => !(key in values)) || pairs.some(([key]) => ![...REQUIRED, "ordinal"].includes(key))
+    || REQUIRED.some(key => !(key in values)) || pairs.some(([key]) => ![...REQUIRED, "ordinal", "mediation"].includes(key))
+    || ("mediation" in values && (!isAdMediation(values.mediation) || values.profile !== "intensive"))
     || !["header", "footer", "underVideo", "feed"].includes(values.placement) || !["desktop", "mobile"].includes(values.device)
     || !["page", "pause"].includes(values.context) || !isAdProfile(values.profile) || !isLocale(values.locale)
     || !/^[A-Za-z0-9_-]{1,100}$/.test(values.nonce)
     || (values.placement === "feed" ? !/^(?:0|[1-9]\d{0,6})$/.test(values.ordinal ?? "") || Number(values.ordinal) > 1_000_000 : "ordinal" in values)
-    || !validPath(values.path, values.locale, values.placement, values.context as AdSlotContext)) return deny(400);
+    || !page || !isAdSlotForPage(values.placement as 'header'|'footer'|'underVideo'|'feed', values.context as AdSlotContext, page)) return deny(400);
   const placement = values.placement as "header" | "footer" | "underVideo" | "feed";
   const device = values.device as "desktop" | "mobile", context = values.context as AdSlotContext;
   try {
@@ -81,7 +69,7 @@ export async function GET(request: Request) {
     const config = await getAdsRuntime();
     if (!config.enabled || !config.effectiveEnabled || config.reason !== "eligible" || config.consent !== "accepted"
       || (config.profile === undefined ? "current" : config.profile) !== values.profile || config.placements[placement as AdPlacement] !== true
-      || selectAdProvider({ profile: values.profile, placement, device, context, ...(placement === "feed" ? { ordinal: Number(values.ordinal) } : {}) }) !== "exoclick") return deny(403);
+      || selectAdProvider({ profile: values.profile, placement, device, context, ...("mediation" in values ? {mediation: values.mediation as 'standard'|'alternative'} : {}), ...(placement === "feed" ? { ordinal: Number(values.ordinal) } : {}) }) !== "exoclick") return deny(403);
     const spot = getExoclickSpot(placement, device, context);
     if (!spot) return deny(503);
     const copy = adsCopy[values.locale], cta = labels[values.locale];

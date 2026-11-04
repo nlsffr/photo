@@ -5,22 +5,27 @@ import { AD_PLACEMENT_KEYS, isAdProfile } from "./ads-contract.ts";
 
 export type AdSlotContext = "page" | "pause";
 export type AdProvider = "trafficstars" | "exoclick";
+export type AdMediation = "standard" | "alternative";
+export const isAdMediation = (value: unknown): value is AdMediation => value === "standard" || value === "alternative";
 
 /** One provider per slot. The feed ordinal counts inserted ads, never media IDs. */
 export function selectAdProvider(input: {
-  profile?: AdProfile; placement: AdPlacement; device: AdDevice; context?: AdSlotContext; ordinal?: number;
+  profile?: AdProfile; placement: AdPlacement; device: AdDevice; context?: AdSlotContext; ordinal?: number; mediation?: AdMediation | null;
 }): AdProvider | null {
   const profile = input.profile === undefined ? "current" : input.profile;
   const context = input.context === undefined ? "page" : input.context;
+  const mediation = input.mediation === undefined ? "standard" : input.mediation;
   if (!isAdProfile(profile) || !["desktop", "mobile"].includes(input.device)
-    || !(AD_PLACEMENT_KEYS as readonly string[]).includes(input.placement) || !["page", "pause"].includes(context)) return null;
+    || !(AD_PLACEMENT_KEYS as readonly string[]).includes(input.placement) || !["page", "pause"].includes(context)
+    || !isAdMediation(mediation) || (profile !== "intensive" && input.mediation !== undefined)) return null;
   if (input.placement === "feed") {
     if (context !== "page" || !Number.isSafeInteger(input.ordinal) || input.ordinal! < 0 || input.ordinal! > 1_000_000) return null;
-    if (profile === "intensive") return "exoclick";
+    if (profile === "intensive") return mediation === "alternative" ? "exoclick" : "trafficstars";
     return profile === "balanced" && input.ordinal! % 2 === 1 ? "exoclick" : "trafficstars";
   }
   if (input.ordinal !== undefined) return null;
   if (context === "pause") return input.placement === "underVideo" && profile === "intensive" ? "exoclick" : null;
+  if (profile === "intensive" && mediation === "alternative" && ["interstitial", "slider"].includes(input.placement)) return "exoclick";
   if ((profile === "current" || profile === "balanced") && input.placement === "footer") return "exoclick";
   if (profile === "balanced" && input.placement === "underVideo") return "exoclick";
   return "trafficstars";

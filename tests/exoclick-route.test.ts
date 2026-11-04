@@ -39,11 +39,35 @@ test("balanced under-video, odd feed and intensive pause/feed choose only their 
     ["balanced", { placement: "underVideo", path: "/sample/123" }, "idzone=6074790"],
     ["balanced", { placement: "feed", path: "/feed", ordinal: "1" }, "idzone=6074810"],
     ["intensive", { placement: "underVideo", context: "pause", path: "/sample/123" }, "idz=6074792"],
-    ["intensive", { placement: "feed", path: "/feed", ordinal: "0" }, "idzone=6074810"],
+    ["intensive", { placement: "feed", path: "/feed", ordinal: "0", mediation:"alternative" }, "idzone=6074810"],
   ] as const) {
     const response = await setup({ runtime: { profile } }).route.GET(request({ profile, ...changes }));
     assert.equal(response.status, 200); assert.ok((await response.text()).includes(expected));
   }
+});
+
+test('the Exo endpoint accepts intensive alternative feed only while pause remains Exo in either branch',async()=>{
+  const changes={profile:'intensive',placement:'feed',path:'/feed',ordinal:'0'};
+  for(const mediation of [undefined,'standard','alternative']){
+    const response=await setup({runtime:{profile:'intensive'}}).route.GET(request({...changes,mediation}));
+    assert.equal(response.status,mediation==='alternative'?200:403);
+  }
+  for(const mediation of ['standard','alternative'])assert.equal((await setup({runtime:{profile:'intensive'}}).route.GET(request({profile:'intensive',placement:'underVideo',context:'pause',path:'/sample/123',mediation}))).status,200);
+  for(const mediation of ['unknown','null','']){
+    const api=setup({runtime:{profile:'intensive'}});assert.equal((await api.route.GET(request({...changes,mediation}))).status,400);assert.equal(api.reads(),0);
+  }
+  for(const profile of ['current','balanced'])assert.equal((await setup({runtime:{profile}}).route.GET(request({profile,mediation:'standard'}))).status,400);
+  for(const placement of ['interstitial','slider','popunder']){
+    const api=setup({runtime:{profile:'intensive'}});assert.equal((await api.route.GET(request({profile:'intensive',placement,mediation:'alternative'}))).status,400);assert.equal(api.reads(),0);
+  }
+  const duplicate=new URL(request({...changes,mediation:'alternative'}).url);duplicate.searchParams.append('mediation','standard');
+  assert.equal((await setup({runtime:{profile:'intensive'}}).route.GET(new Request(duplicate))).status,400);
+  for(const cookie of [null,'v1:accepted','v2:refused']){
+    const api=setup({cookie,runtime:{profile:'intensive'}});
+    assert.equal((await api.route.GET(request({...changes,mediation:'alternative'}))).status,403);assert.equal(api.reads(),0);
+  }
+  for(const denied of [{enabled:false},{effectiveEnabled:false},{reason:'owner'},{reason:'premium'},
+    {placements:{...placements,feed:false}}])assert.equal((await setup({runtime:{profile:'intensive',...denied}}).route.GET(request({...changes,mediation:'alternative'}))).status,403);
 });
 
 test("TS-selected positions and stale profiles cannot request an Exo document", async () => {

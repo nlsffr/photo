@@ -39,11 +39,11 @@ function browser(t:TestContext){
 const placements={header:true,footer:true,underVideo:true,feed:true,popunder:true,interstitial:true,slider:true};
 const eligible={enabled:true,effectiveEnabled:true,revision:4,needsConsent:false,consent:'accepted',placements,reason:'eligible'};
 type Snapshot={consentOffered:boolean;consentAvailable:boolean;canServe:(placement:string)=>boolean;runtime:typeof eligible|null;choose:(choice:'accepted'|'refused')=>Promise<boolean>};
-function provider(t:TestContext,initialTransport:(input?:RequestInfo|URL,init?:RequestInit)=>Promise<Response>){
+function provider(t:TestContext,initialTransport:(input?:RequestInfo|URL,init?:RequestInit)=>Promise<Response>,probe?:unknown){
   const environment=browser(t),hooks=hookHarness();let transport=initialTransport;
   const previousFetch=globalThis.fetch;globalThis.fetch=async(input,init)=>transport(input,init);
   const {AdsProvider}=loadAppModule<{AdsProvider:(props:{children:React.ReactNode})=>React.ReactElement<{value:Snapshot}>}>('src/components/AdsProvider.tsx',{
-    react:hooks.hooks,'@/lib/ads-sdk':{createAdSdkGuard},'@/lib/ads-registry':{isAdsRegistryReady},
+    react:hooks.hooks,...(probe?{'@/lib/ads-mediation':{probeAdMediation:probe}}:{}),'@/lib/ads-sdk':{createAdSdkGuard},'@/lib/ads-registry':{isAdsRegistryReady},
     'next/navigation':{usePathname:()=>'/en'},'./AgeConfirmation':{useAgeConfirmation:()=>({confirmed:true})},
     './Session':{useSession:()=>({loading:false,user:null})},'./Premium':{usePremium:()=>({ready:true,isPremium:false})}
   });
@@ -160,4 +160,34 @@ test('a saved profile revision replaces the frame and rejects filled messages fr
   ui.window.dispatchEvent(filled);ui.setPolicy('balanced',5);const second=ui.frame();
   assert.notEqual(second.node.key,first.node.key);ui.window.dispatchEvent(filled);second.load();
   ui.advance(10_000);assert.equal(ui.empties(),1);
+});
+
+
+test('intensive waits for a single mediation choice and checks cookie/freshness at the exact probe callback',async t=>{
+  let permitted!:()=>boolean,finish!:(value:'standard'|'alternative'|null)=>void,calls=0;
+  const ui=provider(t,async()=>Response.json({...eligible,profile:'intensive'}),(allowed:()=>boolean)=>{calls++;permitted=allowed;return new Promise(resolve=>{finish=resolve;});});
+  ui.render();await flush();
+  assert.equal(ui.render().canServe('feed'),false);assert.equal(calls,1);assert.equal(permitted(),true);
+  ui.document.cookie='lfh_ad_consent=v2:refused';assert.equal(permitted(),false);
+  ui.document.cookie='lfh_ad_consent=v2:accepted';ui.jump(20_001);assert.equal(permitted(),false);
+  finish('alternative');await flush();assert.equal(ui.render().canServe('feed'),false);
+});
+
+test('a resolved intensive branch allows eligible ads without repeating its probe on every render',async t=>{
+  let finish!:(value:'standard')=>void,calls=0;
+  const ui=provider(t,async()=>Response.json({...eligible,profile:'intensive'}),()=>{calls++;return new Promise(resolve=>{finish=resolve;});});
+  ui.render();await flush();ui.render();assert.equal(calls,1);
+  finish('standard');await flush();assert.equal(ui.render().canServe('feed'),true);ui.render();assert.equal(calls,1);
+});
+
+test('a fresh runtime restarts an undecided probe after expiry even when background timers never changed eligibility',async t=>{
+  let finish!:()=>void,calls=0;
+  const ui=provider(t,async()=>Response.json({...eligible,profile:'intensive'}),(permitted:()=>boolean)=>{
+    calls++;return new Promise(resolve=>{finish=()=>resolve(permitted()?'standard':null);});
+  });
+  ui.render();await flush();ui.render();assert.equal(calls,1);
+  ui.jump(20_001);finish();await flush();assert.equal(ui.render().canServe('feed'),false);
+  ui.refresh();await flush();assert.equal(ui.render().canServe('feed'),false);
+  assert.equal(calls,2,'Freshness renewal must retry the unresolved branch without requiring an eligibility toggle.');
+  finish();await flush();assert.equal(ui.render().canServe('feed'),true);
 });

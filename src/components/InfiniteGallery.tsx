@@ -5,6 +5,8 @@ import { PhotoCard } from "./PhotoCard";
 import { AdSlot } from "./AdSlot";
 import { useAds } from "./AdsProvider";
 import { isProfileGalleryAdPosition } from '@/lib/ads-profiles';
+import { resolveAdPageContext } from '@/lib/ads-page-context';
+import { usePathname } from 'next/navigation';
 import type { AdDevice } from '@/lib/ads-registry';
 import type { MediaType, PhotoPage, PhotoView, SortKey } from "@/lib/types";
 import { useLocale } from "./LocaleProvider";
@@ -24,10 +26,11 @@ interface Props {
 
 function GalleryAdInsertion() {
   const ads = useAds();
+  const intensive = ads.runtime?.profile === 'intensive';
   if (!ads.canServe("underVideo")) return null;
   return (
-    <div className="col-span-full my-1">
-      <AdSlot placement="underVideo" />
+    <div className={intensive ? "min-w-0" : "col-span-full my-1"} data-ad-grid-card={intensive || undefined}>
+      <AdSlot placement="underVideo" layout={intensive ? "grid" : undefined} />
     </div>
   );
 }
@@ -36,6 +39,7 @@ export function InfiniteGallery({ initial, params, premium = false }: Props) {
   const { t } = useLocale();
   const ads = useAds();
   const profile = ads.runtime?.profile ?? 'current';
+  const pageContext = resolveAdPageContext(usePathname());
   const [device,setDevice] = useState<AdDevice>('desktop');
   const [items, setItems] = useState<PhotoView[]>(initial.items);
   const [cursor, setCursor] = useState<number | null>(initial.nextCursor);
@@ -144,7 +148,7 @@ export function InfiniteGallery({ initial, params, premium = false }: Props) {
         setLoading(false);
       }
     }
-  }, [buildUrl]);
+  }, [buildUrl, setErrored]);
 
   useEffect(() => {
     const el = sentinelRef.current;
@@ -172,13 +176,14 @@ export function InfiniteGallery({ initial, params, premium = false }: Props) {
 
   return (
     <>
-      <div className="media-grid">
+      <div className={`media-grid${profile === 'intensive' ? ' media-grid-intensive' : ''}`}>
         {items.map((p, i) => (
           <Fragment key={p.id}>
             <div className="min-w-0">
               <PhotoCard photo={p} priority={i < 2} />
             </div>
-            {!premium && isProfileGalleryAdPosition(i+1,profile,device,params.creator ? 'creator' : 'gallery')
+            {!premium && (profile !== 'intensive' || pageContext !== null)
+              && isProfileGalleryAdPosition(i+1,profile,device,pageContext ?? (params.creator ? 'creator' : 'gallery'))
               ? <GalleryAdInsertion /> : null}
           </Fragment>
         ))}
