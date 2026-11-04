@@ -144,10 +144,10 @@ test('intensive waits for mediation then sends only its resolved choice to the s
   ui.policy('balanced',5);const legacy=ui.frame();assert.equal(legacy.url.searchParams.has('mediation'),false);
 });
 
-test('intensive desktop footer centers its existing creative in a bounded 860x250 wrapper',t=>{
+test('intensive desktop footer centers its existing creative in a bounded 860x280 wrapper',t=>{
   const ui=harness(t,{placement:'footer',profile:'intensive'});ui.frame();ui.media.matches=true;ui.media.dispatchEvent(new Event('change'));
   const tree=ui.render();const aside=all(tree).find(n=>n.type==='aside');assert.ok(aside);
-  assert.deepEqual(aside.props.style,{width:'100%',maxWidth:860,minHeight:250});
+  assert.deepEqual(aside.props.style,{width:'100%',maxWidth:860,minHeight:280});
   assert.deepEqual(ui.frame().node.props.style,{width:728,height:90});
 });
 
@@ -188,4 +188,31 @@ test('ineligible global slots never load either SDK even after mediation is reso
     const ui=harness(sub,{placement,profile:'intensive',mediation:'alternative',allowed:false});
     assert.equal(ui.render(),null);assert.equal(ui.render(),null);assert.equal(ui.globalCalls.length,0);assert.equal(ui.sdkStarts(),0);
   });
+});
+
+
+test('feed allocates the remaining column height to its block iframe without a viewport-height guess',t=>{
+ const ui=harness(t,{placement:'feed',profile:'intensive'}),frame=ui.frame(),tree=ui.render();
+ const aside=all(tree).find(n=>n.type==='aside')!,label=all(tree).find(n=>n.type==='p')!;
+ assert.match(String(aside.props.className),/flex-col/);assert.match(String(aside.props.className),/min-h-0/);
+ assert.match(String(label.props.className),/shrink-0/);assert.match(String(frame.node.props.className),/flex-1/);assert.match(String(frame.node.props.className),/min-h-0/);assert.match(String(frame.node.props.className),/block/);
+ assert.deepEqual(frame.node.props.style,{width:'100%',height:0,minHeight:0});
+});
+
+test('intensive page slots reserve280px while their registered creative dimensions stay unchanged',async t=>{
+ for(const placement of ['header','footer','underVideo'])await t.test(placement,sub=>{
+  const ui=harness(sub,{placement,profile:'intensive'});const frame=ui.frame(),aside=all(ui.render()).find(n=>n.type==='aside')!;
+  assert.equal((aside.props.style as {minHeight:number}).minHeight,280);assert.match(String(aside.props.className),/items-center/);
+  assert.deepEqual(frame.node.props.style,placement==='header'?{width:300,height:100}:{width:300,height:250});
+ });
+});
+
+test('the intensive desktop header uses the bounded860px frame without changing its728x90 creative',t=>{
+ const ui=harness(t,{placement:'header',profile:'intensive'});ui.frame();ui.media.matches=true;ui.media.dispatchEvent(new Event('change'));
+ const aside=all(ui.render()).find(n=>n.type==='aside')!;assert.deepEqual(aside.props.style,{width:'100%',maxWidth:860,minHeight:280});assert.deepEqual(ui.frame().node.props.style,{width:728,height:90});
+});
+
+test('page reserve never changes pause/grid or legacy banner wrappers',async t=>{
+ await t.test('pause',sub=>{const ui=harness(sub,{placement:'underVideo',profile:'intensive',context:'pause'});ui.frame();assert.equal(all(ui.render()).find(n=>n.type==='aside')?.props.style,undefined);});
+ for(const profile of ['current','balanced'])await t.test(profile,sub=>{const ui=harness(sub,{placement:'header',profile});ui.frame();assert.equal(all(ui.render()).find(n=>n.type==='aside')?.props.style,undefined);});
 });

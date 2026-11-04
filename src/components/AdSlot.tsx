@@ -65,7 +65,10 @@ function NetworkAdSlot({ placement, className = "", onEmpty, loading, context = 
     && typeof spot.width === "number" && spot.width > 0 && typeof spot.height === "number" && spot.height > 0;
   const gridReady = typeof gridWidth === "number" && Number.isFinite(gridWidth) && gridWidth > 0;
   const gridScale = gridSized && gridReady ? Math.min(1, gridWidth! / (spot.width as number)) : 1;
-  const footerWrapper = profile === "intensive" && placement === "footer" && device === "desktop";
+  const feed = placement === "feed";
+  const pageFrame = profile === "intensive" && context === "page" && layout !== "grid"
+    && ["header", "footer", "underVideo"].includes(placement);
+  const widePageFrame = pageFrame && device === "desktop" && ["header", "footer"].includes(placement);
   const empty = useCallback(() => {
     if (failedFrame.current === frameKey) return;
     failedFrame.current = frameKey;
@@ -164,7 +167,8 @@ function NetworkAdSlot({ placement, className = "", onEmpty, loading, context = 
   const iframe = !gridSized || gridReady ? <iframe key={frameKey} ref={frame} id={id} title={adsCopy[locale].label} loading={loading ?? (placement === "header" ? "eager" : "lazy")}
       src={frameSrc}
       sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-      referrerPolicy="no-referrer" className={gridSized ? "absolute left-0 top-0 block origin-top-left border-0" : "mx-auto max-w-full border-0"}
+      referrerPolicy="no-referrer" className={gridSized ? "absolute left-0 top-0 block origin-top-left border-0"
+        : feed ? "mx-auto block min-h-0 max-w-full flex-1 border-0" : "mx-auto max-w-full border-0"}
       onLoad={event => {
         if (event.currentTarget !== frame.current) return;
         sendVisibility.current?.(event.currentTarget);
@@ -175,11 +179,12 @@ function NetworkAdSlot({ placement, className = "", onEmpty, loading, context = 
         if (!frameFilled.current && !framePending.current) frameTimer.current = window.setTimeout(empty, 10_000);
       }}
       style={gridSized ? { width:spot.width, height:spot.height, transform:`scale(${gridScale})` }
-        : placement === "feed" ? { width:"100%", height:"85dvh", maxHeight:"100%" } : { width:spot.width, height:spot.height }} /> : null;
+        : feed ? { width:"100%", height:0, minHeight:0 } : { width:spot.width, height:spot.height }} /> : null;
   return <aside ref={gridSized ? gridContainer : undefined} aria-label={adsCopy[locale].label} data-ad-placement={placement} data-ad-provider={provider}
-    className={`mx-auto ${gridSized ? "flex w-full min-w-0 flex-col" : "max-w-full overflow-hidden"}${footerWrapper ? " flex flex-col items-center justify-center" : ""} ${className}`}
-    style={gridSized ? {aspectRatio:"0.6"} : footerWrapper ? {width:"100%",maxWidth:860,minHeight:250} : undefined}>
-    <p className="mb-1 text-center text-[10px] uppercase tracking-wide text-[var(--color-ink-faint)]">{adsCopy[locale].label}</p>
+    className={`mx-auto ${gridSized ? "flex w-full min-w-0 flex-col"
+      : feed ? "flex h-full min-h-0 max-w-full flex-col" : "max-w-full overflow-hidden"}${pageFrame ? " flex flex-col items-center justify-center" : ""} ${className}`}
+    style={gridSized ? {aspectRatio:"0.6"} : pageFrame ? { ...(widePageFrame ? {width:"100%",maxWidth:860} : {}), minHeight:280 } : undefined}>
+    <p className={`${feed ? "shrink-0 " : ""}mb-1 text-center text-[10px] uppercase tracking-wide text-[var(--color-ink-faint)]`}>{adsCopy[locale].label}</p>
     {gridSized ? <div className="grid min-h-0 flex-1 place-items-center">
       <div data-ad-grid-frame className="relative mx-auto w-full" style={{maxWidth:spot.width,aspectRatio:`${spot.width} / ${spot.height}`,overflow:"clip"}}>{iframe}</div>
     </div> : iframe}
