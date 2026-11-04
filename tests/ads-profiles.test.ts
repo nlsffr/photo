@@ -9,7 +9,7 @@ type Placement=keyof typeof ADS_REGISTRY;
 const {AD_PROFILE_INFO,adSpotFor,isProfileGalleryAdPosition,profileHasPauseBanner}=loadAppModule<{
   AD_PROFILE_INFO:Array<{key:Profile;title:string;summary:string;details:string[]}>;
   adSpotFor(profile:Profile|undefined,placement:Placement,device:'desktop'|'mobile'):Record<string,unknown>;
-  isProfileGalleryAdPosition(count:number,profile?:Profile,device?:'desktop'|'mobile'):boolean;
+  isProfileGalleryAdPosition(count:number,profile?:Profile,device?:'desktop'|'mobile',context?:'gallery'|'creator'):boolean;
   profileHasPauseBanner(profile?:Profile):boolean;
 }>('src/lib/ads-profiles.ts',{'@/lib/ads-registry':{ADS_REGISTRY}});
 
@@ -45,6 +45,11 @@ test('gallery placement counts media, preserves current rows and separates mobil
   assert.deepEqual(positions('intensive'),[2,8,31]);
   assert.deepEqual(positions('intensive','mobile'),[2]);
   assert.equal(isProfileGalleryAdPosition(42,'intensive','mobile'),true);
+  for (const device of ['desktop','mobile'] as const) {
+    assert.equal(isProfileGalleryAdPosition(2,'intensive',device,'creator'),false);
+    assert.equal(isProfileGalleryAdPosition(8,'intensive',device,'creator'),false);
+    assert.equal(isProfileGalleryAdPosition(31,'intensive',device,'creator'),false);
+  }
   for(const count of [0,-1,NaN,Infinity,2.5])assert.equal(isProfileGalleryAdPosition(count,'intensive'),false);
   assert.equal(profileHasPauseBanner('current'),false);assert.equal(profileHasPauseBanner('balanced'),false);
   assert.equal(profileHasPauseBanner('intensive'),true);

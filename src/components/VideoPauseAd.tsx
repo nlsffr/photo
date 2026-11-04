@@ -75,7 +75,7 @@ export function VideoPauseAd({video, shell, blocked = false}: {
     || !ads.canServe("underVideo")) return null;
   return <div className="pointer-events-none absolute inset-x-0 top-0 bottom-20 z-[7] grid place-items-center">
     <div className="pointer-events-auto relative w-[300px] rounded-lg bg-black/90">
-      <AdSlot placement="underVideo" loading="eager" className="text-white [&>p]:mb-0 [&>p]:h-11 [&>p]:leading-[44px]" />
+      <AdSlot placement="underVideo" context="pause" onEmpty={() => setClosed(true)} loading="eager" className="text-white [&>p]:mb-0 [&>p]:h-11 [&>p]:leading-[44px]" />
       <button type="button" aria-label={adsCopy[locale].close}
         className="absolute right-0 top-0 grid h-11 w-11 place-items-center rounded-lg text-xl text-white hover:bg-white/15 focus-visible:outline-2 focus-visible:outline-white"
         onClick={event => { event.stopPropagation(); setClosed(true); }}>

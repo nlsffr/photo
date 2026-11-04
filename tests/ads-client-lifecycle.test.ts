@@ -127,7 +127,7 @@ function slot(t:TestContext,placement:'header'|'footer'|'feed'){
   });
   const outer=AdSlot({placement,onEmpty:()=>{empties++;}}),Component=outer.type as (props:Record<string,unknown>)=>React.ReactElement|null;
   const render=()=>hooks.render(()=>Component(outer.props as Record<string,unknown>));
-  const frame=()=>{render();const node=all(render(),value=>value.type==='iframe')[0];assert.ok(node);const ref=node.props.ref as {current:unknown};const element={contentWindow:{}};ref.current=element;return{node,element,load:()=> (node.props.onLoad as (event:unknown)=>void)({currentTarget:element})};};
+  const frame=()=>{render();const node=all(render(),value=>value.type==='iframe')[0];assert.ok(node);const ref=node.props.ref as {current:unknown};const element={contentWindow:{postMessage(){}}};ref.current=element;return{node,element,load:()=> (node.props.onLoad as (event:unknown)=>void)({currentTarget:element})};};
   t.after(()=>{hooks.close();environment.restore();});
   return{...environment,render,frame,empties:()=>empties,setAllowed:(value:boolean)=>{allowed=value;},setPolicy:(value:typeof profile,next:number)=>{profile=value;revision=next;}};
 }
@@ -157,7 +157,7 @@ test('revoking eligibility cancels a pending frame timeout before remounting',t=
 test('a saved profile revision replaces the frame and rejects filled messages from the prior profile',t=>{
   const ui=slot(t,'feed');const first=ui.frame();first.load();
   const filled=new Event('message');Object.assign(filled,{origin:'https://example.test',source:first.element.contentWindow,data:{type:'lfh-ad-status',placement:'feed',status:'filled'}});
-  ui.window.dispatchEvent(filled);ui.setPolicy('intensive',5);const second=ui.frame();
+  ui.window.dispatchEvent(filled);ui.setPolicy('balanced',5);const second=ui.frame();
   assert.notEqual(second.node.key,first.node.key);ui.window.dispatchEvent(filled);second.load();
   ui.advance(10_000);assert.equal(ui.empties(),1);
 });

@@ -14,6 +14,7 @@ import { mediaThumbnailUrl } from "@/lib/media-sources";
 import { AdSlot } from "./AdSlot";
 import { useAds } from "./AdsProvider";
 import { isFeedAdPosition } from "@/lib/ads-client-policy";
+import { getPlan } from "@/lib/premium-plans";
 
 function RailButton({
   icon,
@@ -212,9 +213,21 @@ function FeedSlide({
 
 function FeedAdSlide({ after }: { after: number }) {
   const [empty, setEmpty] = useState(false);
+  const ads = useAds();
+  const {locale} = useLocale();
+  const ordinal = (after - 4) / 4;
   if (empty) return null;
+  if (ads.runtime?.profile === 'intensive' && ordinal === 1) {
+    const plan = getPlan('month');
+    const label = DISCOVERY_COPY[locale].premium
+      .replace('{stars}',new Intl.NumberFormat(locale).format(plan.stars))
+      .replace('{days}',new Intl.NumberFormat(locale).format(plan.days));
+    return <div className="flex h-full w-full snap-start snap-always items-center justify-center bg-black p-6 text-center" data-feed-premium-after={after}>
+      <Link href="/premium" className="max-w-sm rounded-3xl border border-white/20 bg-white/5 p-8 text-xl font-semibold text-white">{label}</Link>
+    </div>;
+  }
   return <div className="flex h-full w-full snap-start snap-always items-center justify-center bg-black" data-feed-ad-after={after}>
-    <AdSlot placement="feed" className="h-full w-full" onEmpty={() => setEmpty(true)} />
+    <AdSlot placement="feed" ordinal={ordinal} className="h-full w-full" onEmpty={() => setEmpty(true)} />
   </div>;
 }
 

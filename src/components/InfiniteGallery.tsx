@@ -178,7 +178,7 @@ export function InfiniteGallery({ initial, params, premium = false }: Props) {
             <div className="min-w-0">
               <PhotoCard photo={p} priority={i < 2} />
             </div>
-            {!premium && isProfileGalleryAdPosition(i+1,profile,device)
+            {!premium && isProfileGalleryAdPosition(i+1,profile,device,params.creator ? 'creator' : 'gallery')
               ? <GalleryAdInsertion /> : null}
           </Fragment>
         ))}

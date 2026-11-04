@@ -1,8 +1,10 @@
 "use client";
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { AdPlacement } from "@/lib/ads-contract";
 import type { AdDevice } from "@/lib/ads-registry";
 import { adSpotFor } from "@/lib/ads-profiles";
+import { selectAdProvider, type AdSlotContext } from "@/lib/ads-provider-plan";
+import { getExoclickSpot } from "@/lib/exoclick-registry";
 import { mountTrafficStarsAd } from "@/lib/ads-sdk";
 import { adsCopy } from "@/lib/ads-copy";
 import { useAds } from "./AdsProvider";
@@ -13,25 +15,48 @@ import { usePremium } from "./Premium";
 import { DISCOVERY_COPY } from "@/features/i18n/discovery-copy";
 import { getPlan } from "@/lib/premium-plans";
 
-function NetworkAdSlot({ placement, className = "", onEmpty, loading }: { placement: AdPlacement; className?: string; onEmpty?: () => void; loading?: "eager"|"lazy" }) {
+type NetworkSlotProps = { placement: AdPlacement; className?: string; onEmpty?: () => void; loading?: "eager"|"lazy"; context?: AdSlotContext; ordinal?: number };
+
+function NetworkAdSlot({ placement, className = "", onEmpty, loading, context = "page", ordinal = 0 }: NetworkSlotProps) {
   const ads = useAds();
   const { locale } = useLocale();
+  const path = usePathname();
   const container = useRef<HTMLDivElement>(null);
   const frame = useRef<HTMLIFrameElement>(null);
   const frameTimer = useRef<number | undefined>(undefined);
   const frameFilled = useRef(false);
+  const failedFrame = useRef<string | null>(null);
+  const sendVisibility = useRef<((element: HTMLIFrameElement) => void) | undefined>(undefined);
   const currentAds = useRef(ads);
   useEffect(() => { currentAds.current = ads; }, [ads]);
   const emptyHandler = useRef(onEmpty);
   useEffect(() => { emptyHandler.current = onEmpty; }, [onEmpty]);
   const [device, setDevice] = useState<AdDevice | null>(null);
+  const [failedKey, setFailedKey] = useState<string | null>(null);
   const id = `lfh-ad-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const eligible = ads.canServe(placement);
   const profile = ads.runtime?.profile ?? "current";
-  const spot = device ? adSpotFor(profile, placement, device) : null;
+  const revision = ads.runtime?.revision ?? 0;
   const global = ["popunder", "interstitial", "slider"].includes(placement);
-  const frameSrc = device ? `/api/ads/embed?placement=${placement}&device=${device}` : undefined;
-  const frameKey = `${frameSrc}:${profile}:${ads.runtime?.revision ?? 0}`;
+  const provider = device ? selectAdProvider({profile, placement, device, context, ...(placement === "feed" ? {ordinal} : {})}) : null;
+  const trafficSpot = device ? adSpotFor(profile, placement, device) : null;
+  const exoSpot = device && provider === "exoclick" ? getExoclickSpot(placement, device, context) : null;
+  const spot = provider === "exoclick" ? exoSpot : trafficSpot;
+  // Correlation only, never a credential. React's ID is unique to this mounted slot.
+  const nonce = `${id.slice(0, 40)}-${profile}-${revision}-${device}-${context}-${ordinal}-${locale}`;
+  const exoQuery = new URLSearchParams({placement, device: device ?? "mobile", context, profile, nonce, path, locale});
+  if (placement === "feed") exoQuery.set("ordinal", String(ordinal));
+  const frameSrc = !device || !provider ? undefined : provider === "exoclick"
+    ? `/api/ads/exoclick?${exoQuery}` : `/api/ads/embed?placement=${placement}&device=${device}${placement === "feed" ? `&ordinal=${ordinal}` : ""}`;
+  const frameKey = `${frameSrc}:${profile}:${revision}`;
+  const serving = eligible && failedKey !== frameKey;
+  const empty = useCallback(() => {
+    if (failedFrame.current === frameKey) return;
+    failedFrame.current = frameKey;
+    window.clearTimeout(frameTimer.current);
+    setFailedKey(frameKey);
+    emptyHandler.current?.();
+  }, [frameKey]);
 
   useEffect(() => {
     const media = matchMedia("(min-width: 1024px)");
@@ -43,42 +68,73 @@ function NetworkAdSlot({ placement, className = "", onEmpty, loading }: { placem
     window.clearTimeout(frameTimer.current);
     frameTimer.current = undefined;
     return () => { window.clearTimeout(frameTimer.current); frameTimer.current = undefined; };
-  }, [frameKey, eligible]);
+  }, [frameKey, serving]);
   useEffect(() => {
-    if (!eligible || global) return;
+    if (!serving || global) return;
     const message = (event: MessageEvent) => {
       if (event.origin !== location.origin || event.source !== frame.current?.contentWindow
-        || event.data?.type !== "lfh-ad-status" || event.data?.placement !== placement) return;
-      if (event.data.status === "filled") { frameFilled.current = true; window.clearTimeout(frameTimer.current); }
-      if (event.data.status === "empty") { window.clearTimeout(frameTimer.current); emptyHandler.current?.(); }
+        || event.data?.type !== "lfh-ad-status" || event.data?.placement !== placement
+        || (provider === "exoclick" && event.data.nonce !== nonce)) return;
+      if (event.data.status === "filled" || (provider === "exoclick" && event.data.status === "loaded")) {
+        frameFilled.current = true; window.clearTimeout(frameTimer.current);
+      }
+      if (event.data.status === "empty") empty();
     };
     window.addEventListener("message", message);
     return () => { window.removeEventListener("message", message); window.clearTimeout(frameTimer.current); };
-  }, [eligible, global, placement, frameKey]);
+  }, [serving, global, placement, provider, nonce, empty]);
+  useEffect(() => {
+    const element = frame.current;
+    if (!serving || global || provider !== "exoclick" || !element) return;
+    let visible = false, disposed = false;
+    const post = (value: boolean) => element.contentWindow?.postMessage({type: "lfh-ad-visibility", placement, nonce, visible: value}, location.origin);
+    const update = () => { if (!disposed) post(visible && !document.hidden && currentAds.current.canServe(placement)); };
+    sendVisibility.current = target => { if (target === element) update(); };
+    const observer = typeof IntersectionObserver === "undefined" ? undefined : new IntersectionObserver(entries => {
+      if (disposed) return;
+      const entry = entries.find(value => value.target === element);
+      if (entry) { visible = entry.isIntersecting && entry.intersectionRatio >= .5; update(); }
+    }, {threshold: [0, .5]});
+    observer?.observe(element);
+    const hide = () => post(false);
+    document.addEventListener("visibilitychange", update);
+    window.addEventListener("pagehide", hide);
+    window.addEventListener("pageshow", update);
+    update();
+    return () => {
+      disposed = true; post(false); sendVisibility.current = undefined; observer?.disconnect();
+      document.removeEventListener("visibilitychange", update);
+      window.removeEventListener("pagehide", hide); window.removeEventListener("pageshow", update);
+    };
+  }, [serving, global, provider, placement, nonce, frameKey]);
   useEffect(() => {
     const element = container.current;
-    if (!eligible || !element || !spot || !global) return;
+    if (!eligible || !element || !trafficSpot || !global) return;
     let remove: (() => void) | undefined;
     const mount = () => {
       if (remove) return;
-      remove = mountTrafficStarsAd({ placement, profile, spot, container:element,
+      remove = mountTrafficStarsAd({ placement, profile, spot: trafficSpot, container:element,
         permitted:() => currentAds.current.canServe(placement), onStart:() => currentAds.current.markSdkStarted(device!) });
     };
     mount(); return () => remove?.();
-  }, [eligible, spot, placement, global, device, profile]);
+  }, [eligible, trafficSpot, placement, global, device, profile]);
 
-  if (!eligible || !spot) return null;
+  if (!serving || !spot || !provider) return null;
   if (global) return <div ref={container} id={id} hidden data-ad-placement={placement} />;
-  return <aside aria-label={adsCopy[locale].label} data-ad-placement={placement} className={`mx-auto max-w-full overflow-hidden ${className}`}>
+  return <aside aria-label={adsCopy[locale].label} data-ad-placement={placement} data-ad-provider={provider} className={`mx-auto max-w-full overflow-hidden ${className}`}>
     <p className="mb-1 text-center text-[10px] uppercase tracking-wide text-[var(--color-ink-faint)]">{adsCopy[locale].label}</p>
     <iframe key={frameKey} ref={frame} id={id} title={adsCopy[locale].label} loading={loading ?? (placement === "header" ? "eager" : "lazy")}
       src={frameSrc}
       sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
       referrerPolicy="no-referrer" className="mx-auto max-w-full border-0"
       onLoad={event => {
-        if (placement !== "feed" || event.currentTarget !== frame.current) return;
+        if (event.currentTarget !== frame.current) return;
+        sendVisibility.current?.(event.currentTarget);
+        // Exo's XML/vendor documents own their bounded load timeout; a paused
+        // or reduced-motion linear ad must not be discarded before a user plays it.
+        if (provider !== "trafficstars" || placement !== "feed") return;
         window.clearTimeout(frameTimer.current);
-        if (!frameFilled.current) frameTimer.current = window.setTimeout(() => emptyHandler.current?.(), 10_000);
+        if (!frameFilled.current) frameTimer.current = window.setTimeout(empty, 10_000);
       }}
       style={placement === "feed" ? { width:"100%", height:"85dvh", maxHeight:"100%" } : { width:spot.width, height:spot.height }} />
   </aside>;
@@ -142,6 +198,6 @@ function LegacyAdSlot({
   );
 }
 
-export function AdSlot(props: { placement: AdPlacement; className?: string; onEmpty?: () => void; loading?: "eager"|"lazy"; variant?: never; hide?: never } | { placement?: never; className?: never; onEmpty?: never; loading?: never; variant?: "banner" | "interstitial"; hide?: boolean }) {
-  return props.placement ? <NetworkAdSlot placement={props.placement} className={props.className} onEmpty={props.onEmpty} loading={props.loading} /> : <LegacyAdSlot variant={props.variant} hide={props.hide} />;
+export function AdSlot(props: NetworkSlotProps & { variant?: never; hide?: never } | { placement?: never; className?: never; onEmpty?: never; loading?: never; context?: never; ordinal?: never; variant?: "banner" | "interstitial"; hide?: boolean }) {
+  return props.placement ? <NetworkAdSlot placement={props.placement} className={props.className} onEmpty={props.onEmpty} loading={props.loading} context={props.context} ordinal={props.ordinal} /> : <LegacyAdSlot variant={props.variant} hide={props.hide} />;
 }

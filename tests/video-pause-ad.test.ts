@@ -60,7 +60,7 @@ test('initial pause/play intent never mounts an ad; actual playback then pause m
   const ui=harness(t);assert.equal(ui.render(),null);ui.emit('pause');assert.equal(ui.render(),null);
   ui.emit('playing');ui.emit('pause');assert.equal(ui.render(),null);
   ui.video.paused=false;ui.emit('play');ui.video.paused=true;ui.emit('pause');assert.equal(ui.render(),null);
-  const tree=ui.show(),slots=ui.slots(tree);assert.equal(slots.length,1);assert.equal(slots[0].props.placement,'underVideo');assert.equal(slots[0].props.loading,'eager');
+  const tree=ui.show(),slots=ui.slots(tree);assert.equal(slots.length,1);assert.equal(slots[0].props.placement,'underVideo');assert.equal(slots[0].props.loading,'eager');assert.equal(slots[0].props.context,'pause');
 });
 
 test('play, playing, ended and error immediately hide the ad',async t=>{
@@ -174,4 +174,10 @@ test('different video source keys own fresh playback and pause-ad state',()=>{
   });
   assert.equal(VideoPlayer({src:'/fixture-one.mp4'}).key,'/fixture-one.mp4');
   assert.equal(VideoPlayer({src:'/fixture-two.mp4'}).key,'/fixture-two.mp4');
+});
+
+
+test('an empty or closed NonLinear creative closes the pause wrapper without another provider or re-pause retry',t=>{
+  const ui=harness(t),slot=ui.slots(ui.show())[0];assert.equal(typeof slot.props.onEmpty,'function');
+  (slot.props.onEmpty as ()=>void)();assert.equal(ui.render(),null);assert.equal(ui.show(),null);
 });
