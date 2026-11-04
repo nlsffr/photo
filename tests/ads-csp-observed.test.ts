@@ -9,12 +9,16 @@ import { buildAdsEmbedDocument } from '../src/lib/ads-embed-document.ts';
 const sliderWrapper='https://go.gasipedibexide.com';
 const nativeApi='https://go.lanitesasexige.com';
 const impressionPixel='https://pxl-eu.tsyndicate.com';
+const nativeHls='https://edge-hls.saawsedge.com';
+const avatarImage='https://static-proxy.strpst.com';
+const sliderVideo='https://tsvideo.sacdnssedge.com';
 const has=(values:readonly string[],origin:string)=>values.includes(origin);
 
-test('the observed slider follow-up can connect without granting it script or image privileges',()=>{
+test('the observed slider wrapper and its pixel have only connection and image privileges',()=>{
   assert.equal(has(ADS_CSP.connect,sliderWrapper),true);
   assert.equal(has(ADS_CSP.script,sliderWrapper),false);
-  assert.equal(has(ADS_CSP.image,sliderWrapper),false);
+  assert.equal(has(ADS_CSP.image,sliderWrapper),true);
+  assert.equal(has(ADS_CSP.media,sliderWrapper),false);
 });
 test('the observed regional TrafficStars impression pixel is allowed only as an image',()=>{
   assert.equal(has(ADS_CSP.image,impressionPixel),true);
@@ -34,6 +38,22 @@ test('the actual HTTP advertising document wires the child-only connection allow
   assert.ok(connect.split(' ').includes(nativeApi));
   for(const origin of ADS_CSP.connect)assert.ok(connect.split(' ').includes(origin));
   assert.equal(has(ADS_CSP.connect,nativeApi),false);
+});
+test('NativeAdPreview HLS requests are allowed only inside the advertising document',()=>{
+  const directives=buildAdsEmbedDocument('header','mobile').csp.split(';').map(value=>value.trim());
+  const connect=directives.find(value=>value.startsWith('connect-src '));
+  assert.ok(connect);
+  assert.ok(connect.split(' ').includes(nativeHls));
+  assert.equal(has(ADS_CSP.embedConnect,nativeHls),true);
+  for(const parent of [ADS_CSP.connect,ADS_CSP.script,ADS_CSP.image,ADS_CSP.media])assert.equal(has(parent,nativeHls),false);
+});
+test('the observed slider avatar host is permitted only for images in the main page',()=>{
+  assert.equal(has(ADS_CSP.image,avatarImage),true);
+  for(const other of [ADS_CSP.connect,ADS_CSP.script,ADS_CSP.media,ADS_CSP.frame])assert.equal(has(other,avatarImage),false);
+});
+test('the observed slider MP4 CDN is permitted only for media in the main page',()=>{
+  assert.equal(has(ADS_CSP.media,sliderVideo),true);
+  for(const other of [ADS_CSP.connect,ADS_CSP.script,ADS_CSP.image,ADS_CSP.frame])assert.equal(has(other,sliderVideo),false);
 });
 test('the live-origin correction does not grant wildcard or arbitrary HTTPS access in the main page',()=>{
   for(const values of Object.values(ADS_CSP))for(const source of values)assert.ok(/^https:\/\/[a-z0-9.-]+$/.test(source),source);

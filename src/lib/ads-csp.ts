@@ -8,9 +8,9 @@ export const ADS_CSP = {
   script: ["https://cdn.fozekikikiminu.com", "https://cdn.tsyndicate.com", "https://jssdk.fozekikikiminu.com", "https://jssdk.tsyndicate.com", "https://jssdk.juneworewyjyna.com"],
   style: ["https://cdn.fozekikikiminu.com", "https://cdn.tsyndicate.com"],
   connect: CONNECT_ORIGINS,
-  // NativeAdPreview's model API is needed only inside the advertising document.
-  embedConnect: [...CONNECT_ORIGINS, "https://go.lanitesasexige.com"],
-  image: ["https://pxl.tsyndicate.com", "https://pxl-eu.tsyndicate.com", "https://pxl.fozekikikiminu.com", "https://m.fozekikikiminu.com", "https://tsyndicate.com", "https://static-ah.xhcdn.com"],
-  media: ["https://cdn.tsyndicate.com", "https://static-ah.xhcdn.com"],
+  // NativeAdPreview's API and observed HLS requests are child-document connections only.
+  embedConnect: [...CONNECT_ORIGINS, "https://go.lanitesasexige.com", "https://edge-hls.saawsedge.com"],
+  image: ["https://pxl.tsyndicate.com", "https://pxl-eu.tsyndicate.com", "https://pxl.fozekikikiminu.com", "https://m.fozekikikiminu.com", "https://tsyndicate.com", "https://static-ah.xhcdn.com", "https://go.gasipedibexide.com", "https://static-proxy.strpst.com"],
+  media: ["https://cdn.tsyndicate.com", "https://static-ah.xhcdn.com", "https://tsvideo.sacdnssedge.com"],
   frame: ["https://tsyndicate.com", "https://jssdk.fozekikikiminu.com"],
 } as const;
