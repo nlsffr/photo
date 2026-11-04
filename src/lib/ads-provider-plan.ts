@@ -1,7 +1,7 @@
 import type { AdPlacement, AdProfile } from "./ads-contract";
 import type { AdDevice } from "./ads-registry";
 // @ts-expect-error Native Node requires explicit suffixes.
-import { AD_PLACEMENT_KEYS, isAdProfile } from "./ads-contract.ts";
+import { AD_PLACEMENT_KEYS, isAdProfile, profileAllowsAdPlacement } from "./ads-contract.ts";
 
 export type AdSlotContext = "page" | "pause";
 export type AdProvider = "trafficstars" | "exoclick";
@@ -18,6 +18,7 @@ export function selectAdProvider(input: {
   if (!isAdProfile(profile) || !["desktop", "mobile"].includes(input.device)
     || !(AD_PLACEMENT_KEYS as readonly string[]).includes(input.placement) || !["page", "pause"].includes(context)
     || !isAdMediation(mediation) || (profile !== "intensive" && input.mediation !== undefined)) return null;
+  if (!profileAllowsAdPlacement(profile, input.placement)) return null;
   if (input.placement === "feed") {
     if (context !== "page" || !Number.isSafeInteger(input.ordinal) || input.ordinal! < 0 || input.ordinal! > 1_000_000) return null;
     if (profile === "intensive") return mediation === "alternative" ? "exoclick" : "trafficstars";

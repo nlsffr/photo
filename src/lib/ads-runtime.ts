@@ -8,7 +8,7 @@ import { getDbPool } from './db-pool';
 import { premiumEntitlementState } from './premium-entitlement';
 import { getAdsConfig } from './ads-store';
 import { isAdsRegistryReady } from './ads-registry-data.mjs';
-import { AD_CONSENT_COOKIE, emptyAdPlacements, parseAdConsent, type AdsRuntime } from './ads-contract';
+import { AD_CONSENT_COOKIE, effectiveAdPlacements, emptyAdPlacements, parseAdConsent, type AdsRuntime } from './ads-contract';
 import { evaluateAdsRuntime, type AdsViewer } from './ads-runtime-policy';
 
 // Keep advertising eligibility read-only; isUserPremium also expires stale subscription rows.
@@ -38,7 +38,7 @@ export async function getAdsRuntime():Promise<AdsRuntime> {
     const config=await getAdsConfig();
     if (!config.enabled) return evaluateAdsRuntime(config,consent,'unknown');
     const viewer=await getAdsViewer(jar.get(SESSION_COOKIE)?.value);
-    return evaluateAdsRuntime(config,consent,isAdsRegistryReady(config.placements) ? viewer : 'unknown');
+    return evaluateAdsRuntime(config,consent,isAdsRegistryReady(effectiveAdPlacements(config.profile,config.placements)) ? viewer : 'unknown');
   } catch {
     return {enabled:false,effectiveEnabled:false,revision:0,needsConsent:false,consent,placements:emptyAdPlacements(),reason:'unavailable',profile:'current'};
   }

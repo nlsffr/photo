@@ -72,7 +72,7 @@ test('three native profile radios expose a current legacy fallback and selecting
  assert.equal(writes,0);assert.equal(ui.button('Activer la diffusion').disabled,true);
  (staleMaster.onClick as ()=>void)();assert.equal(writes,0);
  assert.equal(ui.button('Enregistrer la configuration').disabled,false);
- assert.match(text(ui.render()),/Profil enregistré.*Confort/);
+ assert.match(text(ui.render()),/Profil enregistré.*Tranquille/);
  const preview=renderToStaticMarkup(ui.render());assert.match(preview,/data-ad-preview-profile="intensive"/);assert.doesNotMatch(preview,/<script|<iframe|srcdoc=/);
  (staleCheckbox.props.onChange as (event:unknown)=>void)({target:{checked:false}});
  (ui.button('Annuler').onClick as ()=>void)();

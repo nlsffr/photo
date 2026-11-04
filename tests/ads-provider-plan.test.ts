@@ -20,10 +20,13 @@ test("the registry contains the publisher's exact created zones and generated VA
   assert.equal(getExoclickSpot("popunder", "desktop"), null);
 });
 
-test("each profile chooses exactly one provider and preserves the existing TrafficStars header/global formats", () => {
+test("each profile keeps its owned banner providers and enforces allowed global formats", () => {
   for (const device of ["desktop", "mobile"] as const) {
     for (const profile of ["current", "balanced", "intensive"] as const) {
-      for (const placement of ["header", "popunder", "interstitial", "slider"] as const) assert.equal(selectAdProvider({ profile, placement, device }), "trafficstars");
+      for (const placement of ["header", "popunder", "interstitial", "slider"] as const) {
+        const allowed=placement==="header"||profile==="intensive"||(profile==="balanced"&&placement!=="interstitial");
+        assert.equal(selectAdProvider({ profile, placement, device }), allowed?"trafficstars":null);
+      }
     }
     assert.equal(selectAdProvider({ profile: "current", placement: "footer", device }), "exoclick");
     assert.equal(selectAdProvider({ placement: "underVideo", device }), "trafficstars");
@@ -37,7 +40,7 @@ test("each profile chooses exactly one provider and preserves the existing Traff
 test("feed alternation is deterministic from its stable zero-based slot ordinal", () => {
   const choice = (profile: "current" | "balanced" | "intensive", ordinal: number) => selectAdProvider({ profile, placement: "feed", device: "mobile", ordinal });
   assert.deepEqual(Array.from({ length: 6 }, (_, ordinal) => choice("balanced", ordinal)), ["trafficstars", "exoclick", "trafficstars", "exoclick", "trafficstars", "exoclick"]);
-  for (const ordinal of [0, 1, 1000000]) { assert.equal(choice("current", ordinal), "trafficstars"); assert.equal(choice("intensive", ordinal), "trafficstars"); }
+  for (const ordinal of [0, 1, 1000000]) { assert.equal(choice("current", ordinal), null); assert.equal(choice("intensive", ordinal), "trafficstars"); }
 });
 
 test('only intensive has an explicit standard/alternative feed branch and an undecided state remains closed',()=>{

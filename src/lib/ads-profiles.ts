@@ -4,16 +4,16 @@ import {ADS_REGISTRY,type AdDevice,type AdSpot} from '@/lib/ads-registry';
 import {adFormatPlacementFor, type AdPageContext} from './ads-page-context.ts';
 
 export const AD_PROFILE_INFO: ReadonlyArray<{key:AdProfile;title:string;summary:string;details:readonly string[]}> = [
-  {key:'current',title:'1 · Confort',summary:'Navigation actuelle et fréquences conservées ; encart bas ExoClick.',details:[
+  {key:'current',title:'1 · Tranquille',summary:'Bannières uniquement, sans fenêtre ni interruption de navigation.',details:[
     'Galeries : une rangée après 8 médias, puis tous les 16.',
-    'Popunder : au plus 1 fenêtre par session de 5 minutes, espacement de 60 secondes.',
-    'Interstitiel : 3 clics éligibles, fermeture après 5 secondes, cookie de 5 minutes.',
-    'TrafficStars en haut et dans le feed ; ExoClick remplace la bannière du bas.',
+    'Bannières en haut, en bas, sous les vidéos et dans les galeries, selon les emplacements activés.',
+    'Aucun popunder, interstitiel, lecteur flottant, préroll, annonce de pause ou publicité du feed.',
+    'Bannières TrafficStars ; ExoClick pour la bannière du bas.',
   ]},
-  {key:'balanced',title:'2 · Équilibré',summary:'Des annonces plus présentes, avec les mêmes commandes de navigation.',details:[
+  {key:'balanced',title:'2 · Équilibré',summary:'Bannières, feed et lecteur flottant, avec des fenêtres moins fréquentes.',details:[
     'Galeries : une rangée après 6 médias, puis tous les 12.',
     'Popunder : au plus 2 fenêtres par session de 5 minutes, espacées de 30 secondes.',
-    'Interstitiel et vidéo flottante : mêmes limites que le profil Confort.',
+    'Lecteur flottant conservé ; aucun interstitiel, préroll ni annonce de pause.',
     'Bannières basses et sous les vidéos ExoClick ; feed alterné entre les deux régies.',
   ]},
   {key:'intensive',title:'3 · Intensif',summary:'Disposition adaptée du relevé public concurrent, avec nos propres zones TrafficStars et ExoClick.',details:[

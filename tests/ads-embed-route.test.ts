@@ -25,7 +25,8 @@ test('TrafficStars documents cannot bypass the provider selected for the current
     ['balanced','placement=feed&device=mobile&ordinal=0',200],
     ['balanced','placement=feed&device=mobile',400],
     ['intensive','placement=feed&device=desktop&ordinal=0&path=%2Ffeed',200],
-    ['current','placement=feed&device=mobile',200],
+    ['current','placement=feed&device=mobile',403],
+    ['current','placement=feed&device=mobile&ordinal=0',403],
   ] as const){const api=fixture({profile});assert.equal((await api.GET(request(query))).status,status);assert.equal(api.documents(),status===200?1:0);}
   for(const query of ['placement=header&device=mobile&ordinal=0','placement=feed&device=mobile&ordinal=-1','placement=feed&device=mobile&ordinal=01','placement=feed&device=mobile&ordinal=1000001']){
     assert.equal((await fixture().GET(request(query))).status,400);

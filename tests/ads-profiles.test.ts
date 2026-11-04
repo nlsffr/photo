@@ -21,7 +21,7 @@ test('three named profiles retain the current publisher codes and valid vendor s
     assert.ok(isValidAdSpot(spot));
   }
 });
-test('legacy/current reproduces every existing spot exactly and returns stable references',()=>{
+test('legacy/current stored format definitions stay unchanged and return stable references',()=>{
   for(const placement of Object.keys(ADS_REGISTRY) as Placement[]) for(const device of ['desktop','mobile'] as const) {
     assert.equal(adSpotFor(undefined,placement,device),ADS_REGISTRY[placement][device]);
     assert.equal(adSpotFor('current',placement,device),ADS_REGISTRY[placement][device]);
@@ -40,7 +40,7 @@ test('only intensive creator mobile headers reuse the publisher owned 300x250 fo
   assert.equal(adSpotFor('intensive','header','desktop',creator),ADS_REGISTRY.header.desktop);
   assert.equal(adSpotFor('intensive','footer','desktop',creator),ADS_REGISTRY.footer.desktop);
 });
-test('pop frequency increases in supported seconds and only intensive uses native zero initial delay',()=>{
+test('stored vendor frequency templates stay unchanged and only intensive uses native zero initial delay',()=>{
   for(const [profile,count,delay] of [['current',1,60],['balanced',2,30],['intensive',3,5]] as const) {
     const spot=adSpotFor(profile,'popunder','mobile');
     assert.equal(spot.sessionDuration,300);assert.equal(spot.count,count);assert.equal(spot.delay,delay);

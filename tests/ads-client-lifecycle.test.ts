@@ -39,11 +39,11 @@ function browser(t:TestContext){
 const placements={header:true,footer:true,underVideo:true,feed:true,popunder:true,interstitial:true,slider:true};
 const eligible={enabled:true,effectiveEnabled:true,revision:4,needsConsent:false,consent:'accepted',placements,reason:'eligible'};
 type Snapshot={consentOffered:boolean;consentAvailable:boolean;canServe:(placement:string)=>boolean;runtime:typeof eligible|null;choose:(choice:'accepted'|'refused')=>Promise<boolean>};
-function provider(t:TestContext,initialTransport:(input?:RequestInfo|URL,init?:RequestInit)=>Promise<Response>,probe?:unknown){
+function provider(t:TestContext,initialTransport:(input?:RequestInfo|URL,init?:RequestInit)=>Promise<Response>,probe?:unknown,registryReady?:typeof isAdsRegistryReady){
   const environment=browser(t),hooks=hookHarness();let transport=initialTransport;
   const previousFetch=globalThis.fetch;globalThis.fetch=async(input,init)=>transport(input,init);
   const {AdsProvider}=loadAppModule<{AdsProvider:(props:{children:React.ReactNode})=>React.ReactElement<{value:Snapshot}>}>('src/components/AdsProvider.tsx',{
-    react:hooks.hooks,...(probe?{'@/lib/ads-mediation':{probeAdMediation:probe}}:{}),'@/lib/ads-sdk':{createAdSdkGuard},'@/lib/ads-registry':{isAdsRegistryReady},
+    react:hooks.hooks,...(probe?{'@/lib/ads-mediation':{probeAdMediation:probe}}:{}),'@/lib/ads-sdk':{createAdSdkGuard},'@/lib/ads-registry':{isAdsRegistryReady:registryReady??isAdsRegistryReady},
     'next/navigation':{usePathname:()=>'/en'},'./AgeConfirmation':{useAgeConfirmation:()=>({confirmed:true})},
     './Session':{useSession:()=>({loading:false,user:null})},'./Premium':{usePremium:()=>({ready:true,isPremium:false})}
   });
@@ -120,10 +120,10 @@ test('an unavailable first runtime never turns its pending offer into implicit c
 
 function slot(t:TestContext,placement:'header'|'footer'|'feed'){
   const environment=browser(t),hooks=hookHarness();let allowed=true,empties=0;
-  let profile:'current'|'balanced'|'intensive'='current',revision=4;
+  let profile:'current'|'balanced'|'intensive'=placement==='feed'?'balanced':'current',revision=4;
   const {AdSlot}=loadAppModule<{AdSlot:(props:{placement:string;onEmpty:()=>void})=>React.ReactElement}>('src/components/AdSlot.tsx',{
     react:hooks.hooks,'./AdsProvider':{useAds:()=>({runtime:{profile,revision},canServe:()=>allowed})},'./LocaleProvider':{useLocale:()=>({locale:'en'})},
-    '@/lib/ads-registry':{ADS_REGISTRY},'@/lib/ads-sdk':{mountTrafficStarsAd:()=>{throw new Error('Inline slots cannot run a parent SDK.');}},'next/navigation':{usePathname:()=>'/'}
+    '@/lib/ads-registry':{ADS_REGISTRY},'@/lib/ads-sdk':{mountTrafficStarsAd:()=>{throw new Error('Inline slots cannot run a parent SDK.');}},'next/navigation':{usePathname:()=>placement==='feed'?'/feed':'/'}
   });
   const outer=AdSlot({placement,onEmpty:()=>{empties++;}}),Component=outer.type as (props:Record<string,unknown>)=>React.ReactElement|null;
   const render=()=>hooks.render(()=>Component(outer.props as Record<string,unknown>));
@@ -157,7 +157,7 @@ test('revoking eligibility cancels a pending frame timeout before remounting',t=
 test('a saved profile revision replaces the frame and rejects filled messages from the prior profile',t=>{
   const ui=slot(t,'feed');const first=ui.frame();first.load();
   const filled=new Event('message');Object.assign(filled,{origin:'https://example.test',source:first.element.contentWindow,data:{type:'lfh-ad-status',placement:'feed',status:'filled'}});
-  ui.window.dispatchEvent(filled);ui.setPolicy('balanced',5);const second=ui.frame();
+  ui.window.dispatchEvent(filled);ui.setPolicy('intensive',5);const second=ui.frame();
   assert.notEqual(second.node.key,first.node.key);ui.window.dispatchEvent(filled);second.load();
   ui.advance(10_000);assert.equal(ui.empties(),1);
 });
@@ -206,5 +206,26 @@ test('pending from a different window cannot disarm the feed watchdog',t=>{
 test('a different profile revision does not inherit the prior feed pending state',t=>{
  const ui=slot(t,'feed');const old=ui.frame();old.load();
  const pending=new Event('message');Object.assign(pending,{origin:'https://example.test',source:old.element.contentWindow,data:{type:'lfh-ad-status',placement:'feed',status:'pending'}});ui.window.dispatchEvent(pending);
- ui.setPolicy('balanced',5);const next=ui.frame();ui.window.dispatchEvent(pending);next.load();ui.advance(10_000);assert.equal(ui.empties(),1);
+ ui.setPolicy('intensive',5);const next=ui.frame();ui.window.dispatchEvent(pending);next.load();ui.advance(10_000);assert.equal(ui.empties(),1);
+});
+
+
+test('client format gates reject a raw unmasked legacy/current runtime and the balanced interstitial',async t=>{
+ for(const profile of [undefined,'current','balanced','intensive'])await t.test(String(profile),async sub=>{
+  const payload={...eligible,...(profile?{profile}:{})},ui=provider(sub,async()=>Response.json(payload));ui.render();await flush();
+  if(profile==='intensive'){/* An undecided mediation remains closed by the existing contract. */return;}
+  const current=ui.render();for(const placement of ['header','footer','underVideo'])assert.equal(current.canServe(placement),true);
+  for(const placement of ['feed','popunder','slider'])assert.equal(current.canServe(placement),profile==='balanced');
+  assert.equal(current.canServe('interstitial'),false);
+ });
+});
+
+
+test('consent readiness requires only formats permitted by the saved level, not disabled global formats',async t=>{
+ for(const profile of ['current','balanced'] as const)await t.test(profile,async sub=>{
+  const checked:Array<Record<string,boolean>>=[];
+  const ready=(value:Record<string,boolean>)=>{checked.push(value);return profile==='current'?!value.feed&&!value.popunder&&!value.interstitial&&!value.slider:!value.interstitial;};
+  const ui=provider(sub,async()=>Response.json({...eligible,profile}),undefined,ready);ui.render();await flush();
+  assert.equal(ui.render().consentOffered,true);assert.ok(checked.length>0);assert.equal(checked.at(-1)!.header,true);assert.equal(checked.at(-1)!.interstitial,false);
+ });
 });

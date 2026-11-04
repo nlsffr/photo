@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { AD_CONSENT_COOKIE, AD_CONSENT_MAX_AGE, AD_CONSENT_VERSION, AD_PLACEMENT_KEYS, type AdConsent, type AdPlacement, type AdPlacements, type AdsRuntime } from "@/lib/ads-contract";
+import { AD_CONSENT_COOKIE, AD_CONSENT_MAX_AGE, AD_CONSENT_VERSION, AD_PLACEMENT_KEYS, effectiveAdPlacements, profileAllowsAdPlacement, type AdConsent, type AdPlacement, type AdPlacements, type AdsRuntime } from "@/lib/ads-contract";
 import { canServeAds, isAdPagePath, parseAdsRuntime, parseBrowserAdConsent } from "@/lib/ads-client-policy";
 import { useAgeConfirmation } from "./AgeConfirmation";
 import { useSession } from "./Session";
@@ -15,7 +15,7 @@ import { isAdsRegistryReady, type AdDevice } from "@/lib/ads-registry";
 export const ADS_CONSENT_CHANGED = "lfh:ad-consent-changed";
 const POLL_MS = 15_000;
 const RUNTIME_MAX_AGE_MS = POLL_MS + 5_000;
-const CONFIGURED = isAdsRegistryReady(Object.fromEntries(AD_PLACEMENT_KEYS.map(key => [key,true])) as AdPlacements);
+const REGISTRY_PLACEMENTS = Object.fromEntries(AD_PLACEMENT_KEYS.map(key => [key,true])) as AdPlacements;
 
 export function browserAdConsent(): AdConsent {
   return parseBrowserAdConsent(document.cookie);
@@ -105,6 +105,7 @@ export function AdsProvider({ children }: { children: React.ReactNode }) {
   }, [receivedAt]);
 
   const runtimeFresh = receivedContext === sessionContext && fresh && receivedAt > 0;
+  const configured = isAdsRegistryReady(effectiveAdPlacements(runtime?.profile, REGISTRY_PLACEMENTS));
   const allowed = canServeAds({ runtime, ageConfirmed:confirmed, consent, sessionLoading:loading,
     premiumReady:ready, isPremium, pathname, fresh:runtimeFresh });
   const eligibleNow = useRef<()=>boolean>(()=>false);
@@ -152,12 +153,12 @@ export function AdsProvider({ children }: { children: React.ReactNode }) {
   const currentResolution = receivedContext === sessionContext ? resolution : "pending";
   // Disclosure may precede runtime resolution; it grants no permission to serve an ad.
   // An informed click can record both purposes without a later second dialog.
-  const consentOffered = CONFIGURED && isAdPagePath(pathname) && !(ready && isPremium)
+  const consentOffered = configured && isAdPagePath(pathname) && !(ready && isPremium)
     && (currentResolution === "pending" || (runtimeFresh && runtime?.enabled === true
       && ["eligible", "consent_required", "consent_refused"].includes(runtime.reason)));
   return <Context.Provider value={{ runtime, mediation, consent, consentAvailable, consentOffered, needsConsent:consentOffered && consent === null,
     canServe:placement => allowed && mediation !== null && Date.now() < receivedAt + RUNTIME_MAX_AGE_MS
-      && runtime?.placements[placement] === true && browserAdConsent() === "accepted",
+      && profileAllowsAdPlacement(runtime?.profile, placement) && runtime?.placements[placement] === true && browserAdConsent() === "accepted",
     markSdkStarted:device => sdkGuard.current.start(device, runtime?.revision ?? -1), choose }}>
     {children}
   </Context.Provider>;

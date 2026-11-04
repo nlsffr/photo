@@ -82,7 +82,7 @@ test('profile/revision and responsive device changes replace the frame and rejec
 
 test('feed passes a stable ordinal and chooses exactly one provider according to the saved profile',t=>{
   const ui=harness(t,{placement:'feed',profile:'balanced',ordinal:1}),frame=ui.frame();assert.equal(frame.url.pathname,'/api/ads/exoclick');assert.equal(frame.url.searchParams.get('ordinal'),'1');assert.equal(frame.url.searchParams.get('path'),'/fr/feed');
-  ui.policy('current',5);const ts=ui.frame();assert.equal(ts.url.pathname,'/api/ads/embed');assert.equal(ts.url.searchParams.get('ordinal'),'1');
+  ui.policy('intensive',5);const ts=ui.frame();assert.equal(ts.url.pathname,'/api/ads/embed');assert.equal(ts.url.searchParams.get('ordinal'),'1');
 });
 
 test('all runtime exclusions leave no iframe and create no parent-side advertising requests',async t=>{
@@ -175,9 +175,16 @@ test('owned Exo interstitial uses its desktop zone after a responsive change wit
   assert.equal(ui.globalCalls[0].removed,true);assert.equal(ui.globalCalls.at(-1)?.zoneId,6074862);assert.equal(ui.globalCalls.every(call=>call.provider==='exoclick'),true);
 });
 
-test('legacy globals retain TrafficStars and never mount the Exo global adapter',async t=>{
-  for(const profile of ['current','balanced'])await t.test(profile,sub=>{
-    const ui=harness(sub,{placement:'interstitial',profile});ui.render();ui.render();
+test('level1 never mounts a global SDK or feed while level2 retains popunder/slider without interstitial',async t=>{
+  for(const placement of ['feed','popunder','interstitial','slider'])await t.test('current/'+placement,sub=>{
+    const ui=harness(sub,{placement,profile:'current'});assert.equal(ui.render(),null);assert.equal(ui.render(),null);
+    assert.deepEqual(ui.globalCalls,[]);assert.equal(ui.sdkStarts(),0);
+  });
+  await t.test('balanced/interstitial',sub=>{
+    const ui=harness(sub,{placement:'interstitial',profile:'balanced'});assert.equal(ui.render(),null);assert.equal(ui.render(),null);assert.deepEqual(ui.globalCalls,[]);
+  });
+  for(const placement of ['popunder','slider'])await t.test('balanced/'+placement,sub=>{
+    const ui=harness(sub,{placement,profile:'balanced'});ui.render();ui.render();
     assert.deepEqual(ui.globalCalls.map(call=>call.provider),['trafficstars']);
   });
 });

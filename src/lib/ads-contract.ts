@@ -3,6 +3,20 @@ export type AdPlacement = typeof AD_PLACEMENT_KEYS[number];
 export type AdPlacements = Record<AdPlacement, boolean>;
 export const AD_PROFILES = ["current", "balanced", "intensive"] as const;
 export type AdProfile = typeof AD_PROFILES[number];
+
+/** Saved switches stay shared; each level exposes only its permitted formats. */
+export function profileAllowsAdPlacement(profile: AdProfile | undefined, placement: AdPlacement): boolean {
+  const selected = profile ?? "current";
+  if (!isAdProfile(selected) || !(AD_PLACEMENT_KEYS as readonly string[]).includes(placement)) return false;
+  if (selected === "intensive") return true;
+  if (selected === "balanced") return placement !== "interstitial";
+  return placement === "header" || placement === "footer" || placement === "underVideo";
+}
+
+export function effectiveAdPlacements(profile: AdProfile | undefined, saved: AdPlacements): AdPlacements {
+  return Object.fromEntries(AD_PLACEMENT_KEYS.map(key => [key, saved[key] === true && profileAllowsAdPlacement(profile, key)])) as AdPlacements;
+}
+
 export function isAdProfile(value: unknown): value is AdProfile {
   return typeof value === "string" && (AD_PROFILES as readonly string[]).includes(value);
 }
