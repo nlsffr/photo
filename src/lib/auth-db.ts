@@ -6,7 +6,7 @@
  */
 
 import "server-only";
-import type { RowDataPacket } from "mysql2";
+import type { ResultSetHeader, RowDataPacket } from "mysql2";
 import { randomUUID } from "node:crypto";
 import { getDbPool as getPool } from "./db-pool";
 import {
@@ -50,8 +50,10 @@ export async function registerUser(input: {
   });
 }
 
+// A symbol keeps the sensitive credential proof outside user and JSON output.
+export const VERIFIED_CREDENTIAL_HASH = Symbol("verifiedCredentialHash");
 type LoginResult =
-  | { ok: true; user: SessionUser }
+  | { ok: true; user: SessionUser; [VERIFIED_CREDENTIAL_HASH]: string }
   | { ok: false; error: "invalid_credentials" | "no_db" };
 
 /** identifier = email OR username. */
@@ -85,6 +87,7 @@ export async function verifyCredentials(
 
   return {
     ok: true,
+    [VERIFIED_CREDENTIAL_HASH]: row.password_hash,
     user: {
       id: row.id,
       email: row.email,
@@ -95,15 +98,39 @@ export async function verifyCredentials(
 }
 
 /** Create a session row and return its token (the cookie value). */
-export async function createSession(userId: string): Promise<string | null> {
+export async function createSession(userId: string, expectedPasswordHash?: string): Promise<string | null> {
   const db = getPool();
   if (!db) return null;
+  if (expectedPasswordHash !== undefined && (typeof expectedPasswordHash !== "string" || !expectedPasswordHash || expectedPasswordHash.length > 255)) return null;
   const token = newSessionToken();
-  await db.execute(
-    "INSERT INTO sessions (id, user_id, expires_at) VALUES (:id, :uid, :exp)",
-    { id: token, uid: userId, exp: sessionExpiry() },
-  );
-  return token;
+  const params = { id: token, uid: userId, exp: sessionExpiry() };
+  const insert = "INSERT INTO sessions (id, user_id, expires_at) VALUES (:id, :uid, :exp)";
+  if (expectedPasswordHash === undefined) {
+    const [result] = await db.execute<ResultSetHeader>(insert, params);
+    return result.affectedRows === 1 ? token : null;
+  }
+  // Reset and credential login lock the same user first. A preceding login is
+  // revoked by reset; a late login must still match the hash after reset commits.
+  const connection = await db.getConnection();
+  let transactionOpen = false;
+  try {
+    await connection.beginTransaction(); transactionOpen = true;
+    const [rows] = await connection.execute<RowDataPacket[]>(
+      "SELECT password_hash FROM users WHERE id=:uid FOR UPDATE", { uid: userId },
+    );
+    if (rows[0]?.password_hash !== expectedPasswordHash) {
+      await connection.rollback(); transactionOpen = false; return null;
+    }
+    const [result] = await connection.execute<ResultSetHeader>(insert, params);
+    if (result.affectedRows !== 1) {
+      await connection.rollback(); transactionOpen = false; return null;
+    }
+    await connection.commit(); transactionOpen = false;
+    return token;
+  } catch (error) {
+    if (transactionOpen) { try { await connection.rollback(); } catch { /* Preserve the original failure. */ } }
+    throw error;
+  } finally { connection.release(); }
 }
 
 /** Resolve a session token to the user, or null if missing/expired. */

@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { verifyCredentials, createSession } from "@/lib/auth-db";
+import { verifyCredentials, createSession, VERIFIED_CREDENTIAL_HASH } from "@/lib/auth-db";
 import { SESSION_COOKIE, SESSION_TTL_DAYS } from "@/lib/auth";
 import { rateLimitRequest, sweep } from "@/lib/ratelimit";
 
@@ -36,7 +36,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const result = await verifyCredentials(identifier, password);
+  let result: Awaited<ReturnType<typeof verifyCredentials>>;
+  try { result = await verifyCredentials(identifier, password); }
+  catch { return Response.json({ ok: false, error: "unavailable", message: "Connexion indisponible. Réessaie plus tard." }, { status: 503 }); }
   if (!result.ok) {
     const status = result.error === "no_db" ? 503 : 401;
     const message =
@@ -46,17 +48,20 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, error: result.error, message }, { status });
   }
 
-  const token = await createSession(result.user.id);
-  if (token) {
-    const jar = await cookies();
-    jar.set(SESSION_COOKIE, token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: SESSION_TTL_DAYS * 24 * 60 * 60,
-    });
+  let token: string | null;
+  try { token = await createSession(result.user.id, result[VERIFIED_CREDENTIAL_HASH]); }
+  catch { return Response.json({ ok: false, error: "unavailable", message: "Connexion indisponible. Réessaie plus tard." }, { status: 503 }); }
+  if (!token) {
+    return Response.json({ ok: false, error: "invalid_credentials", message: "Identifiants incorrects." }, { status: 401 });
   }
+  const jar = await cookies();
+  jar.set(SESSION_COOKIE, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: SESSION_TTL_DAYS * 24 * 60 * 60,
+  });
 
   return Response.json({ ok: true, user: result.user });
 }
