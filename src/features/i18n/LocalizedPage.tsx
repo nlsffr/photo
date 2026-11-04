@@ -439,7 +439,7 @@ function EnglishAboutPage() {
       <h1 className="text-3xl font-black tracking-tight">About Leak<span className="text-[var(--color-accent)]">FanHub</span></h1>
       <p className="mt-3 text-lg text-[var(--color-ink-muted)]">A modern, dense and fast media gallery built for discovery.</p>
       <div className="mt-8 grid gap-4 sm:grid-cols-2">{cards.map(([title, body]) => <section key={title} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5"><h2 className="font-bold">{title}</h2><p className="mt-1.5 text-sm text-[var(--color-ink-muted)]">{body}</p></section>)}</div>
-      <section className="mt-8 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5"><h2 className="font-bold">Privacy by default</h2><p className="mt-1.5 text-sm text-[var(--color-ink-muted)]">We avoid third-party advertising trackers and let visitors browse before creating an account.</p></section>
+      <section className="mt-8 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5"><h2 className="font-bold">Privacy by default</h2><p className="mt-1.5 text-sm text-[var(--color-ink-muted)]">Optional analytics and partner advertising from TrafficStars and ExoClick depend on your choice. You can decline their trackers and continue using the site, then change your choice in Cookie choices. Premium members do not see advertisements.</p></section>
       <Link href="/" className="mt-8 inline-flex rounded-full bg-[var(--color-accent)] px-6 py-2.5 text-sm font-semibold text-white">Explore the gallery</Link>
     </div>
   );
@@ -490,7 +490,15 @@ function EnglishTermsPage() {
 }
 
 function EnglishPrivacyPage() {
-  return <LegalPage title="Privacy policy" updated="November 1, 2026" updatedLabel="Last updated" intro="LeakFanHub is designed to minimize tracking and explain what is stored." sections={[{ heading: "Optional audience measurement", body: "With your consent, a browser identifier helps count visits and page views and estimate their country. You can decline and still use the site. Use Cookie choices in the footer to change your decision." }, { heading: "Local preferences", body: <p>Likes, saved items and display preferences may be stored locally in your browser until you create an account.</p> }, { heading: "Optional accounts", body: <p>Account email is used for access and support. Passwords are hashed and are never stored in plain text.</p> }, { heading: "No advertising fingerprinting", body: <p>We do not use browser fingerprinting or third-party analytics for marketing profiles.</p> }, { heading: "Your rights", body: <p>You can clear local data or contact us to request access to or deletion of account data.</p> }]} />;
+  return <LegalPage title="Privacy policy" updated="November 4, 2026" updatedLabel="Last updated" intro="LeakFanHub is designed to minimize tracking and explain what is stored." sections={[
+    { heading: "Optional audience measurement", body: "With your consent, a browser identifier helps count visits and page views and estimate their country. You can decline and still use the site. Use Cookie choices in the footer to change your decision." },
+    { heading: "Optional partner advertising", body: <p>After you accept advertising and its trackers, TrafficStars and ExoClick may receive the technical data needed to deliver their ads, including your IP address, browser characteristics and advertising interactions. Their integrations may use cookies or browser storage. Without this acceptance, their integrations stay disabled. Premium accounts do not receive these advertisements. You can change your decision using Cookie choices in the footer. Read the privacy policies of <a href="https://trafficstars.com/privacy-policy/" rel="noopener noreferrer" target="_blank" className="underline">TrafficStars</a> and <a href="https://www.exoclick.com/privacy-policy/" rel="noopener noreferrer" target="_blank" className="underline">ExoClick</a>.</p> },
+    { heading: "Aggregate page measurement", body: <p>A separate server counter measures page loads without cookies or a personal visitor identifier. It also covers requests from visitors who decline optional analytics and cannot count the exact number of people.</p> },
+    { heading: "Site measurement", body: <p>The site’s own audience measurement uses no third-party analytics service and does not build browser fingerprints or retain IP addresses for marketing profiles. Advertising partners’ separate practices are described above.</p> },
+    { heading: "Local preferences", body: <p>Likes, saved items and display preferences may be stored locally in your browser until you create an account.</p> },
+    { heading: "Optional accounts", body: <p>Account email is used for access and support. Passwords are hashed and are never stored in plain text.</p> },
+    { heading: "Your rights", body: <p>You can clear local data or contact us to request access to or deletion of account data.</p> },
+  ]} />;
 }
 
 function EnglishLegalPage() {
