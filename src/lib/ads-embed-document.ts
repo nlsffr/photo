@@ -38,7 +38,7 @@ setTimeout(()=>{check();if(!filled)tell("empty");observer.disconnect();},8000);
   const csp = ["default-src 'none'", "base-uri 'none'", "object-src 'none'", "frame-ancestors 'self'", "form-action 'none'",
     `script-src 'sha256-${hash}' ${ADS_CSP.script.join(" ")}`,
     `style-src 'unsafe-inline' ${ADS_CSP.style.join(" ")}`,
-    `connect-src 'self' ${ADS_CSP.connect.join(" ")}`,
+    `connect-src 'self' ${ADS_CSP.embedConnect.join(" ")}`,
     "img-src 'self' data: https:", "media-src 'self' blob: https:", "frame-src 'self' https:", "upgrade-insecure-requests"].join("; ");
   return { csp, html:`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Advertisement</title><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent}#lfh-ad{position:relative;width:100%;height:100%;display:flex;justify-content:center;align-items:flex-start}iframe{border:0}video{max-width:100%;max-height:100%;object-fit:contain}</style></head><body><div id="lfh-ad"></div><script>${boot}</script></body></html>` };
 }
