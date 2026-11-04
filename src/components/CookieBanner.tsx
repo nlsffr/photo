@@ -8,7 +8,7 @@ import { AUDIENCE_COOKIE, CHOICE_MAX_AGE, cookieCopy, type Choice } from "@/lib/
 import { AD_CONSENT_COOKIE, AD_CONSENT_MAX_AGE, AD_CONSENT_VERSION } from "@/lib/ads-contract";
 import type { ConsentChoiceRequest } from "@/lib/consent-choice-contract";
 import { CHOICE_CHANGED, OPEN_CHOICES, useAudienceChoice } from "./AudienceChoice";
-import { useLocale } from "./LocaleProvider";
+import { LanguageSwitcher, useLocale } from "./LocaleProvider";
 import { useAgeConfirmation } from "./AgeConfirmation";
 import { ADS_CONSENT_CHANGED, useAds } from "./AdsProvider";
 
@@ -86,7 +86,7 @@ export function CookieBanner() {
   const detailsButton = useRef<HTMLButtonElement>(null);
   const declineButton = useRef<HTMLButtonElement>(null);
   const statisticsCheckbox = useRef<HTMLInputElement>(null);
-  const returnFocus = useRef<HTMLElement | null>(null);
+  const dialog = useRef<HTMLDialogElement>(null);
   const saving = useRef(false);
   const [dismissed, setDismissed] = useState(false);
   const [pending, setPending] = useState(false);
@@ -97,7 +97,6 @@ export function CookieBanner() {
   useEffect(() => {
     const open = () => {
       if (saving.current) return;
-      returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       setOpened(true); setShowChoices(true); setError(false);
       setStatisticsDraft(choice === "accepted"); setAdvertisingDraft(ads.consent === "accepted");
     };
@@ -107,6 +106,12 @@ export function CookieBanner() {
   useEffect(() => {
     if (showChoices) (combined ? statisticsCheckbox.current : declineButton.current)?.focus({ preventScroll: true });
   }, [showChoices, opened, combined]);
+  const visible = choice !== undefined && ageConfirmed !== undefined
+    && (opened || !pathname.replace(/\/$/, "").endsWith("/confidentialite"))
+    && (opened || !ageConfirmed || !(dismissed || (choice !== null && !ads.needsConsent)));
+  useEffect(() => {
+    if (visible && dialog.current && !dialog.current.open) dialog.current.showModal();
+  }, [visible]);
   if (choice === undefined || ageConfirmed === undefined) return null;
   // The privacy explanation must remain readable before any entry or cookie choice.
   if (!opened && pathname.replace(/\/$/, "").endsWith("/confidentialite")) return null;
@@ -116,7 +121,7 @@ export function CookieBanner() {
 
   function close() {
     setOpened(false); setDismissed(true);
-    returnFocus.current?.focus({ preventScroll: true });
+    dialog.current?.close();
   }
 
   async function choose(value: Choice, advertisingChoice?: Choice) {
@@ -150,13 +155,21 @@ export function CookieBanner() {
       close();
     } catch { if (fullyRefused) { close(); } else { setError(true); } } finally { window.clearTimeout(timeout); saving.current = false; setPending(false); }
   }
-  return <div className={!ageConfirmed ? "fixed inset-0 z-[100] bg-black/90" : undefined}>
-    <section aria-label={copy.manage} className="fixed inset-x-0 top-[calc(50%+1.5rem)] z-50 mx-auto max-w-[27rem] -translate-y-1/2 px-4 font-sans">
-    <div className="max-h-[calc(100dvh-5rem)] overflow-y-auto overscroll-y-contain rounded-[1.75rem] border border-[var(--color-border)] bg-[var(--color-surface)] px-6 pb-2 pt-6 text-center shadow-[0_24px_80px_-20px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.04)]">
-      <div className="mb-4 flex justify-center">
-        <BrandLogo href={localizedHref(locale, "/")} size="sm" />
+  return <dialog ref={dialog} aria-label={!ageConfirmed ? t("shell.ageGate.title") : copy.manage}
+    closedby={!ageConfirmed || pending ? "none" : "closerequest"}
+    onCancel={event => { if (!ageConfirmed || pending) event.preventDefault(); else close(); }}
+    className={`audience-dialog ${!ageConfirmed ? "audience-dialog-entry" : "audience-dialog-choices"}`}>
+    <section className={!ageConfirmed ? "entry-screen" : "cookie-panel"}>
+      {!ageConfirmed && <div className="entry-language"><LanguageSwitcher variant="entry" /></div>}
+      <div className={!ageConfirmed ? "entry-content" : undefined}>
+      <div className={!ageConfirmed ? "entry-mark" : "mb-4 flex justify-center"}>
+        <BrandLogo href={localizedHref(locale, "/")} size={!ageConfirmed ? "entry" : "sm"} showWord={ageConfirmed} />
       </div>
-      {!ageConfirmed && <p className="mb-4 text-xs leading-relaxed text-[var(--color-ink-muted)]"><span className="mr-1 font-bold text-[var(--color-ink)]">18+</span> {t("shell.ageGate.body")}</p>}
+      {!ageConfirmed && <>
+        <h2 className="entry-title">{t("shell.ageGate.title")}</h2>
+        <p className="entry-body">{t("shell.ageGate.body")}</p>
+      </>}
+      <div className={!ageConfirmed ? "entry-cookie-explanation" : undefined}>
       {combined ? <p className="text-sm leading-relaxed text-[var(--color-ink-muted)]">
         {showChoices ? combinedText.settingsBody : combinedText.body}{" "}
         <Link href={localizedHref(locale,"/confidentialite")} onClick={() => setOpened(false)} className="whitespace-nowrap text-[var(--color-accent)] underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--color-accent)]">{t("shell.cookies.more")}</Link>
@@ -168,7 +181,8 @@ export function CookieBanner() {
           </p>
         ))}
       </div>}
-      <div className="mt-5">
+      </div>
+      <div className={!ageConfirmed ? "entry-actions" : "mt-5"}>
         {showChoices && combined ? <>
           <fieldset disabled={pending} className="mb-4 grid gap-3 text-left">
             <legend className="sr-only">{copy.manage}</legend>
@@ -182,6 +196,7 @@ export function CookieBanner() {
             </label>
           </fieldset>
           <button type="button" disabled={pending} onClick={()=>void choose(statisticsDraft?"accepted":"refused",advertisingDraft?"accepted":"refused")} className="min-h-12 w-full rounded-full bg-[var(--color-accent)] px-5 text-[15px] font-bold tracking-tight text-white transition-colors hover:bg-[var(--color-accent-600)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--color-ink)] disabled:cursor-wait">{combinedText.save}</button>
+          <button type="button" disabled={pending} onClick={()=>void choose("refused","refused")} className="mt-2 min-h-11 w-full rounded-full border border-[var(--color-border)] px-5 text-sm font-semibold">{combinedText.refuseAll}</button>
         </> : showChoices ? (
           <div className="grid grid-cols-2 gap-3">
             <button ref={declineButton} type="button" disabled={pending} onClick={() => choose("refused")} className="min-h-12 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 text-sm font-semibold text-[var(--color-ink)] transition-colors hover:border-[var(--color-accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] disabled:cursor-wait">{copy.refuse}</button>
@@ -192,9 +207,10 @@ export function CookieBanner() {
             if (combined) { void choose("accepted","accepted"); }
             else if (!ageConfirmed && choice !== null) { confirmAge(); close(); }
             else { void choose("accepted"); }
-          }} className="min-h-12 w-full rounded-full bg-[var(--color-accent)] px-5 text-[15px] font-bold tracking-tight text-white transition-colors hover:bg-[var(--color-accent-600)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--color-ink)] disabled:cursor-wait">{copy.accept}</button>
-          {combined && <button type="button" disabled={pending} onClick={()=>void choose("refused","refused")} className="mt-2 min-h-12 w-full rounded-full border border-[var(--color-border)] bg-[var(--color-surface-2)] px-5 text-sm font-semibold text-[var(--color-ink)] transition-colors hover:border-[var(--color-accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] disabled:cursor-wait">{combinedText.refuseAll}</button>}</>
+          }} className={!ageConfirmed ? "entry-enter" : "min-h-12 w-full rounded-full bg-[var(--color-accent)] px-5 text-[15px] font-bold tracking-tight text-white transition-colors hover:bg-[var(--color-accent-600)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--color-ink)] disabled:cursor-wait"}>{!ageConfirmed ? t("shell.ageGate.enter") : copy.accept}</button>
+          {combined && ageConfirmed && <button type="button" disabled={pending} onClick={()=>void choose("refused","refused")} className="mt-2 min-h-11 w-full rounded-full border border-[var(--color-border)] bg-[var(--color-surface-2)] px-5 text-sm font-semibold text-[var(--color-ink)] transition-colors hover:border-[var(--color-accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-accent)] disabled:cursor-wait">{combinedText.refuseAll}</button>}</>
         )}
+        {!ageConfirmed && !showChoices && <a href="https://www.google.com/" rel="noreferrer" className="entry-exit">−18 · {t("shell.ageGate.leave")}</a>}
         <button ref={detailsButton} type="button" disabled={pending} aria-expanded={showChoices} onClick={() => {
           if (showChoices && choice !== null && ageConfirmed) { close(); return; }
           if (!showChoices) { setStatisticsDraft(choice === "accepted"); setAdvertisingDraft(ads.consent === "accepted"); }
@@ -206,7 +222,8 @@ export function CookieBanner() {
         </button>
       </div>
       {error && <p role="alert" className="text-sm text-[var(--color-ink)]">{copy.error}</p>}
-    </div>
+      {!ageConfirmed && <p className="entry-copyright">© {new Date().getFullYear()} LeakFanHub</p>}
+      </div>
     </section>
-  </div>;
+  </dialog>;
 }

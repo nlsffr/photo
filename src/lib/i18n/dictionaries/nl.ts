@@ -89,8 +89,8 @@ export const nlDictionary = {
       logout: "Uitloggen",
     },
     ageGate: {
-      title: "Alleen voor volwassenen",
-      body: "Deze site bevat inhoud voor volwassenen. Door verder te gaan, bevestig je dat je minstens 18 jaar bent of de meerderjarige leeftijd in jouw land hebt bereikt.",
+      title: "Deze website is alleen voor volwassenen",
+      body: "Deze website bevat materiaal met een leeftijdsbeperking, waaronder naaktheid en expliciete afbeeldingen van seksuele handelingen. Door verder te gaan bevestig je dat je minstens 18 jaar bent en de wettelijke leeftijd in jouw rechtsgebied hebt bereikt, en dat je seksueel expliciete inhoud wilt bekijken.",
       enter: "Ik ben 18 jaar of ouder — Doorgaan",
       leave: "Verlaten",
     },

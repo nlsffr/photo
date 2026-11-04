@@ -19,7 +19,7 @@ export const ptDictionary = {
     navigation: { home: "Início", search: "Pesquisar", models: "Modelos", feed: "Feed", trending: "Tendências", mostLiked: "Mais apreciados", random: "Aleatório", forYou: "Para si", following: "A seguir", saved: "Guardados", add: "Adicionar", rankings: "Classificações", premium: "Premium", login: "Iniciar sessão", signup: "Criar conta", help: "Ajuda", contact: "Contacto", dmca: "DMCA", trust: "Confiança e segurança", report: "Denunciar conteúdo", terms: "Termos", privacy: "Privacidade" },
     searchInput: { placeholder: "Pesquisar um modelo ou uma etiqueta…", label: "Pesquisar", clear: "Limpar", submit: "Pesquisar" },
     account: { label: "A minha conta", saved: "Os meus itens guardados", following: "As minhas subscrições", logout: "Terminar sessão" },
-    ageGate: { title: "Apenas para adultos", body: "Este site contém conteúdos para adultos. Ao entrar, confirma que tem pelo menos 18 anos ou a idade legal de maioridade no seu país.", enter: "Tenho 18 anos ou mais — Entrar", leave: "Sair" },
+    ageGate: { title: "Este site é apenas para adultos", body: "Este site contém material com restrição de idade, incluindo nudez e representações explícitas de atividade sexual. Ao entrar, confirmas que tens pelo menos 18 anos e a idade legal na tua jurisdição e que aceitas ver conteúdos sexualmente explícitos.", enter: "Tenho 18 anos ou mais — Entrar", leave: "Sair" },
     cookies: { body: "Utilizamos armazenamento local mínimo para preferências e gostos. Sem rastreadores publicitários de terceiros.", more: "Saber mais" },
   },
   home: {

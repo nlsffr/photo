@@ -8,15 +8,15 @@ export function BrandLogo({
   className = "",
 }: {
   href?: string;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "entry";
   showWord?: boolean;
   className?: string;
 }) {
-  const box = size === "sm" ? "h-7 w-7" : size === "lg" ? "h-10 w-10" : "h-8 w-8";
+  const box = size === "entry" ? "h-16 w-16 sm:h-20 sm:w-20" : size === "sm" ? "h-7 w-7" : size === "lg" ? "h-10 w-10" : "h-8 w-8";
   const text = size === "sm" ? "text-base" : size === "lg" ? "text-2xl" : "text-lg";
 
   return (
-    <Link href={href} className={`inline-flex items-center gap-2 ${className}`}>
+    <Link href={href} aria-label="LeakFanHub" className={`inline-flex items-center gap-2 ${className}`}>
       <span
         className={`relative grid ${box} shrink-0 place-items-center overflow-hidden rounded-lg bg-gradient-to-br from-[var(--color-accent)] to-[var(--color-accent-600)] shadow-md shadow-[var(--color-accent)]/30`}
         aria-hidden

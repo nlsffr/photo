@@ -67,9 +67,11 @@ export function useLocale(): LocaleCtx {
 export function LanguageSwitcher({
   className = "",
   placement = "down",
+  variant = "default",
 }: {
   className?: string;
   placement?: "up" | "down";
+  variant?: "default" | "entry";
 }) {
   const { locale, t } = useLocale();
   const [open, setOpen] = useState(false);
@@ -79,16 +81,17 @@ export function LanguageSwitcher({
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
-        className="flex min-h-9 min-w-9 items-center gap-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-sm"
-        aria-label={t("shell.language")}
+        className={variant === "entry" ? "entry-language-button" : "flex min-h-9 min-w-9 items-center gap-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-sm"}
+        aria-label={`${t("shell.language")} · ${NAMES[locale]}`}
         aria-expanded={open}
       >
         <span className="text-base leading-none" aria-hidden="true">
           {FLAGS[locale]}
         </span>
-        <span className="hidden text-xs font-semibold uppercase text-[var(--color-ink-muted)] sm:inline">
+        {variant === "entry" && <span aria-hidden="true">⌄</span>}
+        {variant !== "entry" && <span className="hidden text-xs font-semibold uppercase text-[var(--color-ink-muted)] sm:inline">
           {locale}
-        </span>
+        </span>}
       </button>
       {open ? (
         <>

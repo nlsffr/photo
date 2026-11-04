@@ -23,8 +23,8 @@ export const esDictionary = {
     searchInput: { placeholder: "Buscar un modelo o una etiqueta…", label: "Buscar", clear: "Borrar", submit: "Buscar" },
     account: { label: "Mi cuenta", saved: "Mis elementos guardados", following: "Mis suscripciones", logout: "Cerrar sesión" },
     ageGate: {
-      title: "Solo para adultos",
-      body: "Este sitio contiene contenido para adultos. Al entrar, confirmas que tienes al menos 18 años o la mayoría de edad legal de tu país.",
+      title: "Este sitio es solo para adultos",
+      body: "Este sitio contiene material restringido por edad, incluidos desnudos y representaciones explícitas de actividades sexuales. Al entrar, confirmas que tienes al menos 18 años y la edad legal en tu jurisdicción, y que aceptas ver contenido sexualmente explícito.",
       enter: "Tengo 18 años o más — Entrar", leave: "Salir",
     },
     cookies: { body: "Usamos almacenamiento local mínimo para preferencias y me gusta. Sin rastreadores publicitarios de terceros.", more: "Más información" },

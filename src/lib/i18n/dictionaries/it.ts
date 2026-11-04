@@ -19,7 +19,7 @@ export const itDictionary = {
     navigation: { home: "Home", search: "Cerca", models: "Modelle", feed: "Feed", trending: "Tendenze", mostLiked: "Più apprezzati", random: "Casuale", forYou: "Per te", following: "Seguiti", saved: "Salvati", add: "Aggiungi", rankings: "Classifiche", premium: "Premium", login: "Accedi", signup: "Registrati", help: "Aiuto", contact: "Contatti", dmca: "DMCA", trust: "Affidabilità e sicurezza", report: "Segnala contenuto", terms: "Termini", privacy: "Privacy" },
     searchInput: { placeholder: "Cerca una modella o un tag…", label: "Cerca", clear: "Cancella", submit: "Cerca" },
     account: { label: "Il mio account", saved: "I miei elementi salvati", following: "I miei abbonamenti", logout: "Esci" },
-    ageGate: { title: "Solo per adulti", body: "Questo sito contiene contenuti per adulti. Entrando, confermi di avere almeno 18 anni o l'età della maggiore età prevista nel tuo Paese.", enter: "Ho almeno 18 anni — Entra", leave: "Esci" },
+    ageGate: { title: "Questo sito è riservato agli adulti", body: "Questo sito contiene materiale soggetto a limiti di età, tra cui nudità e rappresentazioni esplicite di attività sessuali. Entrando, confermi di avere almeno 18 anni e l’età legale nella tua giurisdizione e di acconsentire alla visione di contenuti sessualmente espliciti.", enter: "Ho almeno 18 anni — Entra", leave: "Esci" },
     cookies: { body: "Utilizziamo uno spazio locale minimo per preferenze e Mi piace. Nessun tracker pubblicitario di terze parti.", more: "Scopri di più" },
   },
   home: {

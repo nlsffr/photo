@@ -87,8 +87,8 @@ export const enDictionary = {
       logout: "Log out",
     },
     ageGate: {
-      title: "Adults only",
-      body: "This site contains adult content. By entering, you confirm that you are at least 18 or the age of majority in your country.",
+      title: "This is an adults-only website",
+      body: "This website contains age-restricted material, including nudity and explicit depictions of sexual activity. By entering, you confirm that you are at least 18 years old and of legal age in your jurisdiction, and that you consent to viewing sexually explicit content.",
       enter: "I am 18 or older — Enter",
       leave: "Leave",
     },

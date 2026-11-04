@@ -19,7 +19,7 @@ export const deDictionary = {
     navigation: { home: "Startseite", search: "Suchen", models: "Models", feed: "Feed", trending: "Trends", mostLiked: "Meistgeliked", random: "Zufällig", forYou: "Für dich", following: "Gefolgt", saved: "Gespeichert", add: "Hinzufügen", rankings: "Ranglisten", premium: "Premium", login: "Anmelden", signup: "Registrieren", help: "Hilfe", contact: "Kontakt", dmca: "DMCA", trust: "Vertrauen & Sicherheit", report: "Inhalt melden", terms: "Nutzungsbedingungen", privacy: "Datenschutz" },
     searchInput: { placeholder: "Model oder Tag suchen…", label: "Suchen", clear: "Löschen", submit: "Suchen" },
     account: { label: "Mein Konto", saved: "Meine gespeicherten Inhalte", following: "Meine Abonnements", logout: "Abmelden" },
-    ageGate: { title: "Nur für Erwachsene", body: "Diese Website enthält Inhalte für Erwachsene. Mit dem Betreten bestätigst du, dass du mindestens 18 Jahre alt bist oder das in deinem Land geltende Volljährigkeitsalter erreicht hast.", enter: "Ich bin mindestens 18 — Betreten", leave: "Verlassen" },
+    ageGate: { title: "Diese Website ist nur für Erwachsene", body: "Diese Website enthält altersbeschränkte Inhalte, darunter Nacktheit und explizite Darstellungen sexueller Handlungen. Mit dem Eintreten bestätigst du, dass du mindestens 18 Jahre alt bist und das gesetzliche Mindestalter an deinem Wohnort erreicht hast und dass du sexuell explizite Inhalte ansehen möchtest.", enter: "Ich bin mindestens 18 — Betreten", leave: "Verlassen" },
     cookies: { body: "Wir verwenden nur minimalen lokalen Speicher für Einstellungen und Likes. Keine Werbetracker von Drittanbietern.", more: "Mehr erfahren" },
   },
   home: {

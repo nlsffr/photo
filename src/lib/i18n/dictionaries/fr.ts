@@ -89,8 +89,8 @@ export const frDictionary = {
       logout: "Se déconnecter",
     },
     ageGate: {
-      title: "Contenu réservé aux adultes",
-      body: "Ce site contient du contenu pour adultes. En entrant, tu confirmes avoir au moins 18 ans ou l’âge de la majorité dans ton pays.",
+      title: "Ce site est réservé aux adultes",
+      body: "Ce site contient des contenus réservés aux adultes, notamment de la nudité et des représentations explicites d’activités sexuelles. En entrant, tu confirmes avoir au moins 18 ans et l’âge légal dans ton pays, et accepter de consulter des contenus sexuellement explicites.",
       enter: "J’ai 18 ans ou plus — Entrer",
       leave: "Quitter",
     },

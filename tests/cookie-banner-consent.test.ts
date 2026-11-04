@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test, {type TestContext} from 'node:test';
 import React from 'react';
+// @ts-expect-error Native Node requires explicit suffixes.
+import {cookieCopy} from '../src/lib/audience-choice.ts';
 import {renderToStaticMarkup} from 'react-dom/server';
 // @ts-expect-error Native Node requires explicit suffixes.
 import {parseAdConsent} from '../src/lib/ads-contract.ts';
@@ -38,15 +40,16 @@ function harness(t:TestContext,options:{enabled?:boolean;offer?:boolean;age?:boo
   let cursor=0;const state:unknown[]=[];
   const hooks={...React,useState:(initial:unknown)=>{const index=cursor++;if(!(index in state))state[index]=typeof initial==='function'?initial():initial;return[state[index],(value:unknown)=>{state[index]=typeof value==='function'?value(state[index]):value;}];},useRef:(initial:unknown)=>{const index=cursor++;if(!(index in state))state[index]={current:initial};return state[index];},useEffect:()=>{}};
   const ads={get consentAvailable(){return enabled;},get consentOffered(){return options.offer??enabled;},get needsConsent(){return (options.offer??enabled)&&adConsent===null;},get consent(){return adConsent;},choose:async()=>{throw new Error('The merged panel must use one combined request.');}};
+  const mockEnter=`18+ · ${cookieCopy[(options.locale??'fr') as keyof typeof cookieCopy].accept}`;
   const {CookieBanner}=loadAppModule<{CookieBanner:()=>React.ReactElement|null}>('src/components/CookieBanner.tsx',{
     react:hooks,'next/navigation':{usePathname:()=>'/fr'},'next/link':(props:React.ComponentProps<'a'>)=>React.createElement('a',props),
-    './BrandLogo':{BrandLogo:()=>null},'./LocaleProvider':{useLocale:()=>({locale:options.locale??'fr',t:()=> '18+ age confirmation'})},
+    './BrandLogo':{BrandLogo:()=>null},'./LocaleProvider':{LanguageSwitcher:()=>null,useLocale:()=>({locale:options.locale??'fr',t:(key:string)=>key==='shell.ageGate.enter'?mockEnter:'18+ age confirmation'})},
     './AudienceChoice':{useAudienceChoice:()=>audience,CHOICE_CHANGED:'audience-changed',OPEN_CHOICES:'open-choices'},
     './AgeConfirmation':{useAgeConfirmation:()=>({confirmed:age,confirm:()=>{age=true;}})},
     './AdsProvider':{useAds:()=>ads,ADS_CONSENT_CHANGED:'ad-consent-changed'}
   });
   const render=()=>{cursor=0;return CookieBanner();};
-  const button=(label:string)=>{const node=all(render(),item=>item.type==='button'&&text(item.props.children)===label)[0];assert.ok(node,label);return node.props;};
+  const button=(label:string)=>{const node=all(render(),item=>item.type==='button'&&(text(item.props.children)===label || (!age&&label===cookieCopy[(options.locale??'fr') as keyof typeof cookieCopy].accept&&text(item.props.children)===mockEnter)))[0];assert.ok(node,label);return node.props;};
   return{render,button,writes,jar,setEnabled:(value:boolean)=>{enabled=value;},checkboxes:()=>all(render(),item=>item.type==='input'&&item.props.type==='checkbox')};
 }
 
@@ -75,6 +78,7 @@ test('the configured advertising purpose is disclosed before the pending runtime
 
 test('refusing both records local refusals and never opens a second advertising panel after a network error',async t=>{
   const ui=harness(t,{transport:async()=>{throw new Error('network');}});
+  (ui.button('Choix des cookies').onClick as ()=>void)();
   (ui.button('Tout refuser').onClick as ()=>void)();await flush();
   assert.deepEqual(JSON.parse(String(ui.writes[0].body)),{choice:'refused',advertisingChoice:'refused',ageConfirmed:true,version:'v2'});
   assert.equal(ui.jar.get('lfh_audience'),'refused');assert.equal(ui.jar.get('lfh_ad_consent'),'v2:refused');
@@ -153,8 +157,21 @@ test('the merged entry and granular purpose labels are localized in all twelve s
   ])await t.test(locale,sub=>{
     const ui=harness(sub,{locale});
     const html=renderToStaticMarkup(ui.render());assert.equal((html.match(/<section/g)||[]).length,1);
-    assert.match(html,/TrafficStars/);assert.match(html,/ExoClick/);assert.ok(ui.button(enter));assert.ok(ui.button(refuse));
-    (ui.button(manage).onClick as ()=>void)();assert.equal(ui.checkboxes().length,2);assert.ok(ui.button(save));
+    assert.match(html,/TrafficStars/);assert.match(html,/ExoClick/);assert.ok(ui.button(enter));
+    (ui.button(manage).onClick as ()=>void)();assert.equal(ui.checkboxes().length,2);assert.ok(ui.button(save));assert.ok(ui.button(refuse));
     assert.doesNotMatch(renderToStaticMarkup(ui.render()),/<script|<iframe/);
   });
+});
+
+
+test('first entry is one native dialog with an age-labelled action and a separate underage exit', t=>{
+  const ui=harness(t);
+  const entry=ui.render() as Element;
+  assert.equal(entry.type,'dialog');
+  assert.ok(all(entry,e=>e.type==='h2').length);
+  const exits=all(entry,e=>e.type==='a'&&e.props.href==='https://www.google.com/');
+  assert.equal(exits.length,1);
+  assert.match(text(exits[0]),/18/);
+  assert.equal(exits[0].props.rel,'noreferrer');
+  assert.equal(ui.writes.length,0);
 });
