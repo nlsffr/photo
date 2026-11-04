@@ -80,9 +80,9 @@ test('advertising consent is separate, versioned, and accepting requires an expl
   try {
     const route=loadAppModule<Route>('src/app/api/ads/consent/route.ts',{'server-only':{},'next/headers':{},'./auth-db':{}});
     for (const body of [{choice:'accepted'},{choice:'accepted',ageConfirmed:false},{choice:['accepted'],ageConfirmed:true},{choice:'accepted',ageConfirmed:true,script:'x'}]) assert.equal((await route.POST(request(body,undefined,'POST'))).status,400);
-    const accepted=await route.POST(request({choice:'accepted',ageConfirmed:true},undefined,'POST'));
+    const accepted=await route.POST(request({choice:'accepted',ageConfirmed:true,version:'v2'},undefined,'POST'));
     assert.equal(accepted.status,204);const cookie=accepted.headers.get('set-cookie')??'';
-    assert.match(cookie,/lfh_ad_consent=v1%3Aaccepted/);assert.match(cookie,/Secure/);assert.match(cookie,/SameSite=lax/i);assert.doesNotMatch(cookie,/lfh_audience|lumen_session/);
+    assert.match(cookie,/lfh_ad_consent=v2%3Aaccepted/);assert.match(cookie,/Secure/);assert.match(cookie,/SameSite=lax/i);assert.doesNotMatch(cookie,/lfh_audience|lumen_session/);
     assert.equal((await route.POST(request({choice:'refused'},undefined,'POST'))).status,204);
     assert.equal((await route.POST(request({choice:'accepted',ageConfirmed:true},'https://foreign.example','POST'))).status,403);
   } finally {if(previous===undefined)delete process.env.NEXT_PUBLIC_SITE_URL;else process.env.NEXT_PUBLIC_SITE_URL=previous;(process.env as Record<string,string|undefined>).NODE_ENV=mode;}

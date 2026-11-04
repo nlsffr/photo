@@ -43,12 +43,12 @@ test("legacy analytics choices never create advertising consent, even with an ac
 });
 
 test("one combined acceptance returns both separate consent cookies only after explicit age confirmation", async () => {
-  const response = await route().POST(request({ choice: "accepted", advertisingChoice: "accepted", ageConfirmed: true }));
+  const response = await route().POST(request({ choice: "accepted", advertisingChoice: "accepted", ageConfirmed: true, version: "v2" }));
   assert.equal(response.status, 204);
   assert.equal(await response.text(), "");
   assert.equal(cookies(response).length, 2);
   assert.match(cookie(response, "lfh_audience"), /^lfh_audience=accepted;/);
-  assert.match(cookie(response, "lfh_ad_consent"), /^lfh_ad_consent=v1%3Aaccepted;/);
+  assert.match(cookie(response, "lfh_ad_consent"), /^lfh_ad_consent=v2%3Aaccepted;/);
   for (const value of cookies(response)) {
     assert.match(value, /Max-Age=15552000/);
     assert.match(value, /Path=\//);
@@ -60,21 +60,21 @@ test("one combined acceptance returns both separate consent cookies only after e
 });
 
 test("combined refusal records both refusals and expires the analytics visitor identifier", async () => {
-  const response = await route().POST(request({ choice: "refused", advertisingChoice: "refused" }));
+  const response = await route().POST(request({ choice: "refused", advertisingChoice: "refused", version: "v2" }));
   assert.equal(response.status, 204);
   assert.equal(cookies(response).length, 3);
   assert.match(cookie(response, "lfh_audience"), /^lfh_audience=refused;/);
-  assert.match(cookie(response, "lfh_ad_consent"), /^lfh_ad_consent=v1%3Arefused;/);
+  assert.match(cookie(response, "lfh_ad_consent"), /^lfh_ad_consent=v2%3Arefused;/);
   assert.match(cookie(response, "lfh_visitor"), /Max-Age=0/);
   assert.match(cookie(response, "lfh_visitor"), /HttpOnly/);
 });
 
 test("granular choices stay independent in both directions", async () => {
   for (const [choice, advertisingChoice] of [["accepted", "refused"], ["refused", "accepted"]]) {
-    const response = await route().POST(request({ choice, advertisingChoice, ageConfirmed: true }));
+    const response = await route().POST(request({ choice, advertisingChoice, ageConfirmed: true, version: "v2" }));
     assert.equal(response.status, 204);
     assert.match(cookie(response, "lfh_audience"), new RegExp(`^lfh_audience=${choice};`));
-    assert.match(cookie(response, "lfh_ad_consent"), new RegExp(`^lfh_ad_consent=v1%3A${advertisingChoice};`));
+    assert.match(cookie(response, "lfh_ad_consent"), new RegExp(`^lfh_ad_consent=v2%3A${advertisingChoice};`));
     assert.equal(Boolean(cookie(response, "lfh_visitor")), choice === "refused");
   }
 });
@@ -97,7 +97,7 @@ test("invalid combined bodies never partially update either consent", async () =
 });
 
 test("combined consent rejects missing, foreign, noncanonical and cross-site origins without writing cookies", async () => {
-  const body = { choice: "accepted", advertisingChoice: "accepted", ageConfirmed: true };
+  const body = { choice: "accepted", advertisingChoice: "accepted", ageConfirmed: true, version: "v2" };
   const requests = [request(body, { origin: "" }), request(body, { origin: "https://foreign.example" }),
     request(body, { origin: `${site}/path` }), request(body, { "sec-fetch-site": "cross-site" }),
     request(body, { "sec-fetch-site": "same-site" }), request(body, { origin: "https://forged.example" }, "https://forged.example/api/cookies/choice")];
@@ -110,7 +110,7 @@ test("combined consent rejects missing, foreign, noncanonical and cross-site ori
 });
 
 test("combined consent requires JSON and retains the bounded-body limit", async () => {
-  const body = { choice: "accepted", advertisingChoice: "accepted", ageConfirmed: true };
+  const body = { choice: "accepted", advertisingChoice: "accepted", ageConfirmed: true, version: "v2" };
   const plain = await route().POST(request(body, { "content-type": "text/plain" }));
   assert.equal(plain.status, 415);
   assert.equal(cookies(plain).length, 0);

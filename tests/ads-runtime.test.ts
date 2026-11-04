@@ -35,7 +35,7 @@ function runtime(options:{cookies?:Record<string,string>;row?:Record<string,unkn
 test('runtime ignores analytics consent; only versioned advertising consent is recognized',async()=>{
   assert.equal((await runtime({cookies:{lfh_audience:'accepted'}}).getAdsRuntime()).reason,'consent_required');
   assert.equal((await runtime({cookies:{lfh_ad_consent:'v0:accepted'}}).getAdsRuntime()).effectiveEnabled,false);
-  assert.equal((await runtime({cookies:{lfh_ad_consent:'v1%3Aaccepted'}}).getAdsRuntime()).effectiveEnabled,true);
+  assert.equal((await runtime({cookies:{lfh_ad_consent:'v2%3Aaccepted'}}).getAdsRuntime()).effectiveEnabled,true);
 });
 
 test('runtime always carries a known profile for eligible and closed states, with legacy current fallback',async()=>{
@@ -43,22 +43,22 @@ test('runtime always carries a known profile for eligible and closed states, wit
     for(const viewer of ['guest','owner','premium','unknown'])assert.equal(evaluateAdsRuntime({...config,profile},'accepted',viewer).profile,profile);
     assert.equal(evaluateAdsRuntime({...config,enabled:false,profile},'accepted','guest').profile,profile);
     assert.equal(evaluateAdsRuntime({...config,profile},'refused','guest').profile,profile);
-    assert.equal((await runtime({profile,cookies:{lfh_ad_consent:'v1:accepted'}}).getAdsRuntime()).profile,profile);
+    assert.equal((await runtime({profile,cookies:{lfh_ad_consent:'v2:accepted'}}).getAdsRuntime()).profile,profile);
   }
   assert.equal(evaluateAdsRuntime(config,null,'guest').profile,'current');
   assert.equal((await runtime({settingsError:true}).getAdsRuntime()).profile,'current');
   assert.throws(()=>evaluateAdsRuntime({...config,profile:'unknown' as never},'accepted','guest'),/profile/);
-  const invalid=await runtime({profile:'unknown' as never,cookies:{lfh_ad_consent:'v1:accepted'}}).getAdsRuntime();
+  const invalid=await runtime({profile:'unknown' as never,cookies:{lfh_ad_consent:'v2:accepted'}}).getAdsRuntime();
   assert.equal(invalid.effectiveEnabled,false);assert.equal(invalid.reason,'unavailable');assert.equal(invalid.profile,'current');
 });
 test('runtime returns OFF on unknown session, failed Premium checks and storage errors',async()=>{
-  const cookies={lfh_ad_consent:'v1:accepted',lumen_session:'test-session'};
+  const cookies={lfh_ad_consent:'v2:accepted',lumen_session:'test-session'};
   for(const options of [{user:null},{user:{id:'x'},dbError:true},{user:{id:'x'},row:null},{settingsError:true},{user:{id:'x'},row:{is_premium:1,period_end:'invalid'}}]) {
     const result=await runtime({...options,cookies}).getAdsRuntime();assert.equal(result.effectiveEnabled,false);assert.equal(result.reason,'unavailable');
   }
 });
 test('owners and current Premium are excluded; membership query is read-only; master OFF avoids it',async()=>{
-  const cookies={lfh_ad_consent:'v1:accepted',lumen_session:'test-session'};
+  const cookies={lfh_ad_consent:'v2:accepted',lumen_session:'test-session'};
   assert.equal((await runtime({cookies,user:{id:'x'},owner:true}).getAdsRuntime()).reason,'owner');
   assert.equal((await runtime({cookies,user:{id:'x'},row:{is_premium:1,period_end:'2999-01-01'}}).getAdsRuntime()).reason,'premium');
   assert.equal((await runtime({cookies,user:{id:'x'},row:{is_premium:0}}).getAdsRuntime()).effectiveEnabled,true);

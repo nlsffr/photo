@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { AD_CONSENT_COOKIE, AD_CONSENT_MAX_AGE, AD_PLACEMENT_KEYS, type AdConsent, type AdPlacement, type AdPlacements, type AdsRuntime } from "@/lib/ads-contract";
+import { AD_CONSENT_COOKIE, AD_CONSENT_MAX_AGE, AD_CONSENT_VERSION, AD_PLACEMENT_KEYS, type AdConsent, type AdPlacement, type AdPlacements, type AdsRuntime } from "@/lib/ads-contract";
 import { canServeAds, isAdPagePath, parseAdsRuntime, parseBrowserAdConsent } from "@/lib/ads-client-policy";
 import { useAgeConfirmation } from "./AgeConfirmation";
 import { useSession } from "./Session";
@@ -113,12 +113,12 @@ export function AdsProvider({ children }: { children: React.ReactNode }) {
   const choose = useCallback(async (choice: Exclude<AdConsent, null>) => {
     if (confirmed !== true) return false;
     if (choice === "refused") {
-      document.cookie = `${AD_CONSENT_COOKIE}=v1:refused; Path=/; SameSite=Lax; Max-Age=${AD_CONSENT_MAX_AGE}${location.protocol === "https:" ? "; Secure" : ""}`;
+      document.cookie = `${AD_CONSENT_COOKIE}=${AD_CONSENT_VERSION}:refused; Path=/; SameSite=Lax; Max-Age=${AD_CONSENT_MAX_AGE}${location.protocol === "https:" ? "; Secure" : ""}`;
       setConsent("refused");
     }
     try {
       const response = await fetch("/api/ads/consent", { method:"POST", credentials:"same-origin", cache:"no-store", keepalive:true,
-        headers:{"Content-Type":"application/json"}, body:JSON.stringify({ choice, ageConfirmed:true }) });
+        headers:{"Content-Type":"application/json"}, body:JSON.stringify({ choice, ageConfirmed:true, version:AD_CONSENT_VERSION }) });
       if (!response.ok) throw new Error("choice_failed");
       try { localStorage.setItem("lfh:ad-choice-update", String(Date.now())); } catch { /* Cookie remains authoritative. */ }
       window.dispatchEvent(new Event(ADS_CONSENT_CHANGED));

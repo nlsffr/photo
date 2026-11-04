@@ -16,7 +16,7 @@ export interface AdsConfig {
 export type AdsSave = Pick<AdsConfig, "revision" | "enabled" | "placements" | "profile">;
 export type AdConsent = "accepted" | "refused" | null;
 export const AD_CONSENT_COOKIE = "lfh_ad_consent";
-export const AD_CONSENT_VERSION = "v1";
+export const AD_CONSENT_VERSION = "v2";
 export const AD_CONSENT_MAX_AGE = 180 * 24 * 60 * 60;
 export type AdsRuntimeReason = "disabled" | "consent_required" | "consent_refused" | "premium" | "owner" | "unavailable" | "eligible";
 export interface AdsRuntime {
@@ -34,5 +34,8 @@ export function emptyAdPlacements(): AdPlacements {
 }
 export function parseAdConsent(value: unknown): AdConsent {
   if (typeof value === "string") { try { value = decodeURIComponent(value); } catch { return null; } }
-  return value === "v1:accepted" ? "accepted" : value === "v1:refused" ? "refused" : null;
+  // A previous refusal remains binding; the old TrafficStars-only acceptance
+  // cannot authorize a newly disclosed advertising provider.
+  return value === `${AD_CONSENT_VERSION}:accepted` ? "accepted"
+    : value === `${AD_CONSENT_VERSION}:refused` || value === "v1:refused" ? "refused" : null;
 }

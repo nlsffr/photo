@@ -29,7 +29,7 @@ function browser(t:TestContext){
   const previous={window:globalThis.window,document:globalThis.document,location:globalThis.location,matchMedia:globalThis.matchMedia};
   const events=new EventTarget();
   const windowMock=Object.assign(events,{setTimeout:(callback:()=>void,delay:number)=>{const key=++id;timers.set(key,{at:now+delay,callback});return key;},clearTimeout:(key:number)=>timers.delete(key),setInterval:(callback:()=>void,period:number)=>{const key=++id;timers.set(key,{at:now+period,callback,period});return key;},clearInterval:(key:number)=>timers.delete(key),location:{reload:()=>{}}});
-  const documentMock=Object.assign(new EventTarget(),{cookie:'lfh_ad_consent=v1%3Aaccepted'});
+  const documentMock=Object.assign(new EventTarget(),{cookie:'lfh_ad_consent=v2%3Aaccepted'});
   const media=Object.assign(new EventTarget(),{matches:false});
   Object.assign(globalThis,{window:windowMock,document:documentMock,location:{origin:'https://example.test'},matchMedia:()=>media});
   t.mock.method(Date,'now',()=>now);
@@ -38,10 +38,10 @@ function browser(t:TestContext){
 
 const placements={header:true,footer:true,underVideo:true,feed:true,popunder:true,interstitial:true,slider:true};
 const eligible={enabled:true,effectiveEnabled:true,revision:4,needsConsent:false,consent:'accepted',placements,reason:'eligible'};
-type Snapshot={consentOffered:boolean;consentAvailable:boolean;canServe:(placement:string)=>boolean;runtime:typeof eligible|null};
-function provider(t:TestContext,initialTransport:()=>Promise<Response>){
+type Snapshot={consentOffered:boolean;consentAvailable:boolean;canServe:(placement:string)=>boolean;runtime:typeof eligible|null;choose:(choice:'accepted'|'refused')=>Promise<boolean>};
+function provider(t:TestContext,initialTransport:(input?:RequestInfo|URL,init?:RequestInit)=>Promise<Response>){
   const environment=browser(t),hooks=hookHarness();let transport=initialTransport;
-  const previousFetch=globalThis.fetch;globalThis.fetch=async()=>transport();
+  const previousFetch=globalThis.fetch;globalThis.fetch=async(input,init)=>transport(input,init);
   const {AdsProvider}=loadAppModule<{AdsProvider:(props:{children:React.ReactNode})=>React.ReactElement<{value:Snapshot}>}>('src/components/AdsProvider.tsx',{
     react:hooks.hooks,'@/lib/ads-sdk':{createAdSdkGuard},'@/lib/ads-registry':{isAdsRegistryReady},
     'next/navigation':{usePathname:()=>'/en'},'./AgeConfirmation':{useAgeConfirmation:()=>({confirmed:true})},
@@ -55,6 +55,25 @@ test('a configured pending runtime offers an informed consent choice but cannot 
   const ui=provider(t,()=>new Promise(()=>{}));const value=ui.render();
   assert.equal(value.consentOffered,true);
   for(const key of Object.keys(placements))assert.equal(value.canServe(key),false);
+});
+
+test('the separate advertising caller submits its newly disclosed v2 choice explicitly',async t=>{
+  const ui=provider(t,async()=>Response.json(eligible));ui.render();await flush();
+  const writes:RequestInit[]=[];ui.setTransport(async(input,init)=>{
+    if(input==='/api/ads/consent'){assert.ok(init);writes.push(init);return new Response(null,{status:204});}
+    return Response.json(eligible);
+  });
+  assert.equal(await ui.render().choose('accepted'),true);
+  assert.equal(writes.length,1);
+  assert.deepEqual(JSON.parse(String(writes[0].body)),{choice:'accepted',ageConfirmed:true,version:'v2'});
+});
+
+test('a failed separate refusal still records a current local refusal and blocks serving immediately',async t=>{
+  const ui=provider(t,async()=>Response.json(eligible));ui.render();await flush();assert.equal(ui.render().canServe('header'),true);
+  ui.setTransport(async()=>{throw new TypeError('network');});
+  assert.equal(await ui.render().choose('refused'),true);
+  assert.match(ui.document.cookie,/^lfh_ad_consent=v2:refused;/);
+  assert.equal(ui.render().canServe('header'),false);
 });
 
 test('a transport failure preserves only the original twenty-second runtime lifetime',async t=>{

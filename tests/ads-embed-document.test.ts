@@ -50,7 +50,7 @@ test('the feed document can use a local SDK mock with normal same-origin storage
   let observer:()=>void=()=>{};let filled=false;
   const root={id:'lfh-ad',appendChild:(value:typeof scripts[number])=>scripts.push(value),querySelector:()=>filled?{}:null};
   runInNewContext(script,{
-    document:{cookie:'lfh_ad_consent=v1%3Aaccepted',getElementById:()=>root,createElement:()=>({dataset:{}})},
+    document:{cookie:'lfh_ad_consent=v2%3Aaccepted',getElementById:()=>root,createElement:()=>({dataset:{}})},
     location:{origin:'https://example.test'},parent:{postMessage:(value:{status:string})=>messages.push(value)},
     window:{TSVideoShorts:(value:Record<string,unknown>)=>{options.push(value);filled=true;}},
     MutationObserver:class {constructor(callback:()=>void){observer=callback;}observe(){}disconnect(){}},setTimeout:()=>0,

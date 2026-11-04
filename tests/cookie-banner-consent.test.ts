@@ -3,6 +3,8 @@ import test, {type TestContext} from 'node:test';
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 // @ts-expect-error Native Node requires explicit suffixes.
+import {parseAdConsent} from '../src/lib/ads-contract.ts';
+// @ts-expect-error Native Node requires explicit suffixes.
 import {loadAppModule} from './helpers/load-app-module.ts';
 
 type Element=React.ReactElement<Record<string,unknown>>;
@@ -13,23 +15,23 @@ function all(value:unknown,predicate:(element:Element)=>boolean):Element[]{
   if(React.isValidElement(value)){const element=value as Element;return [...(predicate(element)?[element]:[]),...all(element.props.children,predicate)];}
   return [];
 }
-function harness(t:TestContext,options:{enabled?:boolean;offer?:boolean;age?:boolean;audience?:null|'accepted'|'refused';adConsent?:null|'accepted'|'refused';locale?:string;transport?:(init:RequestInit)=>Promise<Response>}={}){
+function harness(t:TestContext,options:{enabled?:boolean;offer?:boolean;age?:boolean;audience?:null|'accepted'|'refused';adConsent?:null|'accepted'|'refused';rawAdCookie?:string;locale?:string;transport?:(init:RequestInit)=>Promise<Response>}={}){
   let age=options.age??false;
   let audience=options.audience??null;
-  let adConsent=options.adConsent??null;
+  let adConsent=options.rawAdCookie===undefined?options.adConsent??null:parseAdConsent(options.rawAdCookie);
   let enabled=options.enabled??true;
   const writes:RequestInit[]=[];
   const jar=new Map<string,string>();
   if(audience)jar.set('lfh_audience',audience);
-  if(adConsent)jar.set('lfh_ad_consent',`v1:${adConsent}`);
+  if(options.rawAdCookie!==undefined)jar.set('lfh_ad_consent',options.rawAdCookie);else if(adConsent)jar.set('lfh_ad_consent',`v2:${adConsent}`);
   const events=new EventTarget();
   const old={fetch:globalThis.fetch,window:globalThis.window,document:globalThis.document,location:globalThis.location,localStorage:globalThis.localStorage};
-  const documentMock={activeElement:null,get cookie(){return [...jar].map(([key,value])=>`${key}=${value}`).join('; ');},set cookie(value:string){const [key,...parts]=value.split(';')[0].split('=');jar.set(key,parts.join('='));if(key==='lfh_audience')audience=parts.join('=') as typeof audience;if(key==='lfh_ad_consent')adConsent=decodeURIComponent(parts.join('=')).slice(3) as typeof adConsent;}};
+  const documentMock={activeElement:null,get cookie(){return [...jar].map(([key,value])=>`${key}=${value}`).join('; ');},set cookie(value:string){const [key,...parts]=value.split(';')[0].split('=');jar.set(key,parts.join('='));if(key==='lfh_audience')audience=parts.join('=') as typeof audience;if(key==='lfh_ad_consent')adConsent=parseAdConsent(parts.join('='));}};
   Object.assign(globalThis,{window:Object.assign(events,{setTimeout,clearTimeout}),document:documentMock,location:{protocol:'https:'},localStorage:{setItem:()=>{}}});
   globalThis.fetch=async(url,init)=>{
     assert.equal(url,'/api/cookies/choice');assert.ok(init);writes.push(init);
     const response=options.transport?await options.transport(init):new Response(null,{status:204});
-    if(response.status===204){const payload=JSON.parse(String(init.body));audience=payload.choice;jar.set('lfh_audience',audience!);if(payload.advertisingChoice){adConsent=payload.advertisingChoice;jar.set('lfh_ad_consent',`v1%3A${adConsent}`);}}
+    if(response.status===204){const payload=JSON.parse(String(init.body));audience=payload.choice;jar.set('lfh_audience',audience!);if(payload.advertisingChoice){const value=`${payload.version??'v1'}%3A${payload.advertisingChoice}`;adConsent=parseAdConsent(value);jar.set('lfh_ad_consent',value);}}
     return response;
   };
   t.after(()=>Object.assign(globalThis,old));
@@ -54,7 +56,7 @@ test('first entry explains both purposes and accepts them with one request and o
   assert.match(text(ui.render()),/TrafficStars/);
   const enter=ui.button('Entrer');(enter.onClick as ()=>void)();(enter.onClick as ()=>void)();
   assert.equal(ui.writes.length,1);
-  assert.deepEqual(JSON.parse(String(ui.writes[0].body)),{choice:'accepted',advertisingChoice:'accepted',ageConfirmed:true});
+  assert.deepEqual(JSON.parse(String(ui.writes[0].body)),{choice:'accepted',advertisingChoice:'accepted',ageConfirmed:true,version:'v2'});
   assert.equal(ui.jar.has('lfh_ad_consent'),false);
   assert.equal(ui.button('Entrer').disabled,true);
   finish(new Response(null,{status:204}));await flush();
@@ -66,7 +68,7 @@ test('the configured advertising purpose is disclosed before the pending runtime
   assert.match(text(ui.render()),/TrafficStars/);
   (ui.button('Entrer').onClick as ()=>void)();await flush();
   assert.equal(ui.writes.length,1);
-  assert.deepEqual(JSON.parse(String(ui.writes[0].body)),{choice:'accepted',advertisingChoice:'accepted',ageConfirmed:true});
+  assert.deepEqual(JSON.parse(String(ui.writes[0].body)),{choice:'accepted',advertisingChoice:'accepted',ageConfirmed:true,version:'v2'});
   assert.equal(ui.render(),null);
   ui.setEnabled(true);assert.equal(ui.render(),null);
 });
@@ -74,8 +76,8 @@ test('the configured advertising purpose is disclosed before the pending runtime
 test('refusing both records local refusals and never opens a second advertising panel after a network error',async t=>{
   const ui=harness(t,{transport:async()=>{throw new Error('network');}});
   (ui.button('Tout refuser').onClick as ()=>void)();await flush();
-  assert.deepEqual(JSON.parse(String(ui.writes[0].body)),{choice:'refused',advertisingChoice:'refused',ageConfirmed:true});
-  assert.equal(ui.jar.get('lfh_audience'),'refused');assert.equal(ui.jar.get('lfh_ad_consent'),'v1:refused');
+  assert.deepEqual(JSON.parse(String(ui.writes[0].body)),{choice:'refused',advertisingChoice:'refused',ageConfirmed:true,version:'v2'});
+  assert.equal(ui.jar.get('lfh_audience'),'refused');assert.equal(ui.jar.get('lfh_ad_consent'),'v2:refused');
   assert.equal(ui.render(),null);
 });
 
@@ -85,7 +87,7 @@ test('granular purposes start unchecked and remain independently selectable',asy
   const boxes=ui.checkboxes();assert.equal(boxes.length,2);assert.deepEqual(boxes.map(box=>box.props.checked),[false,false]);
   (boxes[0].props.onChange as (event:unknown)=>void)({target:{checked:true}});
   (ui.button('Enregistrer mes choix').onClick as ()=>void)();await flush();
-  assert.deepEqual(JSON.parse(String(ui.writes[0].body)),{choice:'accepted',advertisingChoice:'refused',ageConfirmed:true});
+  assert.deepEqual(JSON.parse(String(ui.writes[0].body)),{choice:'accepted',advertisingChoice:'refused',ageConfirmed:true,version:'v2'});
   assert.equal(ui.render(),null);
 });
 
@@ -96,6 +98,27 @@ test('legacy analytics acceptance never preselects or silently accepts advertisi
   assert.equal(ui.checkboxes()[1].props.checked,false);
   (ui.button('Enregistrer mes choix').onClick as ()=>void)();await flush();
   assert.equal(JSON.parse(String(ui.writes[0].body)).advertisingChoice,'refused');
+});
+
+test('a v1 advertising acceptance receives one newly disclosed panel without preselecting ExoClick',async t=>{
+  const ui=harness(t,{age:true,audience:'accepted',rawAdCookie:'v1%3Aaccepted'});
+  assert.match(text(ui.render()),/ExoClick/);assert.equal(ui.writes.length,0);
+  (ui.button('Choix des cookies').onClick as ()=>void)();
+  assert.equal(ui.checkboxes()[1].props.checked,false);
+});
+
+test('a v1 advertising refusal remains refused without another automatic advertising panel',t=>{
+  const ui=harness(t,{age:true,audience:'accepted',rawAdCookie:'v1%3Arefused'});
+  assert.equal(ui.render(),null);assert.equal(ui.writes.length,0);
+});
+
+test('an old advertising refusal is not requested again just because age or analytics need a choice',async t=>{
+  const ui=harness(t,{age:false,audience:null,rawAdCookie:'v1%3Arefused'});
+  assert.doesNotMatch(text(ui.render()),/TrafficStars|ExoClick/);
+  (ui.button('Entrer').onClick as ()=>void)();await flush();
+  assert.deepEqual(JSON.parse(String(ui.writes[0].body)),{choice:'accepted'});
+  assert.equal(ui.jar.get('lfh_ad_consent'),'v1%3Arefused');
+  assert.equal(ui.render(),null);
 });
 
 test('master OFF keeps the analytics-only payload and cannot reopen a prompt if runtime arrives after entry',async t=>{
@@ -130,7 +153,7 @@ test('the merged entry and granular purpose labels are localized in all twelve s
   ])await t.test(locale,sub=>{
     const ui=harness(sub,{locale});
     const html=renderToStaticMarkup(ui.render());assert.equal((html.match(/<section/g)||[]).length,1);
-    assert.match(html,/TrafficStars/);assert.ok(ui.button(enter));assert.ok(ui.button(refuse));
+    assert.match(html,/TrafficStars/);assert.match(html,/ExoClick/);assert.ok(ui.button(enter));assert.ok(ui.button(refuse));
     (ui.button(manage).onClick as ()=>void)();assert.equal(ui.checkboxes().length,2);assert.ok(ui.button(save));
     assert.doesNotMatch(renderToStaticMarkup(ui.render()),/<script|<iframe/);
   });

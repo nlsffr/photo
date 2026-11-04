@@ -53,9 +53,9 @@ export default function AboutPage() {
       <div className="mt-8 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
         <h2 className="font-bold">Confidentialité par défaut</h2>
         <p className="mt-1.5 text-sm text-[var(--color-ink-muted)]">
-          LeakFanHub ne trace pas ses visiteurs : aucun cookie publicitaire,
-          aucun service tiers, aucune conservation d’adresses IP. Tu peux même
-          utiliser une identité anonyme, sans e-mail.
+          Les statistiques facultatives et les publicités partenaires de TrafficStars et ExoClick
+          dépendent de ton choix. Tu peux refuser leurs traceurs et continuer à utiliser le site,
+          puis modifier ce choix depuis « Choix des cookies ». Les membres Premium ne voient pas de publicité.
         </p>
       </div>
 

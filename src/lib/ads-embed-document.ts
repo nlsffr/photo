@@ -3,7 +3,7 @@ import { ADS_REGISTRY, isValidAdSpot } from "./ads-registry-data.mjs";
 import type { AdSpot } from "./ads-registry";
 import type { AdProfile } from "./ads-contract";
 // @ts-expect-error Native Node tests require explicit suffixes.
-import { isAdProfile } from "./ads-contract.ts";
+import { AD_CONSENT_VERSION, isAdProfile } from "./ads-contract.ts";
 // @ts-expect-error Native Node tests require explicit suffixes.
 import { ADS_CSP } from "./ads-csp.ts";
 
@@ -20,11 +20,12 @@ export function buildAdsEmbedDocument(placement: EmbedPlacement, device: EmbedDe
   const spot = ADS_REGISTRY[placement][device] as AdSpot;
   if (!isValidAdSpot(spot) || !["banner", "feed"].includes(spot.kind)) throw new Error("ad_embed_not_ready");
   const data = JSON.stringify({ placement, device, profile, kind:spot.kind, spotId:spot.spotId, domain:spot.domain,
+    consentValue: `${AD_CONSENT_VERSION}:accepted`,
     scriptUrl:spot.scriptUrl || `https://cdn.tsyndicate.com/sdk/v1/${spot.kind === "banner" ? "ms" : "video.shorts"}.js` }).replace(/</g, "\\u003c");
   const boot = `(()=>{
 const config=${data};
 const tell=status=>parent.postMessage({type:"lfh-ad-status",placement:config.placement,status},location.origin);
-const accepted=()=>{try{const value=document.cookie.split(";").map(entry=>entry.trim()).find(entry=>entry.startsWith("lfh_ad_consent="));return value&&decodeURIComponent(value.slice(15))==="v1:accepted";}catch{return false;}};
+const accepted=()=>{try{const value=document.cookie.split(";").map(entry=>entry.trim()).find(entry=>entry.startsWith("lfh_ad_consent="));return value&&decodeURIComponent(value.slice(15))===config.consentValue;}catch{return false;}};
 if(!accepted()){tell("empty");return;}
 const root=document.getElementById("lfh-ad");
 const script=document.createElement("script");script.async=true;script.defer=true;script.src=config.scriptUrl;

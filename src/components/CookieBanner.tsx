@@ -14,59 +14,59 @@ import { ADS_CONSENT_CHANGED, useAds } from "./AdsProvider";
 
 type CombinedCopy = {body:string;settingsBody:string;statistics:string;statisticsBody:string;advertising:string;advertisingBody:string;refuseAll:string;save:string};
 const combinedCopy: Record<Locale,CombinedCopy> = {
-  fr:{body:"En cliquant sur « Entrer », tu acceptes les cookies de statistiques du site et les cookies publicitaires de TrafficStars. Tu peux tout refuser et continuer, ou choisir séparément.",settingsBody:"Choisis séparément les statistiques et les publicités. Les cookies facultatifs restent désactivés sans ton accord.",statistics:"Statistiques du site",statisticsBody:"Compter les visites et les pages vues.",advertising:"Publicités TrafficStars",advertisingBody:"Afficher et mesurer des publicités avec des cookies et des informations de navigation.",refuseAll:"Tout refuser",save:"Enregistrer mes choix"},
-  en:{body:"By clicking “Enter”, you accept site analytics cookies and TrafficStars advertising cookies. You can decline all and continue, or choose each purpose separately.",settingsBody:"Choose analytics and advertising separately. Optional cookies stay off without your agreement.",statistics:"Site analytics",statisticsBody:"Count visits and page views.",advertising:"TrafficStars advertising",advertisingBody:"Display and measure ads using cookies and browsing information.",refuseAll:"Decline all",save:"Save my choices"},
-  es:{body:"Al pulsar «Entrar», aceptas las cookies de estadísticas del sitio y las cookies publicitarias de TrafficStars. Puedes rechazarlas todas y continuar, o elegir por separado.",settingsBody:"Elige por separado las estadísticas y la publicidad. Las cookies opcionales permanecen desactivadas sin tu permiso.",statistics:"Estadísticas del sitio",statisticsBody:"Contar visitas y páginas vistas.",advertising:"Publicidad de TrafficStars",advertisingBody:"Mostrar y medir anuncios mediante cookies e información de navegación.",refuseAll:"Rechazar todo",save:"Guardar mis opciones"},
-  de:{body:"Mit „Eintreten“ akzeptierst du Statistik-Cookies der Website und Werbe-Cookies von TrafficStars. Du kannst alle ablehnen und fortfahren oder die Zwecke einzeln auswählen.",settingsBody:"Wähle Statistik und Werbung getrennt aus. Optionale Cookies bleiben ohne deine Zustimmung deaktiviert.",statistics:"Website-Statistik",statisticsBody:"Besuche und Seitenaufrufe zählen.",advertising:"TrafficStars-Werbung",advertisingBody:"Werbung mithilfe von Cookies und Informationen zum Surfverhalten anzeigen und messen.",refuseAll:"Alle ablehnen",save:"Auswahl speichern"},
-  it:{body:"Facendo clic su «Entra», accetti i cookie statistici del sito e i cookie pubblicitari di TrafficStars. Puoi rifiutare tutto e continuare, oppure scegliere separatamente.",settingsBody:"Scegli separatamente statistiche e pubblicità. I cookie facoltativi restano disattivati senza il tuo consenso.",statistics:"Statistiche del sito",statisticsBody:"Contare visite e pagine viste.",advertising:"Pubblicità TrafficStars",advertisingBody:"Mostrare e misurare annunci con cookie e informazioni di navigazione.",refuseAll:"Rifiuta tutto",save:"Salva le mie scelte"},
-  pt:{body:"Ao clicar em «Entrar», aceitas os cookies de estatísticas do site e os cookies publicitários da TrafficStars. Podes recusar tudo e continuar ou escolher separadamente.",settingsBody:"Escolhe separadamente as estatísticas e a publicidade. Os cookies opcionais ficam desativados sem o teu consentimento.",statistics:"Estatísticas do site",statisticsBody:"Contar visitas e páginas vistas.",advertising:"Publicidade TrafficStars",advertisingBody:"Apresentar e medir anúncios com cookies e informações de navegação.",refuseAll:"Recusar tudo",save:"Guardar as minhas escolhas"},
-  nl:{body:"Door op ‘Doorgaan’ te klikken, accepteer je statistiekcookies van de site en advertentiecookies van TrafficStars. Je kunt alles weigeren en doorgaan of de doelen afzonderlijk kiezen.",settingsBody:"Kies statistieken en advertenties afzonderlijk. Optionele cookies blijven uit zonder je toestemming.",statistics:"Sitestatistieken",statisticsBody:"Bezoeken en paginaweergaven tellen.",advertising:"TrafficStars-advertenties",advertisingBody:"Advertenties tonen en meten met cookies en surfgegevens.",refuseAll:"Alles weigeren",save:"Mijn keuzes opslaan"},
+  fr:{body:"En cliquant sur « Entrer », tu acceptes les cookies de statistiques du site et les cookies publicitaires de TrafficStars et d’ExoClick. Tu peux tout refuser et continuer, ou choisir séparément.",settingsBody:"Choisis séparément les statistiques et les publicités. Les cookies facultatifs restent désactivés sans ton accord.",statistics:"Statistiques du site",statisticsBody:"Compter les visites et les pages vues.",advertising:"Publicités TrafficStars et ExoClick",advertisingBody:"Afficher et mesurer des publicités avec des cookies et des informations de navigation.",refuseAll:"Tout refuser",save:"Enregistrer mes choix"},
+  en:{body:"By clicking “Enter”, you accept site analytics cookies and TrafficStars and ExoClick advertising cookies. You can decline all and continue, or choose each purpose separately.",settingsBody:"Choose analytics and advertising separately. Optional cookies stay off without your agreement.",statistics:"Site analytics",statisticsBody:"Count visits and page views.",advertising:"TrafficStars and ExoClick advertising",advertisingBody:"Display and measure ads using cookies and browsing information.",refuseAll:"Decline all",save:"Save my choices"},
+  es:{body:"Al pulsar «Entrar», aceptas las cookies de estadísticas del sitio y las cookies publicitarias de TrafficStars y ExoClick. Puedes rechazarlas todas y continuar, o elegir por separado.",settingsBody:"Elige por separado las estadísticas y la publicidad. Las cookies opcionales permanecen desactivadas sin tu permiso.",statistics:"Estadísticas del sitio",statisticsBody:"Contar visitas y páginas vistas.",advertising:"Publicidad de TrafficStars y ExoClick",advertisingBody:"Mostrar y medir anuncios mediante cookies e información de navegación.",refuseAll:"Rechazar todo",save:"Guardar mis opciones"},
+  de:{body:"Mit „Eintreten“ akzeptierst du Statistik-Cookies der Website und Werbe-Cookies von TrafficStars und ExoClick. Du kannst alle ablehnen und fortfahren oder die Zwecke einzeln auswählen.",settingsBody:"Wähle Statistik und Werbung getrennt aus. Optionale Cookies bleiben ohne deine Zustimmung deaktiviert.",statistics:"Website-Statistik",statisticsBody:"Besuche und Seitenaufrufe zählen.",advertising:"TrafficStars und ExoClick-Werbung",advertisingBody:"Werbung mithilfe von Cookies und Informationen zum Surfverhalten anzeigen und messen.",refuseAll:"Alle ablehnen",save:"Auswahl speichern"},
+  it:{body:"Facendo clic su «Entra», accetti i cookie statistici del sito e i cookie pubblicitari di TrafficStars ed ExoClick. Puoi rifiutare tutto e continuare, oppure scegliere separatamente.",settingsBody:"Scegli separatamente statistiche e pubblicità. I cookie facoltativi restano disattivati senza il tuo consenso.",statistics:"Statistiche del sito",statisticsBody:"Contare visite e pagine viste.",advertising:"Pubblicità TrafficStars ed ExoClick",advertisingBody:"Mostrare e misurare annunci con cookie e informazioni di navigazione.",refuseAll:"Rifiuta tutto",save:"Salva le mie scelte"},
+  pt:{body:"Ao clicar em «Entrar», aceitas os cookies de estatísticas do site e os cookies publicitários da TrafficStars e da ExoClick. Podes recusar tudo e continuar ou escolher separadamente.",settingsBody:"Escolhe separadamente as estatísticas e a publicidade. Os cookies opcionais ficam desativados sem o teu consentimento.",statistics:"Estatísticas do site",statisticsBody:"Contar visitas e páginas vistas.",advertising:"Publicidade TrafficStars e ExoClick",advertisingBody:"Apresentar e medir anúncios com cookies e informações de navegação.",refuseAll:"Recusar tudo",save:"Guardar as minhas escolhas"},
+  nl:{body:"Door op ‘Doorgaan’ te klikken, accepteer je statistiekcookies van de site en advertentiecookies van TrafficStars en ExoClick. Je kunt alles weigeren en doorgaan of de doelen afzonderlijk kiezen.",settingsBody:"Kies statistieken en advertenties afzonderlijk. Optionele cookies blijven uit zonder je toestemming.",statistics:"Sitestatistieken",statisticsBody:"Bezoeken en paginaweergaven tellen.",advertising:"TrafficStars en ExoClick-advertenties",advertisingBody:"Advertenties tonen en meten met cookies en surfgegevens.",refuseAll:"Alles weigeren",save:"Mijn keuzes opslaan"},
   ru: {
-    "body": "Нажимая «Войти», вы разрешаете статистические файлы cookie сайта и рекламные файлы cookie TrafficStars. Вы можете отказаться от всех и продолжить либо выбрать каждую цель отдельно.",
+    "body": "Нажимая «Войти», вы разрешаете статистические файлы cookie сайта и рекламные файлы cookie TrafficStars и ExoClick. Вы можете отказаться от всех и продолжить либо выбрать каждую цель отдельно.",
     "settingsBody": "Выберите статистику и рекламу отдельно. Необязательные файлы cookie остаются отключёнными без вашего согласия.",
     "statistics": "Статистика сайта",
     "statisticsBody": "Подсчёт посещений и просмотров страниц.",
-    "advertising": "Реклама TrafficStars",
+    "advertising": "Реклама TrafficStars и ExoClick",
     "advertisingBody": "Показ рекламы и оценка её эффективности с помощью файлов cookie и сведений о просмотрах.",
     "refuseAll": "Отказаться от всех",
     "save": "Сохранить мой выбор"
   },
   zh: {
-    "body": "点击“进入”即表示你接受网站统计 Cookie 和 TrafficStars 广告 Cookie。你可以全部拒绝并继续，也可以分别选择每种用途。",
+    "body": "点击“进入”即表示你接受网站统计 Cookie 和 TrafficStars 和 ExoClick 广告 Cookie。你可以全部拒绝并继续，也可以分别选择每种用途。",
     "settingsBody": "请分别选择是否允许统计和广告。未经你的同意，可选 Cookie 将保持关闭。",
     "statistics": "网站统计",
     "statisticsBody": "统计访问次数和页面浏览量。",
-    "advertising": "TrafficStars 广告",
+    "advertising": "TrafficStars 和 ExoClick 广告",
     "advertisingBody": "使用 Cookie 和浏览信息展示广告并衡量广告效果。",
     "refuseAll": "全部拒绝",
     "save": "保存我的选择"
   },
   ja: {
-    "body": "「入場」を押すと、サイトのアクセス統計CookieとTrafficStarsの広告Cookieに同意したことになります。すべて拒否して閲覧を続けることも、目的ごとに選ぶこともできます。",
+    "body": "「入場」を押すと、サイトのアクセス統計CookieとTrafficStarsとExoClickの広告Cookieに同意したことになります。すべて拒否して閲覧を続けることも、目的ごとに選ぶこともできます。",
     "settingsBody": "アクセス統計と広告について、それぞれ選択してください。任意のCookieは、同意がなければ無効のままです。",
     "statistics": "サイトのアクセス統計",
     "statisticsBody": "訪問数とページ閲覧数を計測します。",
-    "advertising": "TrafficStarsの広告",
+    "advertising": "TrafficStarsとExoClickの広告",
     "advertisingBody": "Cookieと閲覧情報を使用して、広告を表示・測定します。",
     "refuseAll": "すべて拒否する",
     "save": "選択を保存する"
   },
   hi: {
-    "body": "“प्रवेश करें” पर क्लिक करके आप साइट के आँकड़ों की कुकीज़ और TrafficStars की विज्ञापन कुकीज़ स्वीकार करते हैं। आप सभी को अस्वीकार करके भी जारी रख सकते हैं या हर उद्देश्य के लिए अलग विकल्प चुन सकते हैं।",
+    "body": "“प्रवेश करें” पर क्लिक करके आप साइट के आँकड़ों की कुकीज़ और TrafficStars और ExoClick की विज्ञापन कुकीज़ स्वीकार करते हैं। आप सभी को अस्वीकार करके भी जारी रख सकते हैं या हर उद्देश्य के लिए अलग विकल्प चुन सकते हैं।",
     "settingsBody": "आँकड़ों और विज्ञापनों के लिए अलग-अलग विकल्प चुनें। वैकल्पिक कुकीज़ आपकी सहमति के बिना बंद रहती हैं।",
     "statistics": "साइट के आँकड़े",
     "statisticsBody": "विज़िट और पेज व्यू गिनना।",
-    "advertising": "TrafficStars विज्ञापन",
+    "advertising": "TrafficStars और ExoClick विज्ञापन",
     "advertisingBody": "कुकीज़ और ब्राउज़िंग जानकारी से विज्ञापन दिखाना और मापना।",
     "refuseAll": "सभी अस्वीकार करें",
     "save": "मेरे विकल्प सहेजें"
   },
   th: {
-    "body": "เมื่อคลิก “เข้าชม” คุณยอมรับคุกกี้สถิติของเว็บไซต์และคุกกี้โฆษณาของ TrafficStars คุณสามารถปฏิเสธทั้งหมดและใช้งานต่อได้ หรือเลือกแยกแต่ละวัตถุประสงค์",
+    "body": "เมื่อคลิก “เข้าชม” คุณยอมรับคุกกี้สถิติของเว็บไซต์และคุกกี้โฆษณาของ TrafficStars และ ExoClick คุณสามารถปฏิเสธทั้งหมดและใช้งานต่อได้ หรือเลือกแยกแต่ละวัตถุประสงค์",
     "settingsBody": "เลือกสถิติและโฆษณาแยกจากกัน คุกกี้ที่ไม่จำเป็นจะยังปิดอยู่หากคุณไม่ยินยอม",
     "statistics": "สถิติของเว็บไซต์",
     "statisticsBody": "นับการเข้าชมและยอดดูหน้าเว็บ",
-    "advertising": "โฆษณา TrafficStars",
+    "advertising": "โฆษณา TrafficStars และ ExoClick",
     "advertisingBody": "แสดงและวัดผลโฆษณาโดยใช้คุกกี้และข้อมูลการเรียกดู",
     "refuseAll": "ปฏิเสธทั้งหมด",
     "save": "บันทึกตัวเลือกของฉัน"
@@ -92,7 +92,7 @@ export function CookieBanner() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState(false);
   const copy = cookieCopy[locale];
-  const combined = ads.consentOffered;
+  const combined = ads.consentOffered && (ads.consent !== "refused" || opened || showChoices);
   const combinedText = combinedCopy[locale];
   useEffect(() => {
     const open = () => {
@@ -134,7 +134,7 @@ export function CookieBanner() {
     }
     const fullyRefused = value === "refused" && advertisingChoice !== "accepted";
     if (fullyRefused) close();
-    const payload: ConsentChoiceRequest = advertisingChoice === undefined ? {choice:value} : {choice:value,advertisingChoice,ageConfirmed:true};
+    const payload: ConsentChoiceRequest = advertisingChoice === undefined ? {choice:value} : {choice:value,advertisingChoice,ageConfirmed:true,version:AD_CONSENT_VERSION};
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 10_000);
     try {

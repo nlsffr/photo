@@ -26,7 +26,7 @@ test('feed slots use media ordinals without replacing media or appending an empt
   assert.equal(isFeedAdPosition(4,5),false);
 });
 test('browser consent accepts Next encoded cookies and rejects legacy or malformed values',()=>{
-  assert.equal(parseBrowserAdConsent('other=1; lfh_ad_consent=v1%3Aaccepted'),'accepted');
+  assert.equal(parseBrowserAdConsent('other=1; lfh_ad_consent=v2%3Aaccepted'),'accepted');
   assert.equal(parseBrowserAdConsent('lfh_ad_consent=v1:refused'),'refused');
-  for(const value of ['lfh_audience=accepted','lfh_ad_consent=accepted','lfh_ad_consent=v1%253Aaccepted','lfh_ad_consent=%E0%A4%A']) assert.equal(parseBrowserAdConsent(value),null);
+  for(const value of ['lfh_ad_consent=v1:accepted','lfh_ad_consent=v1%3Aaccepted','lfh_audience=accepted','lfh_ad_consent=accepted','lfh_ad_consent=v1%253Aaccepted','lfh_ad_consent=%E0%A4%A']) assert.equal(parseBrowserAdConsent(value),null);
 });

@@ -11,7 +11,7 @@ export default function ConfidentialitePage() {
   return (
     <LegalPage
       title="Politique de confidentialité"
-      updated="1er novembre 2026"
+      updated="4 novembre 2026"
       intro="LeakFanHub est conçu « privacy by default ». Voici, concrètement, ce que nous faisons — et surtout ce que nous ne faisons pas — de tes données."
       sections={[
         {
@@ -19,10 +19,17 @@ export default function ConfidentialitePage() {
           body: <p>Si tu acceptes, un identifiant de navigateur permet de compter les visites et les pages vues et d’estimer leur pays. Tu peux refuser et utiliser le site. Le lien « Choix des cookies » en bas de page permet de modifier ton choix.</p>,
         },
         {
-          heading: "Ce que nous NE collectons pas",
+          heading: "Publicités partenaires facultatives",
+          body: <p>Après acceptation des publicités et de leurs traceurs, TrafficStars et ExoClick peuvent recevoir les données techniques nécessaires à leurs annonces, notamment l’adresse IP, les caractéristiques du navigateur et les interactions publicitaires. Leurs scripts peuvent utiliser des cookies ou le stockage du navigateur. Sans cette acceptation, leurs intégrations restent désactivées. Les comptes Premium ne reçoivent pas ces publicités. Tu peux modifier ton choix depuis « Choix des cookies » en bas de page. Consulter les politiques de <a href="https://trafficstars.com/privacy-policy/" rel="noopener noreferrer" target="_blank" className="underline">TrafficStars</a> et <a href="https://www.exoclick.com/privacy-policy/" rel="noopener noreferrer" target="_blank" className="underline">ExoClick</a>.</p>,
+        },
+        {
+          heading: "Mesure agrégée des pages",
+          body: <p>Un compteur séparé mesure les chargements de pages sans cookie ni identifiant personnel de visiteur. Il couvre aussi les refus des statistiques facultatives et ne permet pas de compter exactement les personnes.</p>,
+        },
+        {
+          heading: "Mesure du site",
           body: (
             <ul className="list-disc space-y-1.5 pl-5">
-              <li>Aucun cookie publicitaire (sauf si tu n’es pas Premium et que des pubs partenaires s’affichent).</li>
               <li>Aucun analytics tiers de type Google Analytics.</li>
               <li>Aucune conservation d’adresses IP à des fins de suivi marketing.</li>
               <li>Aucun « fingerprinting » du navigateur.</li>
