@@ -7,7 +7,8 @@ import {loadAppModule} from './helpers/load-app-module.ts';
 import {getDictionary} from '../src/lib/i18n/dictionaries.ts';
 
 type Element = React.ReactElement<Record<string, unknown>>;
-type Control = {request:()=>boolean;cancel:()=>void};
+type Mode='preroll'|'postroll';
+type Control = {request:(mode?:Mode)=>boolean;cancel:()=>void};
 const nodes=(value:unknown):Element[]=>Array.isArray(value)?value.flatMap(nodes):React.isValidElement(value)?[value as Element,...nodes((value.props as Record<string,unknown>).children)]:[];
 const equal=(a:unknown[],b:unknown[])=>a.length===b.length&&a.every((v,i)=>Object.is(v,b[i]));
 function hooksHarness() {
@@ -43,10 +44,10 @@ function harness(t:TestContext,{allowed=true,profile='intensive',observer=true}=
  let tree:unknown;
  const render=()=>{tree=h.render(()=>VideoPrerollAd(props),value=>{const iframe=nodes(value).find(e=>e.type==='iframe');if(iframe)(iframe.props.ref as {current:unknown}).current=frame;});return tree;};
  const iframe=()=>nodes(tree).find(e=>e.type==='iframe');
- const request=()=>{const intercepted=ref.current!.request();render();return intercepted;};
+ const request=(mode:Mode='preroll')=>{const intercepted=ref.current!.request(mode);render();return intercepted;};
  const status=(status:string,override:Record<string,unknown>={},eventOverride:Record<string,unknown>={})=>{
   const query=new URL(String(iframe()?.props.src),'https://site.test').searchParams;
-  const event=Object.assign(new Event('message'),{origin:'https://site.test',source:contentWindow,data:{type:'lfh-ad-status',placement:'underVideo',context:'preroll',nonce:query.get('nonce'),status,...override},...eventOverride});windowMock.dispatchEvent(event);render();
+  const event=Object.assign(new Event('message'),{origin:'https://site.test',source:contentWindow,data:{type:'lfh-ad-status',placement:'underVideo',context:new URL(String(iframe()?.props.src),'https://site.test').pathname.endsWith('/postroll')?'postroll':'preroll',nonce:query.get('nonce'),status,...override},...eventOverride});windowMock.dispatchEvent(event);render();
  };
  render();t.after(()=>{h.unmount();Object.assign(globalThis,original);});
  return{request,render,iframe,finishes,messages,timers,status,doc,
@@ -101,20 +102,23 @@ test('visibility messages attest activation only after Play and only while actua
 
 test('without IntersectionObserver geometric visibility still gates the local frame',t=>{const ui=harness(t,{observer:false});assert.equal(ui.request(),true);ui.load();assert.ok(ui.messages.some(value=>(value as {visible:boolean}).visible));});
 
-function playerHarness(t:TestContext,{preroll=true,autoPlay=false,intercept=true,rejectPlay=false}={}){
+function playerHarness(t:TestContext,{preroll=true,autoPlay=false,intercept=true,interceptPost=false,rejectPlay=false}={}){
  const originalDocument=globalThis.document;const documentMock={hidden:false};Object.assign(globalThis,{document:documentMock});
  const h=hooksHarness(),dictionary=getDictionary('en'),Pre=()=>null,Pause=()=>null;let playCalls=0,pauseCalls=0,cancelCalls=0;
- const fake={paused:true,error:null,muted:false,play(){playCalls++;if(rejectPlay&&playCalls===1)return Promise.reject(Object.assign(new Error('browser policy'),{name:'NotAllowedError'}));this.paused=false;return Promise.resolve();},pause(){pauseCalls++;this.paused=true;},load(){}};
+ const fake={paused:true,ended:false,seeking:false,readyState:4,duration:120,currentTime:0,error:null,muted:false,play(){playCalls++;if(rejectPlay&&playCalls===1)return Promise.reject(Object.assign(new Error('browser policy'),{name:'NotAllowedError'}));this.paused=false;return Promise.resolve();},pause(){pauseCalls++;this.paused=true;},load(){}};
  const {VideoPlayer}=loadAppModule<{VideoPlayer:(p:unknown)=>Element}>('src/components/VideoPlayer.tsx',{
   react:h.hooks,'./VideoPrerollAd':{VideoPrerollAd:Pre},'./VideoPauseAd':{VideoPauseAd:Pause},'./LocaleProvider':{useLocale:()=>({dictionary,locale:'en'})},
  });
  const keyed=VideoPlayer({src:'/synthetic.mp4',preroll,autoPlay}),Source=keyed.type as (props:unknown)=>unknown;let tree:unknown;
- let intercepted=false;const control={request:()=>{if(intercepted)return false;intercepted=true;return intercept;},cancel:()=>{cancelCalls++;(nodes(tree).find(e=>e.type===Pre)!.props.onFinish as (value:boolean)=>void)(false);}};
+ const attempts=new Set<string>(),requests:string[]=[];const control={request:(mode:Mode='preroll')=>{requests.push(mode);if(attempts.has(mode))return false;attempts.add(mode);return mode==='postroll'?interceptPost:intercept;},cancel:()=>{cancelCalls++;(nodes(tree).find(e=>e.type===Pre)!.props.onFinish as (value:boolean)=>void)(false);}};
  const render=()=>{tree=h.render(()=>Source(keyed.props),value=>{for(const node of nodes(value)){if(node.type==='video')(node.props.ref as {current:unknown}).current=fake;if(node.type===Pre)(node.props.controller as {current:unknown}).current=control;}});};
  render();t.after(()=>{h.unmount();Object.assign(globalThis,{document:originalDocument});});
- return{render,fake,document:documentMock,unmount:h.unmount,media:()=>nodes(tree).find(e=>e.type==='video')!,hasRetry:()=>nodes(tree).some(e=>e.type==='button'&&e.props.children===dictionary.video.retry),playCalls:()=>playCalls,pauseCalls:()=>pauseCalls,cancelCalls:()=>cancelCalls,leaf:()=>nodes(tree).find(e=>e.type===Pre),
+ return{render,fake,requests,document:documentMock,unmount:h.unmount,media:()=>nodes(tree).find(e=>e.type==='video')!,hasRetry:()=>nodes(tree).some(e=>e.type==='button'&&e.props.children===dictionary.video.retry),playCalls:()=>playCalls,pauseCalls:()=>pauseCalls,cancelCalls:()=>cancelCalls,leaf:()=>nodes(tree).find(e=>e.type===Pre),
   click(){const button=nodes(tree).find(e=>e.type==='button'&&[dictionary.feed.play,dictionary.feed.pause].includes(e.props['aria-label'] as string));assert.ok(button);(button.props.onClick as ()=>void)();render();},
-  finish(value:boolean){(nodes(tree).find(e=>e.type===Pre)!.props.onFinish as (value:boolean)=>void)(value);render();},
+  finish(value:boolean,mode:Mode='preroll'){(nodes(tree).find(e=>e.type===Pre)!.props.onFinish as (value:boolean,mode:Mode)=>void)(value,mode);render();},
+  playing(){(nodes(tree).find(e=>e.type==='video')!.props.onPlaying as (event:unknown)=>void)({currentTarget:fake});render();},
+  time(duration:number,currentTime:number){fake.duration=duration;fake.currentTime=currentTime;(nodes(tree).find(e=>e.type==='video')!.props.onTimeUpdate as ()=>void)();render();},
+  ended(){fake.ended=true;fake.paused=true;(nodes(tree).find(e=>e.type==='video')!.props.onEnded as (()=>void)|undefined)?.();render();},
  };
 }
 
@@ -167,5 +171,51 @@ test('background deadlines and terminal messages fail closed even before visibil
   const ui=harness(sub);ui.request();ui.doc.hidden=true;
   if(signal==='timeout')ui.timeout(15_000);else ui.status('empty');
   assert.deepEqual(ui.finishes,[false]);assert.equal(ui.request(),false);
+ });
+});
+
+
+test('postroll is a distinct once-only mode after user Play, never concurrent with the pending preroll',t=>{
+ const ui=harness(t);assert.equal(ui.request('postroll'),false);assert.equal(ui.iframe(),undefined);
+ ui.request();const pre=ui.iframe()!;assert.equal(ui.request('postroll'),false);assert.equal(ui.iframe()!.props.src,pre.props.src);
+ ui.status('ended');assert.equal(ui.request('postroll'),true);const post=ui.iframe()!,url=new URL(String(post.props.src),'https://site.test');
+ assert.equal(url.pathname,'/api/ads/postroll');assert.notEqual(url.searchParams.get('nonce'),new URL(String(pre.props.src),'https://site.test').searchParams.get('nonce'));
+ assert.ok(nodes(ui.render()).some(node=>node.props['data-video-postroll']===true));
+ (pre.props.onError as ()=>void)();assert.ok(ui.iframe(),'late pre error must not close post');
+ ui.status('ended',{context:'preroll'});assert.ok(ui.iframe(),'pre status cannot close post');
+ ui.status('filled');ui.status('skipped');assert.deepEqual(ui.finishes,[true,true]);assert.equal(ui.request('postroll'),false);assert.equal(ui.request(),false);
+});
+
+test('postroll withdrawal/hidden/revision/source/unmount cannot cause a second resume',async t=>{
+ for(const reason of ['permission','hidden','revision','source','unmount'])await t.test(reason,sub=>{
+  const ui=harness(sub);ui.request();ui.status('empty');ui.request('postroll');const afterPre=ui.finishes.length;
+  if(reason==='permission')ui.allow(false);if(reason==='hidden')ui.hidden();if(reason==='revision')ui.revision();if(reason==='source')ui.path();if(reason==='unmount')ui.unmount();
+  assert.equal(ui.finishes.slice(afterPre).includes(true),false);assert.equal(ui.timers.size,0);
+ });
+});
+
+test('the real player requests postroll only from actual near-end playback, pauses main, then resumes once',t=>{
+ const ui=playerHarness(t,{intercept:false,interceptPost:true});ui.time(120,119.4);assert.deepEqual(ui.requests,[]);
+ ui.click();ui.time(120,119.4);assert.deepEqual(ui.requests,['preroll'],'pending Play is not decoded playback');ui.playing();
+ ui.time(9.99,9.99);ui.time(120,119.39);assert.deepEqual(ui.requests,['preroll']);
+ ui.time(120,119.4);assert.deepEqual(ui.requests,['preroll','postroll']);assert.equal(ui.pauseCalls(),1);assert.equal(ui.fake.paused,true);assert.equal(ui.playCalls(),1);
+ ui.time(120,120);assert.equal(ui.requests.length,2);ui.finish(true,'preroll');assert.equal(ui.playCalls(),1,'an old pre terminal cannot resume or close post');ui.finish(true,'postroll');assert.equal(ui.playCalls(),2);ui.finish(true,'postroll');assert.equal(ui.playCalls(),2);
+ ui.playing();ui.time(120,119.9);assert.equal(ui.requests.length,2,'a loop/replay cannot request another postroll');
+});
+
+test('paused, seeking, hidden, invalid-duration, pending pre and ended media do not request postroll',async t=>{
+ for(const reason of ['paused','seeking','hidden','duration','pending-pre','ended'])await t.test(reason,sub=>{
+  const ui=playerHarness(sub,{intercept:reason==='pending-pre',interceptPost:true});ui.click();
+  if(reason!=='pending-pre')ui.playing();
+  if(reason==='paused')ui.fake.paused=true;if(reason==='seeking')ui.fake.seeking=true;if(reason==='hidden')ui.document.hidden=true;if(reason==='ended')ui.ended();
+  ui.time(reason==='duration'?Infinity:120,119.9);assert.equal(ui.requests.includes('postroll'),false);
+ });
+});
+
+test('cancel, hidden terminal, source replacement, ended and unmount cannot restart main after a postroll',async t=>{
+ for(const reason of ['cancel','hidden','source','ended','unmount'])await t.test(reason,sub=>{
+  const ui=playerHarness(sub,{intercept:false,interceptPost:true});ui.click();ui.playing();ui.time(120,119.9);assert.equal(ui.pauseCalls(),1);
+  if(reason==='cancel')ui.click();if(reason==='hidden')ui.document.hidden=true;if(reason==='source')(ui.media().props.ref as {current:unknown}).current={...ui.fake};if(reason==='ended')ui.ended();if(reason==='unmount')ui.unmount();
+  ui.finish(true,'postroll');assert.equal(ui.playCalls(),1);
  });
 });
