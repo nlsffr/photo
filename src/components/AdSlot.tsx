@@ -28,12 +28,19 @@ function NetworkAdSlot({ placement, className = "", onEmpty }: { placement: AdPl
   const eligible = ads.canServe(placement);
   const spot = device ? ADS_REGISTRY[placement][device] : null;
   const global = ["popunder", "interstitial", "slider"].includes(placement);
+  const frameSrc = device ? `/api/ads/embed?placement=${placement}&device=${device}` : undefined;
 
   useEffect(() => {
     const media = matchMedia("(min-width: 1024px)");
     const update = () => setDevice(media.matches ? "desktop" : "mobile"); update();
     media.addEventListener("change", update); return () => media.removeEventListener("change", update);
   }, []);
+  useEffect(() => {
+    frameFilled.current = false;
+    window.clearTimeout(frameTimer.current);
+    frameTimer.current = undefined;
+    return () => { window.clearTimeout(frameTimer.current); frameTimer.current = undefined; };
+  }, [frameSrc, eligible]);
   useEffect(() => {
     if (!eligible || global) return;
     const message = (event: MessageEvent) => {
@@ -44,7 +51,7 @@ function NetworkAdSlot({ placement, className = "", onEmpty }: { placement: AdPl
     };
     window.addEventListener("message", message);
     return () => { window.removeEventListener("message", message); window.clearTimeout(frameTimer.current); };
-  }, [eligible, global, placement]);
+  }, [eligible, global, placement, frameSrc]);
   useEffect(() => {
     const element = container.current;
     if (!eligible || !element || !spot || !global) return;
@@ -61,12 +68,12 @@ function NetworkAdSlot({ placement, className = "", onEmpty }: { placement: AdPl
   if (global) return <div ref={container} id={id} hidden data-ad-placement={placement} />;
   return <aside aria-label={adsCopy[locale].label} data-ad-placement={placement} className={`mx-auto max-w-full overflow-hidden ${className}`}>
     <p className="mb-1 text-center text-[10px] uppercase tracking-wide text-[var(--color-ink-faint)]">{adsCopy[locale].label}</p>
-    <iframe ref={frame} id={id} title={adsCopy[locale].label} loading="lazy"
-      src={`/api/ads/embed?placement=${placement}&device=${device}`}
+    <iframe key={frameSrc} ref={frame} id={id} title={adsCopy[locale].label} loading={placement === "header" ? "eager" : "lazy"}
+      src={frameSrc}
       sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
       referrerPolicy="no-referrer" className="mx-auto max-w-full border-0"
-      onLoad={() => {
-        if (placement !== "feed") return;
+      onLoad={event => {
+        if (placement !== "feed" || event.currentTarget !== frame.current) return;
         window.clearTimeout(frameTimer.current);
         if (!frameFilled.current) frameTimer.current = window.setTimeout(() => emptyHandler.current?.(), 10_000);
       }}

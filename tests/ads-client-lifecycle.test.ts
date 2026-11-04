@@ -1,0 +1,135 @@
+import assert from 'node:assert/strict';
+import test,{type TestContext} from 'node:test';
+import React from 'react';
+import {ADS_REGISTRY,isAdsRegistryReady} from '../src/lib/ads-registry-data.mjs';
+// @ts-expect-error Native Node requires explicit suffixes.
+import {loadAppModule} from './helpers/load-app-module.ts';
+// @ts-expect-error Native Node requires explicit suffixes.
+import {createAdSdkGuard} from '../src/lib/ads-sdk.ts';
+
+type Element=React.ReactElement<Record<string,unknown>>;
+const flush=()=>new Promise<void>(resolve=>setImmediate(resolve));
+const all=(value:unknown,predicate:(element:Element)=>boolean):Element[]=>Array.isArray(value)?value.flatMap(child=>all(child,predicate)):React.isValidElement(value)?[...(predicate(value as Element)?[value as Element]:[]),...all((value.props as Record<string,unknown>).children,predicate)]:[];
+const same=(a:unknown[]|undefined,b:unknown[]|undefined)=>Boolean(a&&b&&a.length===b.length&&a.every((value,index)=>Object.is(value,b[index])));
+
+function hookHarness(){
+  let cursor=0;const cells:unknown[]=[];let effects:Array<()=>void>=[];
+  const hooks={...React,
+    useState:(initial:unknown)=>{const index=cursor++;if(!(index in cells))cells[index]=typeof initial==='function'?initial():initial;return[cells[index],(value:unknown)=>{cells[index]=typeof value==='function'?value(cells[index]):value;}];},
+    useRef:(initial:unknown)=>{const index=cursor++;if(!(index in cells))cells[index]={current:initial};return cells[index];},
+    useCallback:(callback:unknown,deps:unknown[])=>{const index=cursor++;const old=cells[index] as {deps:unknown[];callback:unknown}|undefined;if(!old||!same(old.deps,deps))cells[index]={deps,callback};return (cells[index] as {callback:unknown}).callback;},
+    useEffect:(callback:()=>void|(()=>void),deps:unknown[])=>{const index=cursor++;const old=cells[index] as {deps:unknown[];cleanup?:()=>void}|undefined;if(!old||!same(old.deps,deps)){const next={deps,cleanup:undefined as (()=>void)|undefined};cells[index]=next;effects.push(()=>{old?.cleanup?.();next.cleanup=callback()||undefined;});}},
+    useId:()=> 'sample-slot',
+  };
+  return{hooks,render<T>(component:()=>T){cursor=0;const result=component();const next=effects;effects=[];next.forEach(effect=>effect());return result;},close(){for(const cell of cells){const entry=cell as {cleanup?:()=>void}|null;entry?.cleanup?.();}}};
+}
+
+function browser(t:TestContext){
+  let now=1000,id=0;const timers=new Map<number,{at:number;callback:()=>void;period?:number}>();
+  const previous={window:globalThis.window,document:globalThis.document,location:globalThis.location,matchMedia:globalThis.matchMedia};
+  const events=new EventTarget();
+  const windowMock=Object.assign(events,{setTimeout:(callback:()=>void,delay:number)=>{const key=++id;timers.set(key,{at:now+delay,callback});return key;},clearTimeout:(key:number)=>timers.delete(key),setInterval:(callback:()=>void,period:number)=>{const key=++id;timers.set(key,{at:now+period,callback,period});return key;},clearInterval:(key:number)=>timers.delete(key),location:{reload:()=>{}}});
+  const documentMock=Object.assign(new EventTarget(),{cookie:'lfh_ad_consent=v1%3Aaccepted'});
+  const media=Object.assign(new EventTarget(),{matches:false});
+  Object.assign(globalThis,{window:windowMock,document:documentMock,location:{origin:'https://example.test'},matchMedia:()=>media});
+  t.mock.method(Date,'now',()=>now);
+  return{window:windowMock,document:documentMock,media,restore:()=>Object.assign(globalThis,previous),jump(ms:number){now+=ms;},advance(ms:number){const target=now+ms;for(;;){const due=[...timers].filter(([,timer])=>timer.at<=target).sort((a,b)=>a[1].at-b[1].at)[0];if(!due)break;now=due[1].at;if(due[1].period)due[1].at+=due[1].period;else timers.delete(due[0]);due[1].callback();}now=target;}};
+}
+
+const placements={header:true,footer:true,underVideo:true,feed:true,popunder:true,interstitial:true,slider:true};
+const eligible={enabled:true,effectiveEnabled:true,revision:4,needsConsent:false,consent:'accepted',placements,reason:'eligible'};
+type Snapshot={consentOffered:boolean;consentAvailable:boolean;canServe:(placement:string)=>boolean;runtime:typeof eligible|null};
+function provider(t:TestContext,initialTransport:()=>Promise<Response>){
+  const environment=browser(t),hooks=hookHarness();let transport=initialTransport;
+  const previousFetch=globalThis.fetch;globalThis.fetch=async()=>transport();
+  const {AdsProvider}=loadAppModule<{AdsProvider:(props:{children:React.ReactNode})=>React.ReactElement<{value:Snapshot}>}>('src/components/AdsProvider.tsx',{
+    react:hooks.hooks,'@/lib/ads-sdk':{createAdSdkGuard},'@/lib/ads-registry':{isAdsRegistryReady},
+    'next/navigation':{usePathname:()=>'/en'},'./AgeConfirmation':{useAgeConfirmation:()=>({confirmed:true})},
+    './Session':{useSession:()=>({loading:false,user:null})},'./Premium':{usePremium:()=>({ready:true,isPremium:false})}
+  });
+  t.after(()=>{hooks.close();environment.restore();globalThis.fetch=previousFetch;});
+  return{...environment,render:()=>hooks.render(()=>AdsProvider({children:null})).props.value,setTransport:(next:typeof transport)=>{transport=next;},refresh(){environment.window.dispatchEvent(new Event('focus'));}};
+}
+
+test('a configured pending runtime offers an informed consent choice but cannot serve any advertising',t=>{
+  const ui=provider(t,()=>new Promise(()=>{}));const value=ui.render();
+  assert.equal(value.consentOffered,true);
+  for(const key of Object.keys(placements))assert.equal(value.canServe(key),false);
+});
+
+test('a transport failure preserves only the original twenty-second runtime lifetime',async t=>{
+  const ui=provider(t,async()=>Response.json(eligible));ui.render();await flush();assert.equal(ui.render().canServe('header'),true);
+  ui.advance(5000);ui.setTransport(async()=>{throw new TypeError('network');});ui.refresh();await flush();
+  assert.equal(ui.render().canServe('header'),true);
+  ui.advance(14_999);await flush();assert.equal(ui.render().canServe('header'),true);
+  ui.advance(1);assert.equal(ui.render().canServe('header'),false);
+});
+
+test('background timer throttling cannot authorize an expired runtime at the point of serving',async t=>{
+  const ui=provider(t,async()=>Response.json(eligible));ui.render();await flush();const value=ui.render();assert.equal(value.canServe('header'),true);
+  ui.jump(20_001);assert.equal(value.canServe('header'),false);assert.equal(ui.render().canServe('header'),false);
+});
+
+test('an explicit denial received after its request timed out cannot restore the prior eligible response',async t=>{
+  const ui=provider(t,async()=>Response.json(eligible));ui.render();await flush();assert.equal(ui.render().canServe('header'),true);
+  let finish!:(response:Response)=>void;ui.setTransport(()=>new Promise(resolve=>{finish=resolve;}));ui.refresh();ui.advance(4000);
+  finish(Response.json({...eligible,enabled:false,effectiveEnabled:false,reason:'disabled'}));await flush();
+  assert.equal(ui.render().canServe('header'),false);assert.equal(ui.render().consentOffered,false);
+});
+
+test('explicit denials, malformed JSON and unsuccessful HTTP responses never preserve an eligible runtime',async t=>{
+  for(const [name,response] of [
+    ['OFF',()=>Response.json({...eligible,enabled:false,effectiveEnabled:false,reason:'disabled'})],
+    ['owner',()=>Response.json({...eligible,effectiveEnabled:false,reason:'owner'})],
+    ['Premium',()=>Response.json({...eligible,effectiveEnabled:false,reason:'premium'})],
+    ['refused',()=>Response.json({...eligible,effectiveEnabled:false,consent:'refused',reason:'consent_refused'})],
+    ['malformed',()=>new Response('{broken',{status:200})],
+    ['HTTP503',()=>new Response(null,{status:503})],
+  ] as const)await t.test(name,async sub=>{
+    const ui=provider(sub,async()=>Response.json(eligible));ui.render();await flush();assert.equal(ui.render().canServe('header'),true);
+    ui.setTransport(async()=>response());ui.refresh();await flush();const denied=ui.render();assert.equal(denied.canServe('header'),false);
+    if(name!=='refused')assert.equal(denied.consentOffered,false);
+    ui.setTransport(async()=>{throw new TypeError('network');});ui.refresh();await flush();assert.equal(ui.render().canServe('header'),false);
+  });
+});
+
+test('an unavailable first runtime never turns its pending offer into implicit consent or serving',async t=>{
+  const ui=provider(t,async()=>{throw new TypeError('network');});ui.document.cookie='';assert.equal(ui.render().consentOffered,true);await flush();
+  const value=ui.render();assert.equal(value.consentOffered,false);assert.equal(value.canServe('header'),false);
+  assert.equal(ui.document.cookie,'');
+});
+
+function slot(t:TestContext,placement:'header'|'footer'|'feed'){
+  const environment=browser(t),hooks=hookHarness();let allowed=true,empties=0;
+  const {AdSlot}=loadAppModule<{AdSlot:(props:{placement:string;onEmpty:()=>void})=>React.ReactElement}>('src/components/AdSlot.tsx',{
+    react:hooks.hooks,'./AdsProvider':{useAds:()=>({canServe:()=>allowed})},'./LocaleProvider':{useLocale:()=>({locale:'en'})},
+    '@/lib/ads-registry':{ADS_REGISTRY},'@/lib/ads-sdk':{mountTrafficStarsAd:()=>{throw new Error('Inline slots cannot run a parent SDK.');}},'next/navigation':{usePathname:()=>'/'}
+  });
+  const outer=AdSlot({placement,onEmpty:()=>{empties++;}}),Component=outer.type as (props:Record<string,unknown>)=>React.ReactElement|null;
+  const render=()=>hooks.render(()=>Component(outer.props as Record<string,unknown>));
+  const frame=()=>{render();const node=all(render(),value=>value.type==='iframe')[0];assert.ok(node);const ref=node.props.ref as {current:unknown};const element={contentWindow:{}};ref.current=element;return{node,element,load:()=> (node.props.onLoad as (event:unknown)=>void)({currentTarget:element})};};
+  t.after(()=>{hooks.close();environment.restore();});
+  return{...environment,render,frame,empties:()=>empties,setAllowed:(value:boolean)=>{allowed=value;}};
+}
+
+test('the visible header is eager while the lower footer keeps lazy loading',t=>{
+  const header=slot(t,'header');assert.equal(header.frame().node.props.loading,'eager');
+});
+test('the lower footer remains lazy',t=>{
+  const footer=slot(t,'footer');assert.equal(footer.frame().node.props.loading,'lazy');
+});
+
+test('a device change resets an old filled signal and cancels the old frame timeout',t=>{
+  const ui=slot(t,'feed');const first=ui.frame();first.load();
+  const filled=new Event('message');Object.assign(filled,{origin:'https://example.test',source:first.element.contentWindow,data:{type:'lfh-ad-status',placement:'feed',status:'filled'}});ui.window.dispatchEvent(filled);
+  ui.media.matches=true;ui.media.dispatchEvent(new Event('change'));const second=ui.frame();
+  ui.window.dispatchEvent(filled);second.load();
+  assert.notEqual(first.node.key,second.node.key);
+  ui.advance(10_000);assert.equal(ui.empties(),1);
+});
+
+test('revoking eligibility cancels a pending frame timeout before remounting',t=>{
+  const ui=slot(t,'feed');ui.frame().load();ui.setAllowed(false);assert.equal(ui.render(),null);
+  ui.advance(10_000);assert.equal(ui.empties(),0);
+  ui.setAllowed(true);ui.frame().load();ui.advance(10_000);assert.equal(ui.empties(),1);
+});

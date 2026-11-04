@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ADS_REGISTRY } from '../src/lib/ads-registry-data.mjs';
+import { ADS_REGISTRY, isAdsRegistryReady } from '../src/lib/ads-registry-data.mjs';
 // @ts-expect-error Native Node requires explicit suffixes.
 import { loadAppModule } from './helpers/load-app-module.ts';
 // @ts-expect-error Native Node requires explicit suffixes.
@@ -24,7 +24,7 @@ test('all seven public network placements render nothing while master is OFF',()
 });
 
 function cookieBanner(enabled:boolean,age:boolean,choice:null|'accepted'){
-  const ads={consentAvailable:enabled,needsConsent:enabled,consent:null,choose:async()=>true};
+  const ads={consentAvailable:enabled,consentOffered:enabled,needsConsent:enabled,consent:null,choose:async()=>true};
   const {CookieBanner}=loadAppModule<{CookieBanner:React.ComponentType}>('src/components/CookieBanner.tsx',{
     react:hooks,'next/navigation':{usePathname:()=>'/'} ,'next/link':(p:React.ComponentProps<'a'>)=>React.createElement('a',p),
     './BrandLogo':{BrandLogo:()=>null},'./LocaleProvider':{useLocale:()=>locale},
@@ -56,11 +56,12 @@ test('fresh eligible runtime can explain consent before age but cannot serve any
   const runtime={enabled:true,effectiveEnabled:false,revision:4,needsConsent:true,consent:null,
     placements:{header:false,footer:false,underVideo:false,feed:false,popunder:false,interstitial:false,slider:false},reason:'consent_required'};
   for(const [fresh,context,available] of [[true,'false:guest:true:false',true],[false,'false:guest:true:false',false],[true,'old-session',false]] as const){
-    const initial=[runtime,1000,fresh,context,null];let cursor=0;
+    const initial=[runtime,Date.now(),fresh,context,null,'ready'];let cursor=0;
     type Snapshot={consentAvailable:boolean;canServe:(placement:string)=>boolean};
     const {AdsProvider}=loadAppModule<{AdsProvider:(props:{children:React.ReactNode})=>React.ReactElement<{value:Snapshot}>}>('src/components/AdsProvider.tsx',{
       react:{...React,useState:()=>[initial[cursor++],()=>{}],useRef:(value:unknown)=>({current:value}),useEffect:()=>{},useCallback:(value:unknown)=>value},
       '@/lib/ads-sdk':{createAdSdkGuard},
+      '@/lib/ads-registry':{isAdsRegistryReady},
       'next/navigation':{usePathname:()=>'/en'},'./AgeConfirmation':{useAgeConfirmation:()=>({confirmed:false})},
       './Session':{useSession:()=>({loading:false,user:null})},'./Premium':{usePremium:()=>({ready:true,isPremium:false})}
     });

@@ -21,7 +21,7 @@ test('only explicit ad consent permits eligible guests or members, never owners/
 });
 function runtime(options:{cookies?:Record<string,string>;row?:Record<string,unknown>|null;dbError?:boolean;user?:{id:string}|null;owner?:boolean;settingsError?:boolean;enabled?:boolean}={}) {
   let reads=0;
-  const module=loadAppModule<{getAdsRuntime():Promise<{effectiveEnabled:boolean;consent:string|null;reason:string}>;getAdsViewer(token?:string):Promise<string>}>('src/lib/ads-runtime.ts',{
+  const loadedRuntime=loadAppModule<{getAdsRuntime():Promise<{effectiveEnabled:boolean;consent:string|null;reason:string}>;getAdsViewer(token?:string):Promise<string>}>('src/lib/ads-runtime.ts',{
     'server-only':{},
     'next/headers':{cookies:async()=>({get:(key:string)=>options.cookies?.[key] ? {value:options.cookies[key]} : undefined})},
     './auth-db':{getSessionUser:async()=>options.user??null},
@@ -30,7 +30,7 @@ function runtime(options:{cookies?:Record<string,string>;row?:Record<string,unkn
     './ads-store':{getAdsConfig:async()=>{if(options.settingsError)throw new Error('missing table');return {...config,enabled:options.enabled??true};}},
     './ads-registry-data.mjs':{isAdsRegistryReady:()=>true},
   });
-  return {...module,reads:()=>reads};
+  return {...loadedRuntime,reads:()=>reads};
 }
 test('runtime ignores analytics consent; only versioned advertising consent is recognized',async()=>{
   assert.equal((await runtime({cookies:{lfh_audience:'accepted'}}).getAdsRuntime()).reason,'consent_required');

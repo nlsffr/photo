@@ -42,7 +42,7 @@ export function CookieBanner() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState(false);
   const copy = cookieCopy[locale];
-  const combined = ads.consentAvailable;
+  const combined = ads.consentOffered;
   const combinedText = combinedCopy[locale];
   useEffect(() => {
     const open = () => {

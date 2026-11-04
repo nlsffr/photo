@@ -13,7 +13,7 @@ function all(value:unknown,predicate:(element:Element)=>boolean):Element[]{
   if(React.isValidElement(value)){const element=value as Element;return [...(predicate(element)?[element]:[]),...all(element.props.children,predicate)];}
   return [];
 }
-function harness(t:TestContext,options:{enabled?:boolean;age?:boolean;audience?:null|'accepted'|'refused';adConsent?:null|'accepted'|'refused';locale?:string;transport?:(init:RequestInit)=>Promise<Response>}={}){
+function harness(t:TestContext,options:{enabled?:boolean;offer?:boolean;age?:boolean;audience?:null|'accepted'|'refused';adConsent?:null|'accepted'|'refused';locale?:string;transport?:(init:RequestInit)=>Promise<Response>}={}){
   let age=options.age??false;
   let audience=options.audience??null;
   let adConsent=options.adConsent??null;
@@ -35,7 +35,7 @@ function harness(t:TestContext,options:{enabled?:boolean;age?:boolean;audience?:
   t.after(()=>Object.assign(globalThis,old));
   let cursor=0;const state:unknown[]=[];
   const hooks={...React,useState:(initial:unknown)=>{const index=cursor++;if(!(index in state))state[index]=typeof initial==='function'?initial():initial;return[state[index],(value:unknown)=>{state[index]=typeof value==='function'?value(state[index]):value;}];},useRef:(initial:unknown)=>{const index=cursor++;if(!(index in state))state[index]={current:initial};return state[index];},useEffect:()=>{}};
-  const ads={get consentAvailable(){return enabled;},get needsConsent(){return enabled&&adConsent===null;},get consent(){return adConsent;},choose:async()=>{throw new Error('The merged panel must use one combined request.');}};
+  const ads={get consentAvailable(){return enabled;},get consentOffered(){return options.offer??enabled;},get needsConsent(){return (options.offer??enabled)&&adConsent===null;},get consent(){return adConsent;},choose:async()=>{throw new Error('The merged panel must use one combined request.');}};
   const {CookieBanner}=loadAppModule<{CookieBanner:()=>React.ReactElement|null}>('src/components/CookieBanner.tsx',{
     react:hooks,'next/navigation':{usePathname:()=>'/fr'},'next/link':(props:React.ComponentProps<'a'>)=>React.createElement('a',props),
     './BrandLogo':{BrandLogo:()=>null},'./LocaleProvider':{useLocale:()=>({locale:options.locale??'fr',t:()=> '18+ age confirmation'})},
@@ -59,6 +59,16 @@ test('first entry explains both purposes and accepts them with one request and o
   assert.equal(ui.button('Entrer').disabled,true);
   finish(new Response(null,{status:204}));await flush();
   assert.equal(ui.render(),null);
+});
+
+test('the configured advertising purpose is disclosed before the pending runtime and one informed click records both',async t=>{
+  const ui=harness(t,{enabled:false,offer:true});
+  assert.match(text(ui.render()),/TrafficStars/);
+  (ui.button('Entrer').onClick as ()=>void)();await flush();
+  assert.equal(ui.writes.length,1);
+  assert.deepEqual(JSON.parse(String(ui.writes[0].body)),{choice:'accepted',advertisingChoice:'accepted',ageConfirmed:true});
+  assert.equal(ui.render(),null);
+  ui.setEnabled(true);assert.equal(ui.render(),null);
 });
 
 test('refusing both records local refusals and never opens a second advertising panel after a network error',async t=>{
