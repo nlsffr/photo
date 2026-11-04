@@ -1,3 +1,5 @@
+// @ts-expect-error Native Node requires explicit suffixes.
+import { LOCALES as ACTIVE_LOCALES } from "../src/lib/i18n/config.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement, type ComponentType } from "react";
@@ -66,8 +68,8 @@ test("PhotoCard uses stored image preview for images while retaining the playabl
   assert.match(markup, /<video[^>]+src="\/clip\.mp4"/);
 });
 
-test("VideoPlayer controls and engagement labels use all seven active locales", () => {
-  for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"] as const) {
+test("VideoPlayer controls and engagement labels use all twelve active locales", () => {
+  for (const locale of ACTIVE_LOCALES) {
     const dictionary = getDictionary(locale);
     const { VideoPlayer } = loadAppModule<{ VideoPlayer: ComponentType<{ src: string; title: string; views: number; likes: number }> }>("src/components/VideoPlayer.tsx", {
       "./VideoPauseAd": { VideoPauseAd: () => null },

@@ -1,3 +1,5 @@
+// @ts-expect-error Native Node requires explicit suffixes.
+import { LOCALES as ACTIVE_LOCALES } from "../src/lib/i18n/config.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -6,7 +8,7 @@ async function loadConfig() {
   return import("../src/lib/i18n/config.ts");
 }
 
-test("supports seven discovery and content locales while editorial routes stay English and French", async () => {
+test("supports twelve discovery and content locales while editorial routes stay English and French", async () => {
   const {
     CREATOR_LOCALES,
     DEFAULT_LOCALE,
@@ -17,8 +19,8 @@ test("supports seven discovery and content locales while editorial routes stay E
     resolveLocalizedPage,
   } = await loadConfig();
 
-  assert.deepEqual(LOCALES, ["en", "fr", "es", "de", "it", "pt", "nl"]);
-  assert.deepEqual(CREATOR_LOCALES, ["en", "fr", "es", "de", "it", "pt", "nl"]);
+  assert.deepEqual(LOCALES, ["en", "fr", "es", "de", "it", "pt", "nl", "ru", "zh", "ja", "hi", "th"]);
+  assert.deepEqual(CREATOR_LOCALES, ["en", "fr", "es", "de", "it", "pt", "nl", "ru", "zh", "ja", "hi", "th"]);
   assert.deepEqual(DISCOVERY_ROUTE_PATHS, [
     "/",
     "/models",
@@ -60,7 +62,7 @@ test("supports seven discovery and content locales while editorial routes stay E
 
 test("public helpers localize discoveries and keep content bare while preserving query and fragments", async () => {
   const { localizedHref, localePath, internalLocalePath, stripLocalePrefix, switchLocalePath } = await loadConfig();
-  for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"] as const) {
+  for (const locale of ACTIVE_LOCALES) {
     assert.equal(localePath(locale, "/"), locale === "en" ? "/" : `/${locale}`);
     assert.equal(localePath(locale, "/fr/models?page=2#items"), `${locale === "en" ? "" : `/${locale}`}/models?page=2#items`);
     assert.equal(localizedHref(locale, "/fr/aria-lune/123-v2?from=related#photo"), "/aria-lune/123-v2?from=related#photo");
@@ -76,7 +78,7 @@ test("public helpers localize discoveries and keep content bare while preserving
 
 test("only discoveries expose reciprocal hreflang URL alternatives", async () => {
   const { localeAlternates } = await loadConfig();
-  assert.deepEqual(localeAlternates("/models"), { en: "/models", fr: "/fr/models", es: "/es/models", de: "/de/models", it: "/it/models", pt: "/pt/models", nl: "/nl/models", "x-default": "/models" });
+  assert.deepEqual(localeAlternates("/models"), { ...Object.fromEntries(ACTIVE_LOCALES.map(locale => [locale, `${locale === "en" ? "" : `/${locale}`}/models`])), "x-default": "/models" });
   for (const path of ["/about", "/aria-lune-v3/photos"]) assert.deepEqual(localeAlternates(path), {});
 });
 

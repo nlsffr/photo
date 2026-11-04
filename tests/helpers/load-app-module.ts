@@ -1,6 +1,7 @@
 import { readFileSync, existsSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import ts from "typescript";
 
 const nativeRequire = createRequire(import.meta.url);
@@ -24,7 +25,17 @@ export function loadAppModule<T>(
         jsx: ts.JsxEmit.ReactJSX,
         esModuleInterop: true,
       },
-      fileName: filename,
+      // TypeScript preserves ESM for .mjs despite module:CommonJS; this harness executes CommonJS.
+      fileName: filename.replace(/\.mjs$/, ".js"),
+      transformers: { before: [context => sourceFile => {
+        const visit: ts.Visitor = node => {
+          if (ts.isPropertyAccessExpression(node) && node.name.text === "url"
+            && ts.isMetaProperty(node.expression) && node.expression.keywordToken === ts.SyntaxKind.ImportKeyword
+            && node.expression.name.text === "meta") return ts.factory.createStringLiteral(pathToFileURL(filename).href);
+          return ts.visitEachChild(node, visit, context);
+        };
+        return ts.visitNode(sourceFile, visit) as ts.SourceFile;
+      }] },
     }).outputText;
     function localRequire(specifier: string): unknown {
       if (Object.hasOwn(replacements, specifier))

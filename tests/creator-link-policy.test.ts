@@ -1,3 +1,5 @@
+// @ts-expect-error Native Node requires explicit suffixes.
+import { LOCALES as ACTIVE_LOCALES } from "../src/lib/i18n/config.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement, isValidElement, type ReactNode } from "react";
@@ -34,17 +36,17 @@ function scripts(tree: ReactNode): Schema[] {
 }
 
 test("CreatorCard uses the same public creator address for every rendering language", () => {
-  const { CreatorCard } = loadAppModule<{ CreatorCard: (props: { creator: CreatorWithStats; locale?: "en" | "fr" | "es" | "de" | "it" | "pt" | "nl" }) => ReactNode }>("src/components/CreatorCard.tsx", boundaries);
+  const { CreatorCard } = loadAppModule<{ CreatorCard: (props: { creator: CreatorWithStats; locale?: (typeof ACTIVE_LOCALES)[number] }) => ReactNode }>("src/components/CreatorCard.tsx", boundaries);
   assert.equal(nodes(CreatorCard({ creator }))[0].props.href, "/aria-lune-v3");
   assert.equal(nodes(CreatorCard({ creator, locale: "en" }))[0].props.href, "/aria-lune-v3");
   assert.equal(nodes(CreatorCard({ creator, locale: "fr" }))[0].props.href, "/aria-lune-v3");
-  for (const locale of ["es", "de", "it", "pt", "nl"] as const) {
+  for (const locale of ACTIVE_LOCALES.filter(locale => locale !== "en" && locale !== "fr")) {
     assert.equal(nodes(CreatorCard({ creator, locale }))[0].props.href, `/aria-lune-v3`);
   }
 });
 
 test("media cards use bare media and creator links in every language", () => {
-  for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"] as const) {
+  for (const locale of ACTIVE_LOCALES) {
     const { getDictionary } = loadAppModule<{ getDictionary: (locale: string) => unknown }>("src/lib/i18n/dictionaries.ts");
     const { PhotoCard } = loadAppModule<{ PhotoCard: (props: { photo: PhotoView }) => ReactNode }>("src/components/PhotoCard.tsx", {
       "./LocaleProvider": { useLocale: () => ({ locale, dictionary: getDictionary(locale) }) },
@@ -104,7 +106,7 @@ test("creator renderer uses the loaded page for structured data with one gallery
   });
   const props = { handleParam: "aria-lune-v3", collection: "photos", locale: "fr", searchParams: { page: "2" } };
   const data = scripts(await renderer.CreatorCollectionPage(props));
-  assert.doesNotMatch(JSON.stringify(data), /https:\/\/leakfanhub\.com\/(?:en|fr|es|de|it|pt|nl)(?:\/|["?#])/);
+  assert.doesNotMatch(JSON.stringify(data), /https:\/\/leakfanhub\.com\/(?:en|fr|es|de|it|pt|nl|ru|zh|ja|hi|th)(?:\/|["?#])/);
   assert.equal(data.find((item) => item["@type"] === "CollectionPage")!.url, "https://leakfanhub.com/aria-lune-v3/photos?page=2");
   assert.equal(data.find((item) => item["@type"] === "ItemList")!.itemListElement[0].item.url, "https://leakfanhub.com/aria-lune/123-v2");
   assert.deepEqual(queries, [{ creator: "aria-lune", type: "photo", sort: "recent", cursor: 30, limit: 30 }]);
@@ -118,7 +120,7 @@ test("creator renderer uses the loaded page for structured data with one gallery
 
 
 test("localized discovery surfaces link only to translated or canonical creator pages", async () => {
-  for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"] as const) {
+  for (const locale of ACTIVE_LOCALES) {
     const creatorPath = `/aria-lune-v3`;
     const replacements: Record<string, unknown> = {
       ...boundaries,
@@ -151,7 +153,7 @@ test("localized discovery surfaces link only to translated or canonical creator 
         assert.equal(scripts(tree)[0].mainEntity.itemListElement[0].url, `https://leakfanhub.com${creatorPath}`);
       }
       if (pathname === "/classements") {
-        const expected = { en: "Creator rankings", fr: "Classement des créateurs", es: "Clasificación de creadores", de: "Creator-Ranglisten", it: "Classifiche dei creator", pt: "Classificações de criadores", nl: "Ranglijst van creators" };
+        const expected = { en: "Creator rankings", fr: "Classement des créateurs", es: "Clasificación de creadores", de: "Creator-Ranglisten", it: "Classifiche dei creator", pt: "Classificações de criadores", nl: "Ranglijst van creators", ru: "Рейтинг авторов", zh: "创作者排行榜", ja: "クリエイターランキング", hi: "क्रिएटर रैंकिंग", th: "อันดับครีเอเตอร์" };
         assert.ok(renderToStaticMarkup(tree).includes(expected[locale]), `${locale} ranking heading`);
       }
     }
@@ -186,7 +188,7 @@ test("media pages keep one bounded creator read regardless of collection eligibi
 });
 
 test("guest account and feed controls use available functional routes from every discovery language", () => {
-  for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"] as const) {
+  for (const locale of ACTIVE_LOCALES) {
     const replacements = {
       "./LocaleProvider": { useLocale: () => ({ locale, t: (key: string) => key }) },
       "./Session": { useSession: () => ({ user: null, loading: false }) },

@@ -35,7 +35,7 @@ export type LocalizedMetadataCopy = {
 
 const OPEN_GRAPH_LOCALES: Record<Locale, string> = {
   en: "en_US", fr: "fr_FR", es: "es_ES", de: "de_DE",
-  it: "it_IT", pt: "pt_PT", nl: "nl_NL",
+  it: "it_IT", pt: "pt_PT", nl: "nl_NL", ru: "ru_RU", zh: "zh_CN", ja: "ja_JP", hi: "hi_IN", th: "th_TH",
 };
 
 export function openGraphLocale(locale?: Locale): string {

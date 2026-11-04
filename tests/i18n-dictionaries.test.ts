@@ -1,3 +1,5 @@
+// @ts-expect-error Native Node requires explicit suffixes.
+import { LOCALES as ACTIVE_LOCALES } from "../src/lib/i18n/config.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 // @ts-expect-error Native Node requires explicit suffixes.
@@ -19,8 +21,9 @@ test("every dictionary has complete, nonempty UI text and preserves placeholders
     "src/lib/i18n/dictionaries/en.ts",
   ).enDictionary;
   const expected = leaves(english);
+  assert.equal(Object.keys(expected).length, 274);
 
-  for (const locale of ["fr", "es", "de", "it", "pt", "nl"]) {
+  for (const locale of ACTIVE_LOCALES.filter(locale => locale !== "en")) {
     const loaded = loadAppModule<Record<string, Dictionary>>(
       `src/lib/i18n/dictionaries/${locale}.ts`,
     );
@@ -29,8 +32,8 @@ test("every dictionary has complete, nonempty UI text and preserves placeholders
     for (const [key, value] of Object.entries(actual)) {
       assert.ok(value.trim().length > 0, `${locale}.${key} is empty`);
       assert.deepEqual(
-        value.match(/\{[^}]+\}/g) || [],
-        expected[key].match(/\{[^}]+\}/g) || [],
+        (value.match(/\{[^}]+\}/g) || []).sort(),
+        (expected[key].match(/\{[^}]+\}/g) || []).sort(),
         `${locale}.${key} must preserve substitution placeholders`,
       );
     }

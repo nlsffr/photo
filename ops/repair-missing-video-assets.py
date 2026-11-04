@@ -111,7 +111,7 @@ def creator_notice_matches(row, notice):
             if parsed.hostname not in ('leakfanhub.com', 'www.leakfanhub.com'):
                 continue
             parts = unquote(parsed.path).strip('/').split('/')
-            if len(parts) == 2 and parts[0] in ('fr','en','es','de','it','pt','nl'):
+            if len(parts) == 2 and parts[0] in ('fr','en','es','de','it','pt','nl','ru','zh','ja','hi','th'):
                 parts = parts[1:]
             if len(parts) == 1 and re.fullmatch(re.escape(row['handle']) + r'(?:-v[1-9][0-9]*)?', parts[0], re.I):
                 return True

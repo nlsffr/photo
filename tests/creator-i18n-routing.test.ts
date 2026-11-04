@@ -1,3 +1,5 @@
+// @ts-expect-error Native Node requires explicit suffixes.
+import { LOCALES as ACTIVE_LOCALES } from "../src/lib/i18n/config.ts";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
@@ -33,9 +35,9 @@ type Route = {
 };
 const creator = { handle: "aria-lune", name: "Aria $& Lune", bio: "Ma bio / My bio", avatarUrl: "", followers: 100, verified: true, urlVersion: 3, removedFromIndexAt: null };
 const stats = { mediaCount: 100, photoCount: 70, videoCount: 30, engagedCount: 10, totalViews: 800, totalLikes: 20 };
-const locales = ["en", "fr", "es", "de", "it", "pt", "nl"] as const;
+const locales = ACTIVE_LOCALES;
 const media = { id: "db-media", sourceId: "123", creatorHandle: "aria-lune", title: "Original source title", description: "Original source description", imageUrl: "/fixture.jpg", type: "photo", width: 100, height: 100, tags: [], views: 1, likes: 0, ageMinutes: 0, trending: 0, urlVersion: 2, createdAt: "2026-10-01T00:00:00Z" };
-function setup(locale: "en" | "fr" | "es" | "de" | "it" | "pt" | "nl", options: { removed?: boolean; empty?: boolean } = {}) {
+function setup(locale: (typeof ACTIVE_LOCALES)[number], options: { removed?: boolean; empty?: boolean } = {}) {
   const queries: Record<string, unknown>[] = [];
   const FollowButton = () => null;
   const VerifiedBadge = () => null;
@@ -90,9 +92,9 @@ test("every exact static route wins before creator parsing, including contact su
 });
 
 test("localized overview and exactly the three collection paths reuse the renderer and locale", async () => {
-  const previous = { en: "Previous page", fr: "Page précédente", es: "Página anterior", de: "Vorherige Seite", it: "Pagina precedente", pt: "Página anterior", nl: "Vorige pagina" };
-  const follow = { en: { follow: "Follow", following: "Following" }, fr: { follow: "Suivre", following: "Suivi·e" }, es: { follow: "Seguir", following: "Siguiendo" }, de: { follow: "Folgen", following: "Gefolgt" }, it: { follow: "Segui", following: "Seguito" }, pt: { follow: "Seguir", following: "A seguir" }, nl: { follow: "Volgen", following: "Volgend" } };
-  const verified = { en: "Verified", fr: "Vérifié", es: "Verificado", de: "Verifiziert", it: "Verificato", pt: "Verificado", nl: "Geverifieerd" };
+  const previous = { en: "Previous page", fr: "Page précédente", es: "Página anterior", de: "Vorherige Seite", it: "Pagina precedente", pt: "Página anterior", nl: "Vorige pagina", ru: "Предыдущая страница", zh: "上一页", ja: "前のページ", hi: "पिछला पेज", th: "หน้าก่อนหน้า" };
+  const follow = { en: { follow: "Follow", following: "Following" }, fr: { follow: "Suivre", following: "Suivi·e" }, es: { follow: "Seguir", following: "Siguiendo" }, de: { follow: "Folgen", following: "Gefolgt" }, it: { follow: "Segui", following: "Seguito" }, pt: { follow: "Seguir", following: "A seguir" }, nl: { follow: "Volgen", following: "Volgend" }, ru: { follow: "Подписаться", following: "Вы подписаны" }, zh: { follow: "关注", following: "已关注" }, ja: { follow: "フォロー", following: "フォロー中" }, hi: { follow: "फ़ॉलो करें", following: "फ़ॉलो कर रहे हैं" }, th: { follow: "ติดตาม", following: "กำลังติดตาม" } };
+  const verified = { en: "Verified", fr: "Vérifié", es: "Verificado", de: "Verifiziert", it: "Verificato", pt: "Verificado", nl: "Geverifieerd", ru: "Подтверждено", zh: "已认证", ja: "認証済み", hi: "सत्यापित", th: "ยืนยันแล้ว" };
   for (const locale of locales) {
     const { route, props, render, queries, FollowButton, VerifiedBadge } = setup(locale);
     for (const collection of ["overview", "photos", "videos", "popular"]) {
@@ -125,8 +127,8 @@ test("localized overview and exactly the three collection paths reuse the render
   }
 });
 
-test("all seven internal media renderers keep validation, one canonical and source-authored text", async () => {
-  const ogLocales = { en: "en_US", fr: "fr_FR", es: "es_ES", de: "de_DE", it: "it_IT", pt: "pt_PT", nl: "nl_NL" };
+test("all twelve internal media renderers keep validation, one canonical and source-authored text", async () => {
+  const ogLocales = { en: "en_US", fr: "fr_FR", es: "es_ES", de: "de_DE", it: "it_IT", pt: "pt_PT", nl: "nl_NL", ru: "ru_RU", zh: "zh_CN", ja: "ja_JP", hi: "hi_IN", th: "th_TH" };
   for (const locale of locales) {
     const { route, props, render } = setup(locale);
     const tree = await render("/aria-lune/123-v2");
@@ -176,7 +178,7 @@ test("malformed content paths, extra segments and nested locale prefixes never d
 });
 
 test("expanded content locale wrappers still reject untranslated editorial pages", async () => {
-  for (const locale of ["es", "de", "it", "pt", "nl"] as const) {
+  for (const locale of ACTIVE_LOCALES.filter(locale => locale !== "en" && locale !== "fr")) {
     const { route, props, render, queries } = setup(locale);
     for (const path of ["/about", "/contact/support"]) {
       await assert.rejects(render(path), /NOT_FOUND/, `${locale}${path}`);

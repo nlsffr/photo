@@ -33,7 +33,7 @@ import { creatorCollectionPath } from "@/lib/creator-collections";
 import AddMediaPage from "@/app/(default)/add/page";
 import FeedPage from "@/app/(default)/feed/page";
 import PremiumPage from "@/app/(default)/premium/page";
-import SearchPage from "@/app/(default)/recherche/page";
+import SearchPage from "@/features/search/SearchPage";
 import FrenchAboutPage from "@/app/(default)/about/page";
 import FrenchConditionsPage from "@/app/(default)/conditions/page";
 import FrenchPrivacyPage from "@/app/(default)/confidentialite/page";

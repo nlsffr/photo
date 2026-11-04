@@ -1,3 +1,5 @@
+// @ts-expect-error Native Node requires explicit suffixes.
+import { LOCALES as ACTIVE_LOCALES } from "../src/lib/i18n/config.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -145,16 +147,16 @@ async function loadLocalizedSitemap() {
   return import("../src/lib/i18n/sitemap.ts");
 }
 
-test("static sitemap submits42 translated discovery addresses and8 bare editorial resources", async () => {
+test("static sitemap submits72 translated discovery addresses and8 bare editorial resources", async () => {
   const { buildLocalizedSitemapEntries, LOCALIZED_INDEXABLE_ENTRIES } = await loadLocalizedSitemap();
   const entries = buildLocalizedSitemapEntries("https://leakfanhub.com/");
-  assert.equal(entries.length, 50);
-  assert.equal(new Set(entries.map((entry) => entry.url)).size, 50);
+  assert.equal(entries.length, 80);
+  assert.equal(new Set(entries.map((entry) => entry.url)).size, 80);
   const localized = entries.filter((entry) => entry.alternates);
-  assert.equal(localized.length, 42);
+  assert.equal(localized.length, 72);
   for (const entry of localized) {
     const languages = entry.alternates!.languages;
-    assert.deepEqual(Object.keys(languages), ["en", "fr", "es", "de", "it", "pt", "nl", "x-default"]);
+    assert.deepEqual(Object.keys(languages), [...ACTIVE_LOCALES, "x-default"]);
     assert.equal(languages.en, languages["x-default"]);
     assert.ok(Object.values(languages).includes(entry.url));
   }
@@ -172,12 +174,12 @@ test("static sitemap XML exposes reciprocal discoveries without prefixed editori
   const { renderLocalizedStaticSitemapXml } = await loadLocalizedSitemap();
   const xml = renderLocalizedStaticSitemapXml("https://leakfanhub.com");
   assert.ok(xml.includes('xmlns:xhtml="http://www.w3.org/1999/xhtml"'));
-  assert.equal((xml.match(/<url>/g) ?? []).length, 50);
+  assert.equal((xml.match(/<url>/g) ?? []).length, 80);
   assert.ok(xml.includes("<loc>https://leakfanhub.com/</loc>"));
   assert.ok(xml.includes("<loc>https://leakfanhub.com/models</loc>"));
   assert.ok(xml.includes("<loc>https://leakfanhub.com/fr/models</loc>"));
-  assert.equal((xml.match(/hreflang="x-default"/g) ?? []).length, 42);
-  assert.equal((xml.match(/<xhtml:link /g) ?? []).length, 336);
+  assert.equal((xml.match(/hreflang="x-default"/g) ?? []).length, 72);
+  assert.equal((xml.match(/<xhtml:link /g) ?? []).length, 936);
   assert.doesNotMatch(xml, /<loc>https:\/\/leakfanhub\.com\/en(?:\/|<)/);
-  assert.doesNotMatch(xml, /<loc>https:\/\/leakfanhub\.com\/(?:fr|es|de|it|pt|nl)\/(?:about|dmca|contact|conditions|confidentialite|mentions-legales|trust-and-safety|qu-est-ce-que-lumengallery)</);
+  assert.doesNotMatch(xml, /<loc>https:\/\/leakfanhub\.com\/(?:fr|es|de|it|pt|nl|ru|zh|ja|hi|th)\/(?:about|dmca|contact|conditions|confidentialite|mentions-legales|trust-and-safety|qu-est-ce-que-lumengallery)</);
 });

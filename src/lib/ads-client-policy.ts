@@ -1,6 +1,8 @@
 import type { AdConsent, AdsRuntime } from "./ads-contract";
 // @ts-expect-error Native Node tests require explicit suffixes.
 import { AD_PLACEMENT_KEYS, AD_CONSENT_COOKIE, parseAdConsent, isAdProfile } from "./ads-contract.ts";
+// @ts-expect-error Native Node tests require explicit suffixes.
+import { isLocale } from "./i18n/config.ts";
 
 export function parseBrowserAdConsent(cookieHeader: string): AdConsent {
   const value = cookieHeader.split(";").map(part => part.trim()).find(part => part.startsWith(AD_CONSENT_COOKIE + "="))?.slice(AD_CONSENT_COOKIE.length + 1);
@@ -11,7 +13,7 @@ const PRIVATE_ROUTES = new Set(["admin", "api", "_next", "connexion", "inscripti
 
 export function isAdPagePath(pathname: string): boolean {
   const parts = pathname.split(/[?#]/)[0].split("/").filter(Boolean);
-  if (["en", "fr", "es", "de", "it", "pt", "nl"].includes(parts[0])) parts.shift();
+  if (isLocale(parts[0])) parts.shift();
   return !PRIVATE_ROUTES.has(parts[0]) && !parts.some(part => /\.(?:js|json|xml|txt|css)$/i.test(part));
 }
 

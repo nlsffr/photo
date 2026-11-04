@@ -1,6 +1,9 @@
+// @ts-expect-error Native Node requires explicit suffixes.
+import { LOCALES as ACTIVE_LOCALES } from "../src/lib/i18n/config.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { NextRequest } from "next/server.js";
+import type { NextConfig } from "next";
 // @ts-expect-error Native Node requires explicit suffixes.
 import { loadAppModule } from "./helpers/load-app-module.ts";
 
@@ -52,7 +55,7 @@ function rejected(response: Response, status: number, robots: string, cache: str
 
 test("bare discoveries always render English and localized discoveries keep their explicit URL", async () => {
   const { request, lookups } = fixture();
-  for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"]) {
+  for (const locale of ACTIVE_LOCALES) {
     rewrite(await request("/models?page=2&sort=recent", { cookie: `lfh_locale=${locale}`, "accept-language": "fr" }), "/en/models", "?page=2&sort=recent");
     rewrite(await request("/", { cookie: `lfh_locale=${locale}` }), "/en");
     if (locale !== "en") {
@@ -72,14 +75,19 @@ test("negotiation prefers valid cookie, then weighted browser language, then Eng
     ["de", "fr-FR,fr;q=0.9", "de"],
     ["invalid", "it-IT;q=0.4,es-ES;q=0.9", "es"],
     ["", "fr;q=0,nl-NL;q=0.8,en;q=0.4", "nl"],
-    ["", "ja-JP,zh;q=0.9", "en"],
+    ["", "ja-JP,zh;q=0.9", "ja"],
+    ["", "ru-RU,en;q=0.9", "ru"],
+    ["", "zh-TW,en;q=0.9", "zh"],
+    ["", "hi-IN,en;q=0.9", "hi"],
+    ["", "th-TH,en;q=0.9", "th"],
+    ["", "ko-KR,ar;q=0.9", "en"],
     ["", "", "en"],
   ]) rewrite(await request("/aria-lune-v3", { cookie: `lfh_locale=${cookie}`, "accept-language": language }), `/${expected}/aria-lune-v3`);
 });
 
 test("legacy locale URLs redirect308 to the same-origin bare path with exact search and no preference override", async () => {
   const { request } = fixture();
-  for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"]) {
+  for (const locale of ACTIVE_LOCALES) {
     for (const path of ["/about", "/aria-lune-v3", "/aria-lune-v3/videos", "/aria-lune/123-v2"]) {
       const response = await request(`/${locale}${path}?page=2&next=https%3A%2F%2Fexample.invalid%2Fadmin%3Fx%3D1`, { cookie: "lfh_locale=nl", "accept-language": "de" });
       assert.equal(response.status, 308);
@@ -100,7 +108,7 @@ test("historical English discovery aliases redirect to the bare stable English U
   }
 });
 
-test("functional fallback does not replace a seven-language preference and legacy tags retain their renderer", async () => {
+test("functional fallback does not replace a twelve-language preference and legacy tags retain their renderer", async () => {
   const { request } = fixture();
   rewrite(await request("/about", { cookie: "lfh_locale=es" }), "/en/about");
   rewrite(await request("/models", { cookie: "lfh_locale=es" }), "/en/models");
@@ -124,7 +132,7 @@ test("HTML and RSC/prefetch requests select the same private renderer without a 
     assert.equal(explicit.headers.get("x-middleware-next"), "1");
     privateVariant(explicit);
   }
-  for (const locale of ["en", "fr", "en"]) rewrite(await request("/aria-lune-v3", { cookie: `lfh_locale=${locale}` }), `/${locale}/aria-lune-v3`);
+  for (const locale of ACTIVE_LOCALES) rewrite(await request("/aria-lune-v3", { cookie: `lfh_locale=${locale}` }), `/${locale}/aria-lune-v3`);
 });
 
 test("machine paths and private admin never negotiate or query public content", async () => {
@@ -213,8 +221,7 @@ test("canonical host redirects use the configured origin even for scheme-relativ
 });
 
 test("Next configuration keeps static/media caches and delegates creator aliases to checked Proxy policy", async () => {
-  // @ts-expect-error Native Node requires explicit suffixes.
-  const { default: config } = await import("../next.config.ts");
+  const { default: config } = loadAppModule<{ default: NextConfig }>("next.config.ts");
   const headers = await config.headers!();
   for (const route of headers) {
     for (const header of route.headers) assert.doesNotMatch(header.value, /s-maxage=120/, route.source);

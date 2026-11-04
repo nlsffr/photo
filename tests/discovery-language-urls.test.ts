@@ -10,7 +10,7 @@ import { modelsPageAlternates, buildLocalizedMetadata } from "../src/lib/i18n/me
 // @ts-expect-error Native Node needs the extension.
 import { buildLocalizedSitemapEntries, renderLocalizedStaticSitemapXml } from "../src/lib/i18n/sitemap.ts";
 
-test("only six discoveries have seven stable public addresses with English bare", () => {
+test("only six discoveries have twelve stable public addresses with English bare", () => {
   for (const path of DISCOVERY_ROUTE_PATHS) {
     const expected = Object.fromEntries(LOCALES.map(language => [language,
       language === "en" ? path : `/${language}${path === "/" ? "" : path}`]));
@@ -41,18 +41,18 @@ test("discovery canonicals and reciprocal alternates preserve models page and so
   }
 });
 
-test("static sitemap has42 discovery addresses and8 bare editorial addresses only", () => {
+test("static sitemap has72 discovery addresses and8 bare editorial addresses only", () => {
   const entries = buildLocalizedSitemapEntries("https://leakfanhub.com");
-  assert.equal(entries.length, 50);
-  assert.equal(new Set(entries.map(entry => entry.url)).size, 50);
+  assert.equal(entries.length, 80);
+  assert.equal(new Set(entries.map(entry => entry.url)).size, 80);
   for (const path of DISCOVERY_ROUTE_PATHS) for (const locale of LOCALES) {
     assert.ok(entries.some(entry => entry.url === `https://leakfanhub.com${localePath(locale, path)}`));
   }
   const xml = renderLocalizedStaticSitemapXml("https://leakfanhub.com");
-  assert.equal((xml.match(/<loc>/g) || []).length, 50);
-  assert.equal((xml.match(/hreflang="x-default"/g) || []).length, 42);
+  assert.equal((xml.match(/<loc>/g) || []).length, 80);
+  assert.equal((xml.match(/hreflang="x-default"/g) || []).length, 72);
   assert.doesNotMatch(xml, /https:\/\/leakfanhub\.com\/en(?:\/|<|\")/);
-  assert.doesNotMatch(xml, /https:\/\/leakfanhub\.com\/(?:fr|es|de|it|pt|nl)\/(?:about|contact|dmca)</);
+  assert.doesNotMatch(xml, /https:\/\/leakfanhub\.com\/(?:fr|es|de|it|pt|nl|ru|zh|ja|hi|th)\/(?:about|contact|dmca)</);
 });
 
 test("discovery response language follows the stable URL regardless of cookie or browser", async () => {
@@ -62,7 +62,7 @@ test("discovery response language follows the stable URL regardless of cookie or
   });
   for (const path of DISCOVERY_ROUTE_PATHS) for (const locale of LOCALES) {
     const publicPath = localePath(locale, path);
-    for (const preference of ["en", "fr", "nl"]) {
+    for (const preference of ["en", "fr", "ru", "zh", "ja", "hi", "th"]) {
       const response = await proxy(new NextRequest(`https://leakfanhub.com${publicPath}?page=2`, { headers: { cookie: `lfh_locale=${preference}`, "accept-language": "de" } }));
       assert.equal(response.status, 200);
       assert.equal(response.headers.get("location"), null);

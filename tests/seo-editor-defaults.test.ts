@@ -1,3 +1,5 @@
+// @ts-expect-error Native Node requires explicit suffixes.
+import { LOCALES as ACTIVE_LOCALES } from "../src/lib/i18n/config.ts";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -12,7 +14,7 @@ const hash = (value: string) => createHash("sha256").update(value).digest("hex")
 test("editor defaults equal the current fully resolved metadata in every localized layout", () => {
   const { getSeoDefault } = loadAppModule<{ getSeoDefault(locale: SeoLocale, page: SeoPageKey): SeoEditorEntry }>("src/lib/seo-editor-defaults.ts");
   const { getDictionary } = loadAppModule<{ getDictionary(locale: SeoLocale): { pages: Record<SeoPageKey, { meta: { title: string; description: string } }> } }>("src/lib/i18n/dictionaries.ts");
-  for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"] as const) {
+  for (const locale of ACTIVE_LOCALES) {
     const source = readFileSync(resolve(`src/app/(${locale})/layout.tsx`), "utf8");
     const ast = ts.createSourceFile("layout.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
     let template: string | undefined;

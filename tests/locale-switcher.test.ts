@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+// @ts-expect-error Native Node requires explicit suffixes.
+import { LOCALES as ACTIVE_LOCALES } from "../src/lib/i18n/config.ts";
 import * as React from "react";
 import type { ReactNode } from "react";
 // @ts-expect-error Native test loader needs the extension.
@@ -30,7 +32,8 @@ test("language choices are buttons that persist the preference before reloading 
     "next/navigation": { usePathname: () => "/fr/models" },
   });
   const choices = nodes(LanguageSwitcher({})).filter((node) => node.type === "button" && node.props.lang);
-  assert.equal(choices.length, 7);
+  assert.equal(choices.length, 12);
+  assert.deepEqual(choices.map(choice => choice.props.lang), ACTIVE_LOCALES);
   assert.equal(nodes(LanguageSwitcher({})).filter((node) => node.type === "a").length, 0);
   for (const choice of choices) {
     assert.equal(choice.props.type, "button");
@@ -39,7 +42,7 @@ test("language choices are buttons that persist the preference before reloading 
     assert.equal(reloadCookies.at(-1), cookie);
     assert.equal(location.href, "https://example.test/aria/123-v2?page=2#items");
   }
-  assert.equal(reloadCookies.length, 7);
+  assert.equal(reloadCookies.length, 12);
   location.protocol = "http:";
   (choices[0].props.onClick as () => void)();
   assert.ok(!cookie.includes(";secure"));
@@ -72,5 +75,5 @@ test("discovery language choices persist before navigation and preserve query an
     const preference = `lfh_locale=${locale};path=/;max-age=31536000;samesite=lax;secure`;
     assert.deepEqual(events.at(-1), locale === "fr" ? ["reload", preference] : ["assign", `https://example.test${locale === "en" ? "" : `/${locale}`}/models?sort=views&page=2#items`, preference]);
   }
-  assert.equal(events.length, 7);
+  assert.equal(events.length, 12);
 });

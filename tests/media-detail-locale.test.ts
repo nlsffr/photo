@@ -1,3 +1,5 @@
+// @ts-expect-error Native Node requires explicit suffixes.
+import { LOCALES as ACTIVE_LOCALES } from "../src/lib/i18n/config.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { isValidElement, type ReactNode } from "react";
@@ -7,7 +9,7 @@ import type { Locale } from "../src/lib/i18n/config";
 // @ts-expect-error Native Node requires explicit suffixes.
 import { loadAppModule } from "./helpers/load-app-module.ts";
 
-const locales: Locale[] = ["en", "fr", "es", "de", "it", "pt", "nl"];
+const locales: readonly Locale[] = ACTIVE_LOCALES;
 const creator = { handle: "aria", name: "Aria", urlVersion: 3, verified: true, avatarUrl: "/avatar.jpg", followers: 20 };
 const photo = {
   id: "db-id", sourceId: "123", title: "Original source title", description: "Original source description",
@@ -49,7 +51,7 @@ function setup(overrides: Record<string, unknown> = {}, creatorOverrides: Record
   }
 }
 
-test("media page UI, creator links and back controls use all seven active locales", async () => {
+test("media page UI, creator links and back controls use all twelve active locales", async () => {
   const { MediaDetailPage } = setup();
   for (const locale of locales) {
     const dictionary = loadAppModule<Record<string, Dictionary>>(`src/lib/i18n/dictionaries/${locale}.ts`)[`${locale}Dictionary`];
@@ -68,13 +70,13 @@ test("media page UI, creator links and back controls use all seven active locale
     assert.ok(serialized.includes("https://leakfanhub.com/aria/123-v2"));
     assert.ok(serialized.includes("https://leakfanhub.com/aria-v3"));
     assert.ok(serialized.includes(`"item":"https://leakfanhub.com${locale === "en" ? "/" : `/${locale}`}"`));
-    assert.doesNotMatch(serialized, /https:\/\/leakfanhub\.com\/(?:en|fr|es|de|it|pt|nl)\/aria(?:-v3|\/123-v2)/);
+    assert.doesNotMatch(serialized, /https:\/\/leakfanhub\.com\/(?:en|fr|es|de|it|pt|nl|ru|zh|ja|hi|th)\/aria(?:-v3|\/123-v2)/);
     const relativeAge = new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(-5, "hour");
     assert.ok(visible.includes(relativeAge), `${locale}: age must use its locale`);
   }
 });
 
-test("media metadata keeps the same versioned canonical and authored copy across seven languages", async () => {
+test("media metadata keeps the same versioned canonical and authored copy across twelve languages", async () => {
   const { mediaDetailMetadata } = setup();
   for (const locale of [...locales, undefined]) {
     const metadata = await mediaDetailMetadata({ locale, handleParam: "aria", idParam: "123-v2" });

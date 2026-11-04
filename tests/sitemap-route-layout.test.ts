@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import { access, readFile, readdir } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 import test from "node:test";
+import type { NextConfig } from "next";
+// @ts-expect-error Native Node requires explicit suffixes.
+import { loadAppModule } from "./helpers/load-app-module.ts";
 
 const APP_ROUTES = new URL("../src/app", import.meta.url).pathname;
 const MEDIA_ROUTES = new URL("../src/app/sitemaps/media", import.meta.url).pathname;
@@ -83,8 +86,7 @@ test("expensive sitemap routes reuse one five-minute in-process rendering", asyn
 });
 
 test("sitemap responses own their cache policy without a global HTML override", async () => {
-  // @ts-expect-error Node's native type stripping requires the explicit .ts suffix.
-  const { default: nextConfig } = await import("../next.config.ts");
+  const { default: nextConfig } = loadAppModule<{ default: NextConfig }>("next.config.ts");
   const rules = (await nextConfig.headers?.()) ?? [];
   const sitemapCacheRules = rules.filter(
     (rule) =>

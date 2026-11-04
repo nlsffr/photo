@@ -10,8 +10,8 @@ import {
 } from "@/lib/i18n/config";
 import type { Dictionary } from "@/lib/i18n/dictionaries";
 
-const FLAGS: Record<Locale, string> = { en: "🇬🇧", fr: "🇫🇷", es: "🇪🇸", de: "🇩🇪", it: "🇮🇹", pt: "🇵🇹", nl: "🇳🇱" };
-const NAMES: Record<Locale, string> = { en: "English", fr: "Français", es: "Español", de: "Deutsch", it: "Italiano", pt: "Português", nl: "Nederlands" };
+const FLAGS: Record<Locale, string> = { en: "🇬🇧", fr: "🇫🇷", es: "🇪🇸", de: "🇩🇪", it: "🇮🇹", pt: "🇵🇹", nl: "🇳🇱", ru: "🇷🇺", zh: "🇨🇳", ja: "🇯🇵", hi: "🇮🇳", th: "🇹🇭" };
+const NAMES: Record<Locale, string> = { en: "English", fr: "Français", es: "Español", de: "Deutsch", it: "Italiano", pt: "Português", nl: "Nederlands", ru: "Русский", zh: "中文", ja: "日本語", hi: "हिन्दी", th: "ไทย" };
 
 interface LocaleCtx {
   locale: Locale;

@@ -14,6 +14,17 @@ import { ptDictionary } from "./dictionaries/pt.ts";
 // @ts-expect-error Node's native type stripping requires the explicit .ts suffix.
 import { nlDictionary } from "./dictionaries/nl.ts";
 
+// @ts-expect-error Node's native type stripping requires the explicit .ts suffix.
+import { ruDictionary } from "./dictionaries/ru.ts";
+// @ts-expect-error Node's native type stripping requires the explicit .ts suffix.
+import { zhDictionary } from "./dictionaries/zh.ts";
+// @ts-expect-error Node's native type stripping requires the explicit .ts suffix.
+import { jaDictionary } from "./dictionaries/ja.ts";
+// @ts-expect-error Node's native type stripping requires the explicit .ts suffix.
+import { hiDictionary } from "./dictionaries/hi.ts";
+// @ts-expect-error Node's native type stripping requires the explicit .ts suffix.
+import { thDictionary } from "./dictionaries/th.ts";
+
 const DICTIONARIES: Record<Locale, Dictionary> = {
   en: enDictionary,
   fr: frDictionary,
@@ -22,6 +33,11 @@ const DICTIONARIES: Record<Locale, Dictionary> = {
   it: itDictionary,
   pt: ptDictionary,
   nl: nlDictionary,
+  ru: ruDictionary,
+  zh: zhDictionary,
+  ja: jaDictionary,
+  hi: hiDictionary,
+  th: thDictionary,
 };
 
 export function getDictionary(locale: Locale): Dictionary {

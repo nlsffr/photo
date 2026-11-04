@@ -1,3 +1,5 @@
+// @ts-expect-error Native Node requires explicit suffixes.
+import { LOCALES as ACTIVE_LOCALES } from "../src/lib/i18n/config.ts";
 import assert from 'node:assert/strict';
 import test, {type TestContext} from 'node:test';
 import React from 'react';
@@ -100,8 +102,8 @@ test('close is a translated 44px button and stays closed for the same source acr
   ui.profile('current');ui.render();ui.profile('intensive');assert.equal(ui.show(),null);
 });
 
-test('all seven close labels come from adsCopy',async t=>{
-  for(const locale of ['en','fr','es','de','it','pt','nl'] as const)await t.test(locale,sub=>{
+test('all twelve close labels come from adsCopy',async t=>{
+  for(const locale of ACTIVE_LOCALES)await t.test(locale,sub=>{
     const ui=harness(sub,{locale}),tree=ui.show();assert.equal(all(tree).find(e=>e.type==='button')?.props['aria-label'],adsCopy[locale].close);
   });
 });

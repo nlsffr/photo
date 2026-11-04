@@ -1,3 +1,5 @@
+// @ts-expect-error Native Node requires explicit suffixes.
+import { LOCALES as ACTIVE_LOCALES } from "../src/lib/i18n/config.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { Creator, Photo, CreatorCollectionStats } from "../src/lib/types";
@@ -19,7 +21,7 @@ type Schema = {
   numberOfItems: number;
   itemListElement: Array<{ position: number; item: Schema }>;
 };
-type Input = { creator: Creator; stats: CreatorCollectionStats; items: readonly Photo[]; collection: "overview" | "photos" | "videos" | "popular"; locale?: "en" | "fr" | "es" | "de" | "it" | "pt" | "nl"; page?: number; site: string };
+type Input = { creator: Creator; stats: CreatorCollectionStats; items: readonly Photo[]; collection: "overview" | "photos" | "videos" | "popular"; locale?: (typeof ACTIVE_LOCALES)[number]; page?: number; site: string };
 const creator: Creator = { handle: "aria-lune", name: "Aria Lune", bio: "A creator", avatarUrl: "/avatar.jpg", location: "", followers: 45, verified: true, urlVersion: 3 };
 const stats: CreatorCollectionStats = { mediaCount: 99, photoCount: 80, videoCount: 19, engagedCount: 10, totalViews: 1000, totalLikes: 20 };
 function media(id: string, type: Photo["type"] = "photo"): Photo {
@@ -114,15 +116,15 @@ test("every loaded item removal is honored without generating replacement entrie
 });
 
 
-test("seven rendered languages keep public structured-data URLs and entity IDs identical", () => {
+test("twelve rendered languages keep public structured-data URLs and entity IDs identical", () => {
   const english = build({ locale: "en", collection: "videos", page: 2 });
-  for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"] as const) {
+  for (const locale of ACTIVE_LOCALES) {
     const data = build({ locale, collection: "videos", page: 2 });
     const page = data.find((node) => node["@type"] === "CollectionPage")!;
     assert.equal(page.inLanguage, locale);
     assert.equal(page.url, english[0].url);
     assert.deepEqual(page.mainEntity, english[0].mainEntity);
     assert.deepEqual(page.hasPart.map((item) => item.url), english[0].hasPart.map((item) => item.url));
-    assert.doesNotMatch(JSON.stringify(data), /https:\/\/example\.test\/(?:en|fr|es|de|it|pt|nl)(?:\/|[?#"])/);
+    assert.doesNotMatch(JSON.stringify(data), /https:\/\/example\.test\/(?:en|fr|es|de|it|pt|nl|ru|zh|ja|hi|th)(?:\/|[?#"])/);
   }
 });

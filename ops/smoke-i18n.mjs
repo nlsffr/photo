@@ -1,77 +1,85 @@
 import assert from "node:assert/strict";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { LOCALES, DISCOVERY_ROUTE_PATHS } from "../src/lib/i18n/config.ts";
 
-const origin = (process.argv[2] || "http://localhost:3000").replace(/\/$/, "");
-const canonical = (process.argv[3] || "https://leakfanhub.com").replace(/\/$/, "");
-const locales = ["en", "fr", "es", "de", "it", "pt", "nl"];
-const paths = ["", "/models", "/trending-medias", "/most-liked", "/classements", "/influenceuses-tendances"];
-const headers = {
-  host: new URL(canonical).host,
-  "x-forwarded-host": new URL(canonical).host,
-  "x-forwarded-proto": "https",
-};
-let checked = 0;
+const EXPECTED_LOCALES = ["en", "fr", "es", "de", "it", "pt", "nl", "ru", "zh", "ja", "hi", "th"];
+assert.deepEqual(LOCALES, EXPECTED_LOCALES, "the smoke must cover exactly the twelve published languages");
+assert.equal(DISCOVERY_ROUTE_PATHS.length, 6);
 
-async function page(path) {
-  const response = await fetch(`${origin}${path}`, {
-    headers, redirect: "manual", signal: AbortSignal.timeout(30_000),
-  });
-  return { response, html: await response.text() };
+export function discoveryPath(locale, path) {
+  return locale === "en" ? path : `/${locale}${path === "/" ? "" : path}`;
+}
+
+export function discoveryPlan(canonical) {
+  const site = canonical.replace(/\/$/, "");
+  return LOCALES.flatMap(locale => DISCOVERY_ROUTE_PATHS.map(path => ({
+    locale, path: discoveryPath(locale, path),
+    canonical: `${site}${discoveryPath(locale, path)}`,
+    languages: { ...Object.fromEntries(LOCALES.map(language => [language, `${site}${discoveryPath(language, path)}`])),
+      "x-default": `${site}${path}` },
+  })));
 }
 
 function tags(html, tag) {
-  return [...html.matchAll(new RegExp(`<${tag}\\b([^>]*)>`, "gi"))].map((match) =>
-    Object.fromEntries([...match[1].matchAll(/([\w-]+)="([^"]*)"/g)].map((entry) => [
+  return [...html.matchAll(new RegExp(`<${tag}\\b([^>]*)>`, "gi"))].map(match =>
+    Object.fromEntries([...match[1].matchAll(/([\w-]+)="([^"]*)"/g)].map(entry => [
       entry[1].toLowerCase(), entry[2].replaceAll("&amp;", "&"),
     ])),
   );
 }
 
-for (const locale of locales) {
-  for (const path of paths) {
-    const pathname = `/${locale}${path}`;
-    const { response, html } = await page(pathname);
-    assert.equal(response.status, 200, pathname);
-    assert.equal(tags(html, "html")[0]?.lang, locale, `${pathname} document language`);
-    assert.ok(/<h1\b/i.test(html), `${pathname} has a heading`);
+export async function smoke(origin = "http://localhost:3000", canonical = "https://leakfanhub.com", request = fetch) {
+  origin = origin.replace(/\/$/, "");
+  canonical = canonical.replace(/\/$/, "");
+  const headers = { host: new URL(canonical).host, "x-forwarded-host": new URL(canonical).host, "x-forwarded-proto": "https" };
+  const page = async path => {
+    const response = await request(`${origin}${path}`, { headers, redirect: "manual", signal: AbortSignal.timeout(30_000) });
+    return { response, html: await response.text() };
+  };
+  const plan = discoveryPlan(canonical);
+  assert.equal(plan.length, 72);
+  for (const entry of plan) {
+    const { response, html } = await page(entry.path);
+    assert.equal(response.status, 200, entry.path);
+    assert.equal(tags(html, "html")[0]?.lang, entry.locale, `${entry.path} document language`);
+    assert.ok(/<h1\b/i.test(html), `${entry.path} has a heading`);
     const links = tags(html, "link");
-    assert.equal(links.find((link) => link.rel === "canonical")?.href,
-      `${canonical}${pathname}`, `${pathname} canonical`);
-    const alternates = Object.fromEntries(links.filter((link) => link.hreflang)
-      .map((link) => [link.hreflang, new URL(link.href).href]));
-    assert.deepEqual(alternates, {
-      ...Object.fromEntries(locales.map((language) => [language, `${canonical}/${language}${path}`])),
-      "x-default": `${canonical}${path || "/"}`,
-    }, `${pathname} reciprocal alternates`);
+    assert.equal(links.find(link => link.rel === "canonical")?.href, entry.canonical, `${entry.path} self canonical`);
+    const alternates = Object.fromEntries(links.filter(link => link.hreflang).map(link => [link.hreflang, new URL(link.href).href]));
+    assert.deepEqual(alternates, entry.languages, `${entry.path} reciprocal alternates`);
     const metadata = tags(html, "meta");
-    assert.ok(metadata.find((meta) => meta.name === "description")?.content?.trim(), `${pathname} description`);
-    assert.ok(!metadata.some((meta) => meta.name === "robots" && /noindex/i.test(meta.content)), `${pathname} indexable`);
-    if (!["en", "fr"].includes(locale)) {
-      for (const link of tags(html, "a")) {
-        if (!link.href?.startsWith(`/${locale}/`)) continue;
-        const target = link.href.split(/[?#]/)[0].slice(locale.length + 1);
-        assert.ok(paths.includes(target), `${pathname} unsupported localized link: ${link.href}`);
-      }
+    assert.ok(metadata.find(meta => meta.name === "description")?.content?.trim(), `${entry.path} description`);
+    assert.ok(!metadata.some(meta => meta.name === "robots" && /noindex/i.test(meta.content)), `${entry.path} indexable`);
+    if (DISCOVERY_ROUTE_PATHS.at(-1) === entry.path.replace(new RegExp(`^/${entry.locale}(?=/|$)`), "")) {
+      console.log(JSON.stringify({ locale: entry.locale, pages: 6, passed: true }));
     }
-    checked += 1;
   }
-  console.log(JSON.stringify({ locale, pages: paths.length, passed: true }));
+  const { response: sitemapResponse, html: sitemap } = await page("/sitemaps/static");
+  assert.equal(sitemapResponse.status, 200);
+  const entries = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map(match => match[1]);
+  assert.equal(entries.length, 80, "72 discovery addresses and8 bare editorial addresses");
+  assert.equal(new Set(entries).size, 80);
+  for (const entry of plan) assert.ok(entries.includes(entry.canonical), entry.canonical);
+  for (const path of ["/about", "/dmca", "/trust-and-safety", "/contact", "/conditions", "/confidentialite", "/mentions-legales", "/qu-est-ce-que-lumengallery"]) {
+    assert.ok(entries.includes(`${canonical}${path}`), `bare editorial entry ${path}`);
+  }
+  assert.ok(!entries.some(url => /^\/en(?:\/|$)/.test(new URL(url).pathname)), "English has no prefixed public address");
+  for (const [path, target] of [["/en", "/"], ["/en/models?page=2", "/models?page=2"], ...LOCALES.map(locale => [`/${locale}/about`, "/about"])]) {
+    const { response } = await page(path);
+    assert.equal(response.status, 308, `${path} permanent redirect`);
+    assert.equal(response.headers.get("location"), `${canonical}${target}`);
+  }
+  for (const locale of ["ru", "zh", "ja", "hi", "th"]) {
+    const { response } = await page(`/${locale}/api/readyz`);
+    assert.equal(response.status, 404, `a locale cannot wrap the API: ${locale}`);
+  }
+  for (const path of ["/api/healthz", "/api/readyz"]) assert.equal((await page(path)).response.status, 200, path);
+  const result = { passed: true, discoveryPages: plan.length, staticSitemapUrls: entries.length, legacyRedirects: 14, rejectedLocalizedMachinePaths: 5 };
+  console.log(JSON.stringify(result));
+  return result;
 }
 
-const sitemap = await page("/sitemaps/static");
-assert.equal(sitemap.response.status, 200);
-const entries = [...sitemap.html.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
-assert.equal(entries.length, 58, "static sitemap URL count");
-assert.equal(new Set(entries).size, 58, "static sitemap unique URLs");
-for (const locale of locales) {
-  for (const path of paths) assert.ok(entries.includes(`${canonical}/${locale}${path}`));
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  smoke(process.argv[2], process.argv[3]).catch(error => { console.error(error); process.exitCode = 1; });
 }
-for (const path of ["/es/about", "/de/lyla", "/pt/lyla/photos", "/nl/lyla/1659433"]) {
-  const { response, html } = await page(path);
-  assert.ok(response.status === 404 || tags(html, "meta").some(
-    (meta) => meta.name === "robots" && /noindex/i.test(meta.content),
-  ), `${path} must not create a translated indexable duplicate`);
-}
-for (const path of ["/api/healthz", "/api/readyz"]) {
-  assert.equal((await page(path)).response.status, 200, path);
-}
-console.log(JSON.stringify({ passed: true, discoveryPages: checked, staticSitemapUrls: entries.length, unsupportedRoutesChecked: 4 }));

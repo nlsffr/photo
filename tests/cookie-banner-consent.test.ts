@@ -113,7 +113,7 @@ test('failed combined acceptance stays in the same panel without inventing a con
   assert.equal(ui.button('Entrer').disabled,false);
 });
 
-test('the merged entry and granular purpose labels are localized in all seven supported languages',async t=>{
+test('the merged entry and granular purpose labels are localized in all twelve supported languages',async t=>{
   for(const [locale,enter,refuse,manage,save] of [
     ['fr','Entrer','Tout refuser','Choix des cookies','Enregistrer mes choix'],
     ['en','Enter','Decline all','Cookie choices','Save my choices'],
@@ -121,7 +121,12 @@ test('the merged entry and granular purpose labels are localized in all seven su
     ['de','Eintreten','Alle ablehnen','Cookie-Auswahl','Auswahl speichern'],
     ['it','Entra','Rifiuta tutto','Scelte sui cookie','Salva le mie scelte'],
     ['pt','Entrar','Recusar tudo','Opções de cookies','Guardar as minhas escolhas'],
-    ['nl','Doorgaan','Alles weigeren','Cookiekeuzes','Mijn keuzes opslaan']
+    ['nl','Doorgaan','Alles weigeren','Cookiekeuzes','Mijn keuzes opslaan'],
+    ['ru','Войти','Отказаться от всех','Настройки cookie','Сохранить мой выбор'],
+    ['zh','进入','全部拒绝','Cookie 选项','保存我的选择'],
+    ['ja','入場','すべて拒否する','Cookieの選択','選択を保存する'],
+    ['hi','प्रवेश करें','सभी अस्वीकार करें','कुकी विकल्प','मेरे विकल्प सहेजें'],
+    ['th','เข้าชม','ปฏิเสธทั้งหมด','ตัวเลือกคุกกี้','บันทึกตัวเลือกของฉัน']
   ])await t.test(locale,sub=>{
     const ui=harness(sub,{locale});
     const html=renderToStaticMarkup(ui.render());assert.equal((html.match(/<section/g)||[]).length,1);

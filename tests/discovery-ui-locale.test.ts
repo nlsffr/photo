@@ -1,3 +1,5 @@
+// @ts-expect-error Native Node requires explicit suffixes.
+import { LOCALES as ACTIVE_LOCALES } from "../src/lib/i18n/config.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 import * as React from "react";
@@ -8,7 +10,7 @@ import type { Dictionary } from "../src/lib/i18n/dictionaries";
 import type { Locale } from "../src/lib/i18n/config";
 import type { MediaType, SortKey } from "../src/lib/types";
 
-const locales: Locale[] = ["en", "fr", "es", "de", "it", "pt", "nl"];
+const locales: readonly Locale[] = ACTIVE_LOCALES;
 const item = {
   id: "media-1", title: "Source-authored title", type: "video", videoUrl: "/clip.mp4",
   imageUrl: "/preview.jpg", creatorHandle: "creator", likes: 4, views: 12,

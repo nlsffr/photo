@@ -1,3 +1,5 @@
+import type { Locale } from "./i18n/config";
+
 export const SEO_PAGES = [
   { key: "home", label: "Accueil", path: "/" },
   { key: "models", label: "Modèles", path: "/models" },
@@ -8,13 +10,16 @@ export const SEO_PAGES = [
 ] as const;
 
 export type SeoPageKey = (typeof SEO_PAGES)[number]["key"];
-export type SeoLocale = "en" | "fr" | "es" | "de" | "it" | "pt" | "nl";
+export type SeoLocale = Locale;
 
 export const SEO_LANGUAGES: ReadonlyArray<{ code: SeoLocale; label: string }> = [
   { code: "fr", label: "Français" }, { code: "en", label: "English" },
   { code: "es", label: "Español" }, { code: "de", label: "Deutsch" },
   { code: "it", label: "Italiano" }, { code: "pt", label: "Português" },
   { code: "nl", label: "Nederlands" },
+  { code: "ru", label: "Русский" }, { code: "zh", label: "中文" },
+  { code: "ja", label: "日本語" }, { code: "hi", label: "हिन्दी" },
+  { code: "th", label: "ไทย" },
 ];
 
 export type SeoEditorEntry = {

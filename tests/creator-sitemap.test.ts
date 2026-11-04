@@ -30,7 +30,7 @@ test("creator sitemap lists each eligible versioned collection once without reti
     assert.equal((xml.match(/<url>/g) ?? []).length, 1);
     assert.ok(xml.includes(`<loc>${SITE}${path}</loc>`));
     assert.match(xml, /<lastmod>2026-10-30T08:00:00\.000Z<\/lastmod>/);
-    assert.doesNotMatch(xml, /xhtml|hreflang|\/(?:en|fr|es|de|it|pt|nl)\//);
+    assert.doesNotMatch(xml, /xhtml|hreflang|\/(?:en|fr|es|de|it|pt|nl|ru|zh|ja|hi|th)\//);
   }
 });
 

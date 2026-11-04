@@ -51,6 +51,116 @@ export const DISCOVERY_COPY = {
     popularGalleries: "Populaire galerijen", galleriesTitle: "Trending en populaire galerijen",
     galleriesLinks: ["Trending galerijen", "Topcreators", "Media met de meeste likes"],
   },
+  ru: {
+    "windows": [
+      "24 часа",
+      "7 дней",
+      "30 дней",
+      "За всё время"
+    ],
+    "emptyRankings": "Пока недостаточно данных.",
+    "like": "Нравится",
+    "save": "Сохранить",
+    "adultsOnly": "Только 18+",
+    "ad": "Реклама",
+    "premium": "Premium без рекламы — {stars} Stars на {days} дней",
+    "removeAd": "Убрать с Premium",
+    "popularGalleries": "Популярные галереи",
+    "galleriesTitle": "Галереи в тренде и популярные галереи",
+    "galleriesLinks": [
+      "Галереи в тренде",
+      "Лучшие авторы",
+      "Материалы с наибольшим числом отметок «Нравится»"
+    ]
+  },
+  zh: {
+    "windows": [
+      "24小时",
+      "7天",
+      "30天",
+      "全部时间"
+    ],
+    "emptyRankings": "暂无足够数据。",
+    "like": "点赞",
+    "save": "收藏",
+    "adultsOnly": "仅限18岁以上人士",
+    "ad": "广告",
+    "premium": "无广告 Premium — {stars} Stars，畅享{days}天",
+    "removeAd": "开通 Premium 移除广告",
+    "popularGalleries": "热门图库",
+    "galleriesTitle": "趋势与热门图库",
+    "galleriesLinks": [
+      "趋势图库",
+      "热门创作者",
+      "获赞最多的媒体"
+    ]
+  },
+  ja: {
+    "windows": [
+      "24時間",
+      "7日間",
+      "30日間",
+      "全期間"
+    ],
+    "emptyRankings": "まだ十分なデータがありません。",
+    "like": "いいね",
+    "save": "保存",
+    "adultsOnly": "18歳以上限定",
+    "ad": "広告",
+    "premium": "広告なしのプレミアム — {stars} Starsで{days}日間",
+    "removeAd": "プレミアムで広告を非表示",
+    "popularGalleries": "人気のギャラリー",
+    "galleriesTitle": "急上昇と人気のギャラリー",
+    "galleriesLinks": [
+      "急上昇ギャラリー",
+      "人気クリエイター",
+      "いいね数が多いメディア"
+    ]
+  },
+  hi: {
+    "windows": [
+      "24 घंटे",
+      "7 दिन",
+      "30 दिन",
+      "पूरा समय"
+    ],
+    "emptyRankings": "अभी पर्याप्त डेटा नहीं है।",
+    "like": "पसंद करें",
+    "save": "सहेजें",
+    "adultsOnly": "केवल 18 वर्ष या अधिक उम्र के लिए",
+    "ad": "विज्ञापन",
+    "premium": "विज्ञापन-मुक्त प्रीमियम — {stars} Stars में {days} दिन",
+    "removeAd": "प्रीमियम से विज्ञापन हटाएँ",
+    "popularGalleries": "लोकप्रिय गैलरी",
+    "galleriesTitle": "ट्रेंडिंग और लोकप्रिय गैलरी",
+    "galleriesLinks": [
+      "ट्रेंडिंग गैलरी",
+      "शीर्ष क्रिएटर",
+      "सबसे ज़्यादा पसंद किया गया मीडिया"
+    ]
+  },
+  th: {
+    "windows": [
+      "24 ชั่วโมง",
+      "7 วัน",
+      "30 วัน",
+      "ตลอดเวลา"
+    ],
+    "emptyRankings": "ยังมีข้อมูลไม่เพียงพอ",
+    "like": "ถูกใจ",
+    "save": "บันทึก",
+    "adultsOnly": "สำหรับผู้มีอายุ 18 ปีขึ้นไปเท่านั้น",
+    "ad": "โฆษณา",
+    "premium": "พรีเมียมไร้โฆษณา — {stars} Stars ใช้ได้ {days} วัน",
+    "removeAd": "นำโฆษณาออกด้วยพรีเมียม",
+    "popularGalleries": "แกลเลอรียอดนิยม",
+    "galleriesTitle": "แกลเลอรีที่กำลังมาแรงและยอดนิยม",
+    "galleriesLinks": [
+      "แกลเลอรีที่กำลังมาแรง",
+      "ครีเอเตอร์ยอดนิยม",
+      "สื่อที่ถูกใจมากที่สุด"
+    ]
+  },
 } satisfies Record<Locale, {
   windows: [string, string, string, string]; emptyRankings: string; like: string; save: string;
   adultsOnly: string; ad: string; premium: string; removeAd: string;

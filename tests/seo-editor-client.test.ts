@@ -1,3 +1,5 @@
+// @ts-expect-error Native Node requires explicit suffixes.
+import { LOCALES as ACTIVE_LOCALES } from "../src/lib/i18n/config.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 import * as React from "react";
@@ -7,7 +9,7 @@ import type { SeoEditorEntry } from "../src/lib/seo-editor-contract";
 import { loadAppModule } from "./helpers/load-app-module.ts";
 
 const pages = ["home", "models", "trending", "mostLiked", "rankings", "influencers"] as const;
-const languages = ["en", "fr", "es", "de", "it", "pt", "nl"] as const;
+const languages = ACTIVE_LOCALES;
 const fixtures = (): SeoEditorEntry[] => pages.flatMap((page) => languages.map((locale) => ({
   page, locale, title: `Fixture ${page} ${locale}`, description: `Synthetic description ${page} ${locale}`,
   revision: 7, updatedAt: "2026-11-01T10:00:00Z", source: "saved" as const,
@@ -118,7 +120,7 @@ test("editor loads all page/language choices and exposes labeled native controls
   t.mock.method(globalThis, "fetch", async () => Response.json({ entries: fixtures() }));
   const editor = view(); editor.render(); await settle(); editor.render();
   assert.equal(editor.nodes().filter((node) => node.type === "option").length, 6);
-  assert.equal(editor.nodes().filter((node) => node.type === "button" && typeof node.props["aria-pressed"] === "boolean").length, 7);
+  assert.equal(editor.nodes().filter((node) => node.type === "button" && typeof node.props["aria-pressed"] === "boolean").length, 12);
   assert.equal(editor.field("title").props.maxLength, 300);
   assert.equal(editor.field("description").props.maxLength, 2000);
   for (const name of ["title", "description", "page"]) {

@@ -1,7 +1,7 @@
 // @ts-expect-error Node’s native type stripping requires the explicit .ts suffix.
 import { parseCreatorCollectionPath } from "../creator-collections.ts";
 
-export const LOCALES = ["en", "fr", "es", "de", "it", "pt", "nl"] as const;
+export const LOCALES = ["en", "fr", "es", "de", "it", "pt", "nl", "ru", "zh", "ja", "hi", "th"] as const;
 export type Locale = (typeof LOCALES)[number];
 export const CREATOR_LOCALES = LOCALES;
 export type CreatorLocale = (typeof CREATOR_LOCALES)[number];

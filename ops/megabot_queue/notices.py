@@ -42,7 +42,7 @@ def notice_matches(row, notice):
             if parsed.hostname not in ('leakfanhub.com', 'www.leakfanhub.com'):
                 continue
             parts = unquote(parsed.path).strip('/').split('/')
-            if parts[0] in ('fr', 'en', 'es', 'de', 'it', 'pt', 'nl'):
+            if parts[0] in ('fr', 'en', 'es', 'de', 'it', 'pt', 'nl', 'ru', 'zh', 'ja', 'hi', 'th'):
                 parts = parts[1:]
             if parts and profile.fullmatch(parts[0]) and (
                 len(parts) == 1 or (len(parts) == 2 and media.fullmatch(parts[1]))

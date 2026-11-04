@@ -1,3 +1,5 @@
+// @ts-expect-error Native Node requires explicit suffixes.
+import { LOCALES as ACTIVE_LOCALES } from "../src/lib/i18n/config.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -57,14 +59,20 @@ test("media fallback templates and Open Graph use every supported locale without
     it: "Video di @alice su LeakFanHub",
     pt: "Vídeo de @alice no LeakFanHub",
     nl: "Video van @alice op LeakFanHub",
+    ru: "Видео от @alice на LeakFanHub",
+    zh: "@alice 在 LeakFanHub 上的视频",
+    ja: "動画：@aliceのLeakFanHub投稿",
+    hi: "वीडियो · @alice की LeakFanHub पोस्ट",
+    th: "วิดีโอ โดย @alice บน LeakFanHub",
   };
-  for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"] as const) {
-    const context = { site: "https://leakfanhub.com", canonicalPath: `/${locale}/alice/98123`, locale };
+  for (const locale of ACTIVE_LOCALES) {
+    const context = { site: "https://leakfanhub.com", canonicalPath: "/alice/98123", locale };
     const fallback = buildMediaPagePresentation({ ...baseMedia, title: "", description: "" }, context);
     assert.ok(fallback.description.startsWith(expected[locale]), locale);
-    assert.ok(fallback.name.includes("alice") && fallback.name.endsWith("#98123"), locale);
+    assert.ok(fallback.name.includes("alice") && fallback.name.includes("98123"), locale);
+    assert.doesNotMatch(fallback.description, /\{(?:kind|handle|id|titleDetail)\}/);
     assert.equal(fallback.metadata.openGraph.locale?.slice(0, 2), locale);
-    assert.equal(fallback.metadata.openGraph.alternateLocale?.length, 6);
+    assert.equal(fallback.metadata.openGraph.alternateLocale?.length, 11);
     const authored = buildMediaPagePresentation(baseMedia, context);
     assert.equal(authored.h1, "A real launch title", locale);
     assert.equal(authored.description, "Behind the scenes from the launch.", locale);

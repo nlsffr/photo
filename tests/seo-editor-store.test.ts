@@ -131,14 +131,14 @@ test("SQL-looking text is stored as a value without changing any other target", 
   assert.equal(db.rows.length, 1);
   assert.equal(db.rows[0].title, value);
   const entries = await api.listSeoEntries();
-  assert.equal(entries.length, 42);
+  assert.equal(entries.length, 72);
   assert.equal(entries.filter((entry) => entry.source === "saved").length, 1);
 });
 
 test("no configured database leaves public defaults available but cannot save", async () => {
   const api = store(null);
   assert.equal(await api.readSeoOverride("fr", "home"), null);
-  assert.equal((await api.listSeoEntries()).length, 42);
+  assert.equal((await api.listSeoEntries()).length, 72);
   assert.deepEqual(await api.saveSeoEntry(initial, "owner-id"), { ok: false, error: "unavailable" });
 });
 

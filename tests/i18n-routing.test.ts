@@ -1,3 +1,5 @@
+// @ts-expect-error Native Node requires explicit suffixes.
+import { LOCALES as ACTIVE_LOCALES } from "../src/lib/i18n/config.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { isValidElement, type ReactElement } from "react";
@@ -12,7 +14,7 @@ async function loadConfig() {
 test("bare pages keep their public URL regardless of the negotiated or saved language", async () => {
   const { localeRedirectTarget, LOCALIZED_ROUTE_PATHS } = await loadConfig();
   for (const pathname of LOCALIZED_ROUTE_PATHS) {
-    for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"]) {
+    for (const locale of ACTIVE_LOCALES) {
       assert.equal(localeRedirectTarget(pathname, locale, "fr-FR"), null, pathname);
     }
   }
@@ -20,7 +22,7 @@ test("bare pages keep their public URL regardless of the negotiated or saved lan
 
 test("only known historical locale URLs have a bare redirect target", async () => {
   const { localeRedirectTarget } = await loadConfig();
-  for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"]) {
+  for (const locale of ACTIVE_LOCALES) {
     assert.equal(localeRedirectTarget(`/${locale}`, "fr", "de"), locale === "en" ? "/" : null);
     assert.equal(localeRedirectTarget(`/${locale}/models`, "en", "fr"), locale === "en" ? "/models" : null);
     assert.equal(localeRedirectTarget(`/${locale}/aria-lune-v3/videos`, "en", "fr"), "/aria-lune-v3/videos");
@@ -40,9 +42,9 @@ test("public URLs localize only discoveries while private renderer addresses rem
   }
 });
 
-test("seven-language discovery dispatch remains available behind internal renderers with functional English fallback", async () => {
+test("twelve-language discovery dispatch remains available behind internal renderers with functional English fallback", async () => {
   const { DISCOVERY_ROUTE_PATHS, LOCALIZED_ROUTE_PATHS, resolveLocalizedPage, supportedLocaleForPath } = await loadConfig();
-  for (const locale of ["es", "de", "it", "pt", "nl"] as const) {
+  for (const locale of ACTIVE_LOCALES.filter(locale => locale !== "en" && locale !== "fr")) {
     for (const pathname of DISCOVERY_ROUTE_PATHS) {
       assert.equal(supportedLocaleForPath(locale, pathname), locale);
       assert.deepEqual(resolveLocalizedPage(locale, pathname), { kind: "static", pathname });
@@ -68,7 +70,7 @@ test("each new locale wrapper forwards the exact catch-all path and locale", asy
     }) => Promise<{ title: string }>;
   };
 
-  for (const locale of ["es", "de", "it", "pt", "nl"] as const) {
+  for (const locale of ACTIVE_LOCALES.filter(locale => locale !== "en" && locale !== "fr")) {
     const route = loadAppModule<Route>(
       `src/app/(${locale})/${locale}/[[...path]]/page.tsx`,
       {

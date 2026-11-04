@@ -1,3 +1,5 @@
+// @ts-expect-error Native Node requires explicit suffixes.
+import { LOCALES as ACTIVE_LOCALES } from "../src/lib/i18n/config.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { NextRequest } from "next/server.js";
@@ -261,11 +263,11 @@ test("a late response for the previous photo cannot replace the current comments
   assert.doesNotMatch(html, /Stale photo comment/);
 });
 
-test("comment loading, empty and signed-in form labels follow all seven active locales", async (t) => {
+test("comment loading, empty and signed-in form labels follow all twelve active locales", async (t) => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () => Response.json({ items: [] });
   t.after(() => { globalThis.fetch = originalFetch; });
-  for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"] as const) {
+  for (const locale of ACTIVE_LOCALES) {
     const copy = getDictionary(locale).comments;
     const view = commentsView(locale);
     t.after(() => view.cleanup());

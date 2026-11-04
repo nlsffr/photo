@@ -65,7 +65,7 @@ type Search = Record<string, string>;
 type Route = { metadata?: Metadata; generateMetadata?: (props: { searchParams: Promise<Search> }) => Promise<Metadata> };
 type Localized = { localizedPageMetadata(locale: SeoLocale, path: string, search: Promise<Search>): Promise<Metadata> };
 
-test("all six bare and seven-language discovery routes apply saved text without changing routing or indexing", async () => {
+test("all six bare and twelve-language discovery routes apply saved text without changing routing or indexing", async () => {
   let override: SeoEditorEntry | null = null;
   const reads: Array<[SeoLocale, SeoPageKey]> = [];
   const replacements: Record<string, unknown> = {

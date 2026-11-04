@@ -1,3 +1,5 @@
+// @ts-expect-error Native Node requires explicit suffixes.
+import { LOCALES as ACTIVE_LOCALES } from "../src/lib/i18n/config.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -23,7 +25,7 @@ test("discovery metadata has a self canonical and reciprocal language URLs", asy
     description: "Parcourir les créateurs",
   });
 
-  const languages = { en: "/models", fr: "/fr/models", es: "/es/models", de: "/de/models", it: "/it/models", pt: "/pt/models", nl: "/nl/models", "x-default": "/models" };
+  const languages = { ...Object.fromEntries(ACTIVE_LOCALES.map(locale => [locale, `${locale === "en" ? "" : `/${locale}`}/models`])), "x-default": "/models" };
   assert.deepEqual(english.alternates, { canonical: "/models", languages });
   assert.deepEqual(french.alternates, { canonical: "/fr/models", languages });
   assert.equal(english.openGraph?.url, "/models");
@@ -40,8 +42,8 @@ test("all discovery languages have stable canonicals without changing localized 
     ["/most-liked", "mostLiked"], ["/classements", "rankings"],
     ["/influenceuses-tendances", "influencers"],
   ] as const;
-  const ogLocales = { es: "es_ES", de: "de_DE", it: "it_IT", pt: "pt_PT", nl: "nl_NL" };
-  for (const locale of ["es", "de", "it", "pt", "nl"] as const) {
+  const ogLocales = { es: "es_ES", de: "de_DE", it: "it_IT", pt: "pt_PT", nl: "nl_NL", ru: "ru_RU", zh: "zh_CN", ja: "ja_JP", hi: "hi_IN", th: "th_TH" };
+  for (const locale of ACTIVE_LOCALES.filter(locale => locale !== "en" && locale !== "fr")) {
     for (const [path, key] of pages) {
       const copy = getDictionary(locale).pages[key].meta;
       const metadata = buildLocalizedMetadata(locale, path, copy);
@@ -49,10 +51,10 @@ test("all discovery languages have stable canonicals without changing localized 
       assert.equal(metadata.alternates?.canonical, canonical);
       assert.equal(metadata.alternates?.languages?.[locale], canonical);
       assert.equal(metadata.alternates?.languages?.["x-default"], path);
-      assert.equal(Object.keys(metadata.alternates?.languages ?? {}).length, 8);
+      assert.equal(Object.keys(metadata.alternates?.languages ?? {}).length, 13);
       assert.equal(metadata.openGraph?.url, canonical);
       assert.equal(metadata.openGraph?.locale, ogLocales[locale]);
-      assert.equal(metadata.openGraph?.alternateLocale?.length, 6);
+      assert.equal(metadata.openGraph?.alternateLocale?.length, 11);
       assert.notEqual(copy.description, getDictionary("en").pages[key].meta.description);
     }
   }
@@ -100,7 +102,7 @@ test("creator metadata preserves collection, version and numbered page on the si
 
 test("retired media prefixes never escape into a canonical, including the media version", async () => {
   const { mediaPageAlternates } = await loadMetadata();
-  for (const locale of ["en", "fr", "es", "de", "it", "pt", "nl"] as const) {
+  for (const locale of ACTIVE_LOCALES) {
     assert.deepEqual(mediaPageAlternates(`/${locale}/aria/123-v4`, locale), { canonical: "/aria/123-v4" });
   }
 });

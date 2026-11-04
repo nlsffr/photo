@@ -1,3 +1,5 @@
+// @ts-expect-error Native Node requires explicit suffixes.
+import { LOCALES as ACTIVE_LOCALES } from "../src/lib/i18n/config.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -6,7 +8,7 @@ async function config() {
   return import("../src/lib/i18n/config.ts");
 }
 
-test("all seven content locales dispatch creators, collections and media without expanding functional pages", async () => {
+test("all twelve content locales dispatch creators, collections and media without expanding functional pages", async () => {
   const { LOCALES, resolveLocalizedPage, localesForPath } = await config();
   for (const locale of LOCALES) {
     assert.deepEqual(resolveLocalizedPage(locale, "/aria-lune-v3"), { kind: "creator", handle: "aria-lune-v3", collection: "overview" });
@@ -16,7 +18,7 @@ test("all seven content locales dispatch creators, collections and media without
     assert.deepEqual(resolveLocalizedPage(locale, "/aria-lune-v999/123-v2"), { kind: "media", handle: "aria-lune-v999", id: "123-v2" });
     assert.deepEqual(localesForPath("/aria-lune/123-v2"), LOCALES);
   }
-  for (const locale of ["es", "de", "it", "pt", "nl"] as const) {
+  for (const locale of ACTIVE_LOCALES.filter(locale => locale !== "en" && locale !== "fr")) {
     assert.equal(resolveLocalizedPage(locale, "/about"), null);
     assert.equal(resolveLocalizedPage(locale, "/contact/support"), null);
     assert.deepEqual(localesForPath("/contact/support"), ["en", "fr"]);

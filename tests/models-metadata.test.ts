@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+// @ts-expect-error Native Node requires explicit suffixes.
+import { LOCALES as ACTIVE_LOCALES } from "../src/lib/i18n/config.ts";
 import { isValidElement, type ReactElement } from "react";
 import type { Metadata } from "next";
 // @ts-expect-error Native Node requires the explicit suffix.
@@ -60,7 +62,7 @@ const requests: { search: Search; suffix: string; sort: string; offset: number }
 test("models canonical and Open Graph keep the numbered public URL in all rendered languages", async () => {
   const { models, localized } = routes();
   for (const { search, suffix } of requests) {
-    for (const locale of ["", "en", "fr", "es", "de", "it", "pt", "nl"] as const) {
+    for (const locale of ["", ...ACTIVE_LOCALES] as const) {
       const base = `${locale && locale !== "en" ? `/${locale}` : ""}/models`;
       const metadata = locale
         ? await localized.localizedPageMetadata(locale, "/models", Promise.resolve(search))
@@ -68,7 +70,7 @@ test("models canonical and Open Graph keep the numbered public URL in all render
       assert.equal(metadata.alternates?.canonical, `${base}${suffix}`, `${locale || "default"}: ${JSON.stringify(search)}`);
       assert.equal(metadata.alternates?.languages?.[locale || "en"], `${base}${suffix}`);
       assert.equal(metadata.alternates?.languages?.["x-default"], `/models${suffix}`);
-      assert.equal(Object.keys(metadata.alternates?.languages ?? {}).length, 8);
+      assert.equal(Object.keys(metadata.alternates?.languages ?? {}).length, 13);
       assert.equal(new URL(String(metadata.openGraph?.url), "https://leakfanhub.com").href, `https://leakfanhub.com${base}${suffix}`);
     }
   }
@@ -77,7 +79,7 @@ test("models canonical and Open Graph keep the numbered public URL in all render
 test("models rendering uses the same normalized page as its metadata and collection JSON-LD", async () => {
   const { reads, models, localized } = routes();
   for (const { search, suffix, sort, offset } of requests) {
-    for (const locale of ["", "en", "fr", "es", "de", "it", "pt", "nl"] as const) {
+    for (const locale of ["", ...ACTIVE_LOCALES] as const) {
       reads.length = 0;
       let tree = locale
         ? await localized.LocalizedPage({ locale, pathname: "/models", searchParams: Promise.resolve(search) })
