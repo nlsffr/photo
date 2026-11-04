@@ -144,7 +144,7 @@ export function VideoPrerollAd({controller, shell, onFinish}: {
 
   if (!attempt || !eligible || path !== attempt.path || ads.runtime?.revision !== attempt.revision) return null;
   const query = new URLSearchParams({nonce:attempt.nonce, path:attempt.path, locale:attempt.locale, device:attempt.device});
-  return <div className="absolute inset-0 z-20 bg-black" data-video-preroll>
+  return <div className="absolute inset-0 z-[46] bg-black" data-video-preroll>
     <iframe ref={frame} src={`/api/ads/preroll?${query}`} title={adsCopy[attempt.locale].label} loading="eager"
       allow="autoplay" sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
       referrerPolicy="no-referrer" className="block h-full w-full border-0"
