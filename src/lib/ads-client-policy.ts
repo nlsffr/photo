@@ -9,7 +9,7 @@ export function parseBrowserAdConsent(cookieHeader: string): AdConsent {
   return parseAdConsent(value);
 }
 
-const PRIVATE_ROUTES = new Set(["admin", "api", "_next", "connexion", "inscription", "premium", "add", "account", "profil", "favoris", "abonnements", "contact", "confidentialite", "conditions", "mentions-legales", "dmca", "trust-and-safety", "welcome"]);
+const PRIVATE_ROUTES = new Set(["admin", "api", "_next", "connexion", "inscription", "premium", "add", "account", "profil", "identite", "favoris", "abonnements", "contact", "confidentialite", "conditions", "mentions-legales", "dmca", "trust-and-safety", "welcome"]);
 
 export function isAdPagePath(pathname: string): boolean {
   const parts = pathname.split(/[?#]/)[0].split("/").filter(Boolean);

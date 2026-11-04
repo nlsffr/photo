@@ -4,6 +4,8 @@ import test from 'node:test';
 import { canServeAds, isAdPagePath, isFeedAdPosition, parseAdsRuntime, parseBrowserAdConsent } from '../src/lib/ads-client-policy.ts';
 // @ts-expect-error Native Node requires explicit suffixes.
 import { emptyAdPlacements } from '../src/lib/ads-contract.ts';
+// @ts-expect-error Native Node requires explicit suffixes.
+import { LOCALES } from '../src/lib/i18n/config.ts';
 const runtime = { enabled: true, effectiveEnabled: true, revision: 1, needsConsent: false, consent: 'accepted', placements: {...emptyAdPlacements(), header: true}, reason: 'eligible' } as const;
 
 test('advertising is closed until every current eligibility check succeeds', () => {
@@ -18,6 +20,7 @@ test('malformed or partial runtime never enables any placement', () => {
   for(const profile of ['current','balanced','intensive'])assert.equal(parseAdsRuntime({...runtime,profile})?.profile,profile);
 });
 test('functional and private routes cannot load advertising even under language prefixes', () => {
+  for (const prefix of ['',...LOCALES.map(locale=>'/'+locale)]) assert.equal(isAdPagePath(prefix+'/identite'),false);
   for (const p of ['/admin/ads','/fr/premium','/connexion','/api/ads/runtime','/confidentialite','/contact/support','/dmca','/inscription','/add','/mentions-legales']) assert.equal(isAdPagePath(p),false,p);
   for (const p of ['/','/fr/models','/feed','/creator/123','/creator/videos']) assert.equal(isAdPagePath(p),true,p);
 });
