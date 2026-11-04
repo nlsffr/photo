@@ -92,9 +92,9 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       { source: "/:path*", headers: commonSecurityHeaders },
-      // This exact HTTP advertising document supplies its own hashed CSP and
+      // These exact HTTP advertising documents supply their own hashed CSP and
       // SAMEORIGIN policy. All other paths keep the restrictive document policy.
-      { source: "/:path((?!api/ads/embed/?$).*)", headers: documentPolicyHeaders },
+      { source: "/:path((?!api/ads/(?:embed|exoclick)/?$).*)", headers: documentPolicyHeaders },
       { source: "/_next/static/:path*", headers: staticCacheHeaders },
       { source: "/favicon.svg", headers: staticCacheHeaders },
       { source: "/icon", headers: mediaCacheHeaders },

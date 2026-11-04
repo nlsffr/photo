@@ -35,6 +35,17 @@ function allowedOrigin(url: URL): boolean {
   return !url.username && !url.password && (url.origin === "https://leakfanhub.com"
     || (url.protocol === "http:" && ["127.0.0.1", "localhost"].includes(url.hostname)));
 }
+function parentOrigin(request: Request, url: URL): string | null {
+  if (!["http:", "https:"].includes(url.protocol)) return null;
+  // Next can expose an internal localhost URL behind Nginx. Only our fixed
+  // public Host or an exact local QA host may select the document's parent.
+  const host = request.headers.get("host");
+  if (host === null) return allowedOrigin(url) ? url.origin : null;
+  if (["leakfanhub.com", "leakfanhub.com:443"].includes(host.toLowerCase())) return "https://leakfanhub.com";
+  if (url.protocol !== "http:" || !["127.0.0.1", "localhost"].includes(url.hostname)
+    || !/^(?:127\.0\.0\.1|localhost)(?::[0-9]{1,5})?$/.test(host)) return null;
+  try { const local = new URL("http://" + host); return allowedOrigin(local) ? local.origin : null; } catch { return null; }
+}
 function validPath(path: string, locale: Locale, placement: string, context: AdSlotContext): boolean {
   if (!path.startsWith("/") || path.startsWith("//") || path.length > 1024 || /[\u0000-\u0020\u007f?#\\]/.test(path)
     || /%(?:2f|5c)/i.test(path) || new URL(path, "https://leakfanhub.com").pathname !== path) return false;
@@ -51,8 +62,9 @@ function validPath(path: string, locale: Locale, placement: string, context: AdS
 /** Own registry only. All creative/VAST requests happen later inside the gated document. */
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  if (!allowedOrigin(url) || ["cross-site", "same-site"].includes(request.headers.get("sec-fetch-site") ?? "")
-    || (request.headers.has("origin") && request.headers.get("origin") !== url.origin)) return deny(403);
+  const origin = parentOrigin(request, url);
+  if (!origin || ["cross-site", "same-site"].includes(request.headers.get("sec-fetch-site") ?? "")
+    || (request.headers.has("origin") && request.headers.get("origin") !== origin)) return deny(403);
   const pairs = [...url.searchParams], values = Object.fromEntries(pairs);
   if (url.hash || url.search.length > 4096 || new Set(pairs.map(([key]) => key)).size !== pairs.length
     || REQUIRED.some(key => !(key in values)) || pairs.some(([key]) => ![...REQUIRED, "ordinal"].includes(key))
@@ -73,7 +85,7 @@ export async function GET(request: Request) {
     const spot = getExoclickSpot(placement, device, context);
     if (!spot) return deny(503);
     const copy = adsCopy[values.locale], cta = labels[values.locale];
-    const common = { placement, nonce: values.nonce, parentOrigin: url.origin, consentValue: "v2:accepted" as const };
+    const common = { placement, nonce: values.nonce, parentOrigin: origin, consentValue: "v2:accepted" as const };
     const document = spot.kind === "banner"
       ? buildExoclickBannerDocument({ ...common, placement: placement as "header" | "footer" | "underVideo", spot,
         labels: { advertisement: copy.label, unavailable: cta.unavailable } })

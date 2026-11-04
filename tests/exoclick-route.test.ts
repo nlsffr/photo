@@ -79,6 +79,14 @@ test("foreign origins and cross-site embedders fail closed while exact local QA 
   for (const origin of ["http://127.0.0.1:3028", "http://localhost:3028"]) assert.equal((await setup().route.GET(request({}, {}, origin))).status, 200);
 });
 
+test('the actual Host selects the fixed parent origin behind Next internal URLs without trusting arbitrary hosts',async()=>{
+  const local=await setup().route.GET(request({}, {host:'127.0.0.1:3029'}, 'http://localhost:3029'));
+  assert.equal(local.status,200);assert.match(await local.text(),/"parentOrigin":"http:\/\/127.0.0.1:3029"/);
+  const production=await setup().route.GET(request({}, {host:'leakfanhub.com'}, 'http://localhost:3000'));
+  assert.equal(production.status,200);assert.match(await production.text(),/"parentOrigin":"https:\/\/leakfanhub.com"/);
+  for(const host of ['attacker.test','leakfanhub.com.attacker.test','user@leakfanhub.com','leakfanhub.com/path','leakfanhub.com:444'])assert.equal((await setup().route.GET(request({}, {host}))).status,403,host);
+});
+
 test("missing registry readiness and backend exceptions disclose no internal error or vendor document", async () => {
   for (const options of [{ missingSpot: true }, { unavailable: true }]) {
     const response = await setup(options).route.GET(request()); assert.equal(response.status, 503); assert.equal(await response.text(), "");
