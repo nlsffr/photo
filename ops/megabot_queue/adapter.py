@@ -23,6 +23,10 @@ class RetryableError(RuntimeError):
     """No checkpoint was advanced for the failed page."""
 
 
+class MediaLockBusy(RetryableError):
+    """A stripe is busy and this profile should retry its current page."""
+
+
 class MissingMedia(RuntimeError):
     """The details endpoint confirms absence; skip only this refresh pass."""
 
@@ -110,14 +114,17 @@ def load_source(path):
 
 @contextmanager
 def media_lock(directory, source_id):
-    """Shared fixed-size lock set: equal source IDs always use the same lock."""
+    """Try the existing shared stripe without waiting behind another transfer."""
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
     stripe = int.from_bytes(hashlib.sha256(source_id.encode()).digest()[:2], "big") % 64
     flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
     fd = os.open(directory / f"media-{stripe:02d}.lock", flags, 0o600)
     try:
-        fcntl.flock(fd, fcntl.LOCK_EX)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise MediaLockBusy("media_lock_busy") from None
         yield
     finally:
         os.close(fd)
@@ -391,8 +398,14 @@ def run_profile(handle, next_page=1, empty_streak=0, checkpoint=None, *,
             bot.db.eligible_id()
             posts = bot.fetch_profile_page(handle, next_page)
             if posts:
+                busy = False
                 for post in posts:
-                    bot.process_post(post)
+                    try:
+                        bot.process_post(post)
+                    except MediaLockBusy:
+                        busy = True
+                if busy:
+                    raise MediaLockBusy("media_lock_busy")
                 empty_streak = 0
             else:
                 empty_streak += 1

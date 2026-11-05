@@ -375,6 +375,27 @@ class SupervisorTests(unittest.TestCase):
                        'url': 'https://host/PRIVATE_SENTINEL'})
         self.assertEqual(s.read_result(self.config, owner), {'status': 'retry'})
 
+    def test_busy_stripe_is_a_local_retry_with_either_parent_allowlist(self):
+        (self.state / 'results').mkdir(parents=True)
+        for recognizes_reason in (False, True):
+            with self.subTest(recognizes_reason=recognizes_reason):
+                queue = Queue(self.root / f'busy-{recognizes_reason}.sqlite3')
+                queue.seed(['a', 'b'], 1)
+                owner = str(uuid.uuid4())
+                handle = queue.claim(owner, 1)['handle']
+                queue.checkpoint(handle, owner, 7, 1)
+                s.atomic_json(s.result_path(self.config, owner), {'status': 'retry', 'reason': 'media_lock_busy'})
+                reasons = s.REASONS if recognizes_reason else s.REASONS - {'media_lock_busy'}
+                with patch.object(s, 'REASONS', reasons):
+                    result = s.read_result(self.config, owner)
+                self.assertEqual(result.get('reason'), 'media_lock_busy' if recognizes_reason else None)
+                self.assertNotIn(result.get('reason'), s.NETWORK_FAILURES)
+                s.finish_job(queue, {'handle': handle, 'owner': owner}, result, 2)
+                self.assertNotEqual(queue.claim('unaffected', 2)['handle'], handle)
+                self.assertIsNone(queue.claim('too-early', 3))
+                retried = queue.claim('replacement', 4000)
+                self.assertEqual((retried['handle'], retried['next_page'], retried['empty_streak']), (handle, 7, 1))
+
 
 if __name__ == '__main__':
     unittest.main()

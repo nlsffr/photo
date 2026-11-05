@@ -48,7 +48,7 @@ REASONS = frozenset('''source_unavailable request_or_json_failed invalid_details
 invalid_profile_page ambiguous_profile_page unexpected_profile database_transaction_lost
 pagination_limit invalid_media_id media_processing_failed profile_execution_failed
 profile_excluded profile_changed storage_limit_reached source_changed unexpected_error
-retryable_error missing_result process_exit'''.split())
+retryable_error missing_result process_exit media_lock_busy'''.split())
 NETWORK_FAILURES = frozenset(('request_or_json_failed', 'http_429', 'http_500',
                               'http_502', 'http_503', 'http_504'))
 

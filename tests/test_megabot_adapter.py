@@ -1,7 +1,8 @@
+import fcntl
+import hashlib
 import multiprocessing
 from contextlib import contextmanager
 from pathlib import Path
-import queue
 import tempfile
 from types import SimpleNamespace
 import unittest
@@ -10,11 +11,12 @@ from unittest.mock import Mock, patch
 from ops.megabot_queue import adapter
 
 
-def _lock_process(directory, entered, attempting, release):
-    attempting.set()
-    with adapter.media_lock(directory, "same-id"):
-        entered.put(True)
-        release.wait(5)
+def _legacy_lock_process(directory, acquired, release):
+    stripe = int.from_bytes(hashlib.sha256(b"same-id").digest()[:2], "big") % 64
+    with (Path(directory) / f"media-{stripe:02d}.lock").open("a+b") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        acquired.set()
+        release.wait(15)
 
 
 def source_fixture(pages=None, details=None, *, active=True, stored=0, fail_media=False, remove_before_publish=False,
@@ -369,6 +371,33 @@ class AdapterTest(unittest.TestCase):
         self.assertEqual(state.checkpoints, [(2, 0)])
         self.assertEqual(state.inserted, {'1'})
 
+    def test_busy_stripe_keeps_page_pending_and_processes_other_posts(self):
+        source, state = source_fixture({
+            1: [{'id': '1', 'handle': 'allowed'}],
+            2: [{'id': '2', 'handle': 'allowed'}, {'id': '3', 'handle': 'allowed'}],
+        })
+        real_lock = adapter.media_lock
+
+        @contextmanager
+        def contended_lock(directory, source_id):
+            if source_id == '2':
+                raise adapter.MediaLockBusy('media_lock_busy')
+            with real_lock(directory, source_id):
+                yield
+
+        with patch.object(adapter, 'media_lock', new=contended_lock):
+            with self.assertRaisesRegex(adapter.MediaLockBusy, 'media_lock_busy'):
+                self.run_fixture(source, state, max_pages=2)
+        self.assertEqual(state.checkpoints, [(2, 0)])
+        self.assertEqual(state.inserted, {'1', '3'})
+        self.assertFalse(any(url.endswith('/media/2') for url in state.requests))
+
+        result = self.run_fixture(source, state, next_page=2, max_pages=1)
+        self.assertEqual(result['new'], 1)
+        self.assertEqual(state.inserted, {'1', '2', '3'})
+        self.assertEqual(state.checkpoints, [(2, 0), (3, 0)])
+        self.assertEqual(sum(url.endswith('/media/3') for url in state.requests), 1)
+
     def test_conflicting_arrays_are_not_misreported_as_empty(self):
         source, state = source_fixture({1: {'medias': [], 'posts': [{'id': '1', 'handle': 'allowed'}]}})
         with self.assertRaisesRegex(adapter.RetryableError, 'ambiguous_profile_page'):
@@ -410,32 +439,28 @@ class AdapterTest(unittest.TestCase):
         self.assertEqual(state.commits, 0)
         self.assertEqual(original._ensure, ensure)
 
-    def test_two_processes_cannot_process_same_media_concurrently(self):
+    def test_new_worker_retries_busy_legacy_stripe_then_acquires_it(self):
         context = multiprocessing.get_context('spawn')
-        entered = [context.Queue(), context.Queue()]
-        attempting = [context.Event(), context.Event()]
-        release = [context.Event(), context.Event()]
-        children = [context.Process(target=_lock_process, args=(self.directory.name, entered[i], attempting[i], release[i])) for i in range(2)]
+        acquired, release = context.Event(), context.Event()
+        holder = context.Process(target=_legacy_lock_process, args=(self.directory.name, acquired, release))
+        holder.start()
         try:
-            children[0].start()
-            self.assertTrue(entered[0].get(timeout=5))
-            children[1].start()
-            self.assertTrue(attempting[1].wait(5))
-            with self.assertRaises(queue.Empty):
-                entered[1].get(timeout=.2)
-            release[0].set()
-            self.assertTrue(entered[1].get(timeout=5))
-            release[1].set()
-            for child in children:
-                child.join(5)
-                self.assertEqual(child.exitcode, 0)
+            self.assertTrue(acquired.wait(5))
+            with self.assertRaisesRegex(adapter.MediaLockBusy, 'media_lock_busy'):
+                with adapter.media_lock(self.directory.name, 'same-id'):
+                    self.fail('entered the held legacy stripe')
+            self.assertTrue(holder.is_alive())
+            with adapter.media_lock(self.directory.name, 'different-id'):
+                pass
+            release.set()
+            holder.join(5)
+            self.assertEqual(holder.exitcode, 0)
+            with adapter.media_lock(self.directory.name, 'same-id'):
+                pass
         finally:
-            for child in children:
-                if child.is_alive():
-                    child.terminate()
-                    child.join(5)
-            for result in entered:
-                result.close()
+            if holder.is_alive():
+                holder.terminate()
+                holder.join(5)
 
 
 if __name__ == '__main__':
