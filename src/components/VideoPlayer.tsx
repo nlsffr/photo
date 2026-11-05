@@ -5,7 +5,7 @@ import { formatCount, formatDuration } from "@/lib/format";
 import { mediaThumbnailUrl } from "@/lib/media-sources";
 import { useLocale } from "./LocaleProvider";
 import { VideoPauseAd } from "./VideoPauseAd";
-import { VideoPrerollAd, type VideoPrerollControl, type VideoAdMode } from "./VideoPrerollAd";
+import { VideoPrerollAd, type VideoPrerollControl } from "./VideoPrerollAd";
 
 interface Props {
   src: string;
@@ -16,7 +16,7 @@ interface Props {
   width?: number;
   height?: number;
   autoPlay?: boolean;
-  /** Explicit media-page opt-in; autoplay previews never run pre/postroll. */
+  /** Explicit media-page opt-in; autoplay previews never run a preroll. */
   preroll?: boolean;
   muted?: boolean;
   className?: string;
@@ -57,12 +57,6 @@ function VideoPlayerSource({
   const playRequest = useRef(0);
   const prerollControl = useRef<VideoPrerollControl | null>(null);
   const playIntent = useRef(false);
-  const adActive = useRef(false);
-  const pendingMode = useRef<VideoAdMode | null>(null);
-  const contentPlayed = useRef(false);
-  const userActivated = useRef(false);
-  const postAttempted = useRef(false);
-  const playbackPending = useRef(false);
   const pendingReload = useRef(false);
   const pendingVideo = useRef<HTMLVideoElement | null>(null);
   const [prerollActive, setPrerollActive] = useState(false);
@@ -81,7 +75,6 @@ function VideoPlayerSource({
 
   const playFailed = useCallback((reason: unknown, request: number, video: HTMLVideoElement) => {
     if (request !== playRequest.current || videoRef.current !== video) return;
-    playbackPending.current = false;
     setPlaying(false);
     setBuffering(false);
     const name = reason && typeof reason === "object" && "name" in reason ? reason.name : "";
@@ -93,7 +86,6 @@ function VideoPlayerSource({
     const video = videoRef.current;
     if (!video) return;
     const request = ++playRequest.current;
-    playbackPending.current = true;
     setError(false);
     setBuffering(true);
     if (reload) {
@@ -102,47 +94,36 @@ function VideoPlayerSource({
       video.load();
     }
     void video.play().then(() => {
-      if (request !== playRequest.current || videoRef.current !== video) return;
-      playbackPending.current = false;
-      if (!video.paused) setPlaying(true);
+      if (request !== playRequest.current || videoRef.current !== video || video.paused) return;
+      setPlaying(true);
     }).catch((reason: unknown) => playFailed(reason, request, video));
   }, [playFailed]);
 
   const requestPlayback = useCallback((reload = false) => {
     if (!videoRef.current) return;
-    userActivated.current = true;
     pendingVideo.current = videoRef.current;
-    pendingMode.current = "preroll";
     playIntent.current = true;
     pendingReload.current = reload;
-    if (preroll && !autoPlay && prerollControl.current?.request("preroll")) {
-      adActive.current = true;
+    if (preroll && !autoPlay && prerollControl.current?.request()) {
       setPrerollActive(true);
       return;
     }
     playIntent.current = false;
-    pendingMode.current = null;
     // A popunder may hide this tab during the same Play gesture.
     if (!(preroll && !autoPlay && document.hidden)) startPlayback(reload);
     pendingVideo.current = null;
   }, [preroll, autoPlay, startPlayback]);
 
-  const finishPreroll = useCallback((resume: boolean, mode: VideoAdMode = "preroll") => {
-    if (pendingMode.current !== mode) return;
-    adActive.current = false;
-    pendingMode.current = null;
+  const finishPreroll = useCallback((resume: boolean) => {
     setPrerollActive(false);
     if (!playIntent.current) return;
     playIntent.current = false;
-    if (resume && !document.hidden && videoRef.current === pendingVideo.current
-      && !(mode === "postroll" && videoRef.current?.ended)) startPlayback(pendingReload.current);
+    if (resume && !document.hidden && videoRef.current === pendingVideo.current) startPlayback(pendingReload.current);
     pendingVideo.current = null;
   }, [startPlayback]);
 
   const cancelPreroll = useCallback(() => {
     playIntent.current = false;
-    adActive.current = false;
-    pendingMode.current = null;
     pendingVideo.current = null;
     prerollControl.current?.cancel();
     setPrerollActive(false);
@@ -159,7 +140,6 @@ function VideoPlayerSource({
       requestPlayback();
     } else {
       playRequest.current += 1;
-      playbackPending.current = false;
       v.pause();
       setPlaying(false);
       setBuffering(false);
@@ -189,24 +169,7 @@ function VideoPlayerSource({
     if (!v || !v.duration) return;
     setCurrent(v.currentTime);
     setProgress((v.currentTime / v.duration) * 100);
-    // Only decoded user playback can reach the postroll; seek/pause/preview events cannot arm it.
-    if (!preroll || autoPlay || !userActivated.current || !contentPlayed.current || postAttempted.current
-      || adActive.current || playbackPending.current || v.paused || v.ended || v.seeking || v.error
-      || document.hidden || !Number.isFinite(v.duration) || v.duration < 10 || v.currentTime < v.duration - .6) return;
-    postAttempted.current = true;
-    if (!prerollControl.current?.request("postroll")) return;
-    pendingVideo.current = v;
-    pendingMode.current = "postroll";
-    pendingReload.current = false;
-    playIntent.current = true;
-    adActive.current = true;
-    setPrerollActive(true);
-    playRequest.current += 1;
-    playbackPending.current = false;
-    v.pause();
-    setPlaying(false);
-    setBuffering(false);
-  }, [preroll, autoPlay]);
+  }, []);
 
   const seek = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const v = videoRef.current;
@@ -271,7 +234,7 @@ function VideoPlayerSource({
       const request = ++playRequest.current;
       void v.play().catch((reason: unknown) => playFailed(reason, request, v));
     }
-    return () => { playRequest.current += 1; playIntent.current = false; pendingMode.current = null; adActive.current = false; };
+    return () => { playRequest.current += 1; playIntent.current = false; };
   }, [autoPlay, playFailed]);
 
   const aspectStyle = { aspectRatio: String(ratio), maxHeight: "85vh" };
@@ -295,16 +258,12 @@ function VideoPlayerSource({
         onStalled={() => setBuffering(true)}
         onPlaying={(event) => {
           if (event.currentTarget.paused) return;
-          contentPlayed.current = true;
-          playbackPending.current = false;
           setBuffering(false);
           setError(false);
           setPlaying(true);
         }}
         onCanPlay={() => setBuffering(false)}
         onError={() => {
-          contentPlayed.current = false;
-          playbackPending.current = false;
           cancelPreroll();
           playRequest.current += 1;
           setError(true);
@@ -321,10 +280,6 @@ function VideoPlayerSource({
         }}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
-        onEnded={() => {
-          if (adActive.current) cancelPreroll();
-          setPlaying(false);
-        }}
         onClick={togglePlay}
         className="absolute inset-0 h-full w-full object-contain"
       />

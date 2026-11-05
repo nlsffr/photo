@@ -8,13 +8,14 @@ import {buildExoclickVastDocument} from "@/lib/exoclick-vast";
 import {exoclickCopy} from "@/lib/exoclick-copy";
 import {adsCopy} from "@/lib/ads-copy";
 import {isLocale} from "@/lib/i18n/config";
+import {buildRetiredPostrollDocument} from "@/lib/ads-retired-postroll";
 
 const headers={"Cache-Control":"private, no-store","Vary":"Cookie","X-Robots-Tag":"noindex, nofollow",
   "X-Content-Type-Options":"nosniff","X-Frame-Options":"SAMEORIGIN","Referrer-Policy":"no-referrer"};
 const deny=(status:number)=>new Response("",{status,headers});
 const REQUIRED=["nonce","path","locale","device"];
 
-/** This serves a gated document; all VAST and creative requests remain in the browser. */
+/** Preroll remains gated. Retired postroll only releases an old page's controller. */
 export async function serveVideoRoll(request:Request,mode:"preroll"|"postroll") {
   const url=new URL(request.url),origin=adsDocumentParentOrigin(request,url);
   if(!origin||request.headers.get("sec-fetch-site")!=="same-origin"
@@ -24,6 +25,11 @@ export async function serveVideoRoll(request:Request,mode:"preroll"|"postroll") 
     ||REQUIRED.some(key=>!(key in values))||pairs.some(([key])=>!REQUIRED.includes(key))
     ||!isLocale(values.locale)||!["desktop","mobile"].includes(values.device)||!/^[A-Za-z0-9_-]{1,100}$/.test(values.nonce)
     ||page?.kind!=="media")return deny(400);
+  if(mode==="postroll") {
+    const document=buildRetiredPostrollDocument(values.nonce,origin);
+    return new Response(document.html,{headers:{...headers,"Content-Type":"text/html; charset=utf-8",
+      "Content-Security-Policy":document.csp,"X-LFH-Ad-Retired":"postroll"}});
+  }
   try {
     const jar=await cookies();
     if(parseAdConsent(jar.get(AD_CONSENT_COOKIE)?.value)!=="accepted")return deny(403);

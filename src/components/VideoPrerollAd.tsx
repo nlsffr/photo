@@ -7,23 +7,21 @@ import type {Locale} from "@/lib/i18n/config";
 import {useAds} from "./AdsProvider";
 import {useLocale} from "./LocaleProvider";
 
-export type VideoAdMode = "preroll" | "postroll";
-export type VideoPrerollControl = {request: (mode?: VideoAdMode) => boolean; cancel: () => void};
-type Attempt = {mode: VideoAdMode; nonce: string; revision: number; path: string; locale: Locale; device: "mobile" | "desktop"};
+export type VideoPrerollControl = {request: () => boolean; cancel: () => void};
+type Attempt = {nonce: string; revision: number; path: string; locale: Locale; device: "mobile" | "desktop"};
 
-/** Only the media-page player mounts this controller. Both modes require the first user Play before making a request. */
+/** Only the media-page player mounts this controller. It makes no request before user Play. */
 export function VideoPrerollAd({controller, shell, onFinish}: {
   controller: RefObject<VideoPrerollControl | null>;
   shell: RefObject<HTMLElement | null>;
-  onFinish: (resume: boolean, mode: VideoAdMode) => void;
+  onFinish: (resume: boolean) => void;
 }) {
   const ads = useAds();
   const {locale} = useLocale();
   const path = usePathname();
   const id = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   const frame = useRef<HTMLIFrameElement | null>(null);
-  const attempted = useRef({preroll:false, postroll:false});
-  const activated = useRef(false);
+  const attempted = useRef(false);
   const active = useRef<Attempt | null>(null);
   const live = useRef(false);
   const deadline = useRef<number | undefined>(undefined);
@@ -45,30 +43,28 @@ export function VideoPrerollAd({controller, shell, onFinish}: {
     return current.ads.runtime?.profile === "intensive" && current.ads.runtime.revision === value.revision
       && current.path === value.path && current.ads.canServe("underVideo");
   }, []);
-  const finish = useCallback((resume: boolean, expected?: Attempt) => {
+  const finish = useCallback((resume: boolean) => {
     const current = active.current;
-    if (!current || (expected && current !== expected)) return;
+    if (!current) return;
     active.current = null;
     window.clearTimeout(deadline.current);
     deadline.current = undefined;
     // Stop the child before removing it; no terminal can resume twice.
-    frame.current?.contentWindow?.postMessage({type:"lfh-ad-visibility", placement:"underVideo", context:current.mode,
+    frame.current?.contentWindow?.postMessage({type:"lfh-ad-visibility", placement:"underVideo", context:"preroll",
       nonce:current.nonce, activated:true, visible:false}, location.origin);
     if (!live.current) return;
     setAttempt(null);
-    latest.current.onFinish(resume && permitted(current) && visible(), current.mode);
+    latest.current.onFinish(resume && permitted(current) && visible());
   }, [permitted, visible]);
 
   useImperativeHandle(controller, () => ({
-    request(mode = "preroll") {
-      if (!live.current || (mode === "postroll" && !activated.current)) return false;
-      if (active.current) return active.current.mode === mode;
-      if (attempted.current[mode]) return false;
-      attempted.current[mode] = true;
-      if (mode === "preroll") activated.current = true;
+    request() {
+      if (active.current) return true;
+      if (attempted.current || !live.current) return false;
+      attempted.current = true;
       const current = latest.current;
       if (current.ads.runtime?.profile !== "intensive" || !current.ads.canServe("underVideo") || !visible()) return false;
-      const value: Attempt = {mode, nonce:`lfh-${mode}-${id}-${current.ads.runtime.revision}`, revision:current.ads.runtime.revision,
+      const value: Attempt = {nonce:`lfh-preroll-${id}-${current.ads.runtime.revision}`, revision:current.ads.runtime.revision,
         path:current.path, locale:current.locale, device:matchMedia("(min-width: 1024px)").matches ? "desktop" : "mobile"};
       active.current = value;
       filled.current = false;
@@ -90,7 +86,7 @@ export function VideoPrerollAd({controller, shell, onFinish}: {
 
   const eligible = ads.runtime?.profile === "intensive" && ads.canServe("underVideo");
   useEffect(() => {
-    if (attempt && (!eligible || ads.runtime?.revision !== attempt.revision || path !== attempt.path)) finish(false, attempt);
+    if (attempt && (!eligible || ads.runtime?.revision !== attempt.revision || path !== attempt.path)) finish(false);
   }, [attempt, eligible, ads.runtime?.revision, path, finish]);
 
   useEffect(() => {
@@ -98,12 +94,12 @@ export function VideoPrerollAd({controller, shell, onFinish}: {
     if (!attempt || !element) return;
     let disposed = false, marked = false;
     const post = (value: boolean) => element.contentWindow?.postMessage({type:"lfh-ad-visibility", placement:"underVideo",
-      context:attempt.mode, nonce:attempt.nonce, activated:true, visible:value}, location.origin);
+      context:"preroll", nonce:attempt.nonce, activated:true, visible:value}, location.origin);
     const update = () => {
       if (disposed || active.current !== attempt) return;
-      if (!visible() || !permitted(attempt)) { finish(false, attempt); return; }
+      if (!visible() || !permitted(attempt)) { finish(false); return; }
       if (!marked) {
-        if (!latest.current.ads.markSdkStarted(attempt.device)) { finish(false, attempt); return; }
+        if (!latest.current.ads.markSdkStarted(attempt.device)) { finish(false); return; }
         marked = true;
       }
       post(true);
@@ -111,24 +107,24 @@ export function VideoPrerollAd({controller, shell, onFinish}: {
     const message = (event: MessageEvent) => {
       if (disposed || active.current !== attempt || event.origin !== location.origin || event.source !== element.contentWindow
         || event.data?.type !== "lfh-ad-status" || event.data?.placement !== "underVideo"
-        || event.data?.context !== attempt.mode || event.data?.nonce !== attempt.nonce) return;
-      if (!permitted(attempt) || !visible()) { finish(false, attempt); return; }
+        || event.data?.context !== "preroll" || event.data?.nonce !== attempt.nonce) return;
+      if (!permitted(attempt) || !visible()) { finish(false); return; }
       if (event.data.status === "filled" && !filled.current) {
         filled.current = true;
         window.clearTimeout(deadline.current);
-        deadline.current = window.setTimeout(() => finish(true, attempt), 125_000);
-      } else if (["ended", "empty", "skipped"].includes(event.data.status)) finish(true, attempt);
+        deadline.current = window.setTimeout(() => finish(true), 125_000);
+      } else if (["ended", "empty", "skipped"].includes(event.data.status)) finish(true);
     };
     const observer = typeof IntersectionObserver === "undefined" ? undefined : new IntersectionObserver(entries => {
       const entry = entries.find(value => value.target === element);
-      if (entry && (!entry.isIntersecting || entry.intersectionRatio < .5)) finish(false, attempt);
+      if (entry && (!entry.isIntersecting || entry.intersectionRatio < .5)) finish(false);
       else update();
     }, {threshold:[0, .5]});
     observer?.observe(element);
     sendVisibility.current = update;
-    deadline.current = window.setTimeout(() => finish(true, attempt), 15_000);
+    deadline.current = window.setTimeout(() => finish(true), 15_000);
     window.addEventListener("message", message);
-    const pagehide = () => finish(false, attempt);
+    const pagehide = () => finish(false);
     window.addEventListener("pagehide", pagehide);
     document.addEventListener("visibilitychange", update);
     // Geometric checks also support browsers without IntersectionObserver.
@@ -148,11 +144,10 @@ export function VideoPrerollAd({controller, shell, onFinish}: {
 
   if (!attempt || !eligible || path !== attempt.path || ads.runtime?.revision !== attempt.revision) return null;
   const query = new URLSearchParams({nonce:attempt.nonce, path:attempt.path, locale:attempt.locale, device:attempt.device});
-  return <div className="absolute inset-0 z-[46] bg-black" data-video-preroll={attempt.mode === "preroll" || undefined}
-    data-video-postroll={attempt.mode === "postroll" || undefined}>
-    <iframe key={attempt.nonce} ref={frame} src={`/api/ads/${attempt.mode}?${query}`} title={adsCopy[attempt.locale].label} loading="eager"
+  return <div className="absolute inset-0 z-[46] bg-black" data-video-preroll>
+    <iframe ref={frame} src={`/api/ads/preroll?${query}`} title={adsCopy[attempt.locale].label} loading="eager"
       allow="autoplay" sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
       referrerPolicy="no-referrer" className="block h-full w-full border-0"
-      onLoad={() => sendVisibility.current?.()} onError={() => finish(true, attempt)} />
+      onLoad={() => sendVisibility.current?.()} onError={() => finish(true)} />
   </div>;
 }
