@@ -214,9 +214,9 @@ test('intensive lower page slots reserve280px while their registered creative di
  });
 });
 
-test('the intensive desktop header uses the bounded860px frame without changing its728x90 creative',t=>{
+test('the intensive desktop header reserves 280px without changing its 728x90 creative',t=>{
  const ui=harness(t,{placement:'header',profile:'intensive'});ui.frame();ui.media.matches=true;ui.media.dispatchEvent(new Event('change'));
- const aside=all(ui.render()).find(n=>n.type==='aside')!;assert.deepEqual(aside.props.style,{width:'100%',maxWidth:860});assert.deepEqual(ui.frame().node.props.style,{width:728,height:90});
+ const aside=all(ui.render()).find(n=>n.type==='aside')!;assert.deepEqual(aside.props.style,{width:'100%',maxWidth:860,minHeight:280});assert.deepEqual(ui.frame().node.props.style,{width:728,height:90});
 });
 
 test('page reserve never changes pause/grid or legacy banner wrappers',async t=>{
@@ -225,10 +225,10 @@ test('page reserve never changes pause/grid or legacy banner wrappers',async t=>
 });
 
 
-test('intensive mobile headers follow both owned100px and250px formats instead of an unrelated page reserve',async t=>{
+test('intensive mobile headers reserve 280px with both existing creative formats',async t=>{
  for(const [pathname,height]of [['/fr',100],['/fr/example_creator',250]] as const)await t.test(pathname,sub=>{
   const ui=harness(sub,{placement:'header',profile:'intensive',pathname}),frame=ui.frame(),aside=all(ui.render()).find(node=>node.type==='aside')!;
-  assert.equal((aside.props.style as {minHeight?:number}|undefined)?.minHeight,undefined);assert.deepEqual(frame.node.props.style,{width:300,height});
+  assert.equal((aside.props.style as {minHeight:number}).minHeight,280);assert.deepEqual(frame.node.props.style,{width:300,height});
  });
 });
 

@@ -183,7 +183,7 @@ function NetworkAdSlot({ placement, className = "", onEmpty, loading, context = 
   return <aside ref={gridSized ? gridContainer : undefined} aria-label={adsCopy[locale].label} data-ad-placement={placement} data-ad-provider={provider}
     className={`mx-auto ${gridSized ? "flex w-full min-w-0 flex-col"
       : feed ? "flex h-full min-h-0 max-w-full flex-col" : "max-w-full overflow-hidden"}${pageFrame ? " flex flex-col items-center justify-center" : ""} ${className}`}
-    style={gridSized ? {aspectRatio:"0.6"} : pageFrame ? { ...(widePageFrame ? {width:"100%",maxWidth:860} : {}), ...(placement === "header" ? {} : {minHeight:280}) } : undefined}>
+    style={gridSized ? {aspectRatio:"0.6"} : pageFrame ? { minHeight:280, ...(widePageFrame ? {width:"100%",maxWidth:860} : {}) } : undefined}>
     <p className={`${feed ? "shrink-0 " : ""}mb-1 text-center text-[10px] uppercase tracking-wide text-[var(--color-ink-faint)]`}>{adsCopy[locale].label}</p>
     {gridSized ? <div className="grid min-h-0 flex-1 place-items-center">
       <div data-ad-grid-frame className="relative mx-auto w-full" style={{maxWidth:spot.width,aspectRatio:`${spot.width} / ${spot.height}`,overflow:"clip"}}>{iframe}</div>
