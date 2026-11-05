@@ -186,8 +186,10 @@ class EligibleDatabase:
         cur = self.original.conn.cursor()
         try:
             cur.execute(
-                "SELECT id FROM creators WHERE handle=%s AND is_hidden=0 "
-                "AND removed_from_index_at IS NULL LIMIT 1" + (" FOR UPDATE" if locked else ""),
+                "SELECT c.id FROM creators c "
+                "LEFT JOIN creator_import_caps cap ON cap.creator_id=c.id "
+                "WHERE c.handle=%s AND c.is_hidden=0 AND c.removed_from_index_at IS NULL "
+                "AND cap.creator_id IS NULL LIMIT 1" + (" FOR UPDATE" if locked else ""),
                 (self.handle,),
             )
             row = cur.fetchone()

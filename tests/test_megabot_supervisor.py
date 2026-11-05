@@ -6,6 +6,7 @@ import io
 import json
 import os
 from pathlib import Path
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -16,6 +17,30 @@ import uuid
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from ops.megabot_queue import supervisor as s
 from ops.megabot_queue.queue import Queue
+
+
+class CatalogueTests(unittest.TestCase):
+    def test_catalogue_excludes_all_capped_profiles_and_keeps_existing(self):
+        # The actual catalogue query is compatible with SQLite on this fixture.
+        connection = sqlite3.connect(":memory:")
+        self.addCleanup(connection.close)
+        connection.executescript("""
+            CREATE TABLE creators (id TEXT, handle TEXT, is_hidden INTEGER, removed_from_index_at TEXT);
+            CREATE TABLE creator_import_caps (creator_id TEXT, admitted INTEGER);
+            INSERT INTO creators VALUES ('1','existing',0,NULL),('2','capped',0,NULL),
+                ('3','hidden',1,NULL),('4','withdrawn',0,'2026-01-01');
+            INSERT INTO creator_import_caps VALUES ('2',1);
+        """)
+        database = Mock()
+        cursor = database.cursor.return_value
+        cursor.execute.side_effect = lambda query: None if query.startswith("SET SESSION") else connection.execute(query)
+        cursor.fetchall.side_effect = lambda: connection.execute(cursor.execute.call_args.args[0]).fetchall()
+        mysql = Mock()
+        mysql.connector.connect.return_value = database
+        config = {"env": {"MEGABOT_DB_HOST": "fixture", "MEGABOT_DB_USER": "fixture",
+                          "MEGABOT_DB_PASSWORD": "fixture", "MEGABOT_DB_NAME": "fixture"}}
+        with patch.dict(sys.modules, {"mysql": mysql, "mysql.connector": mysql.connector}):
+            self.assertEqual(s.load_catalogue(config), ["existing"])
 
 
 class StopAfterWait:

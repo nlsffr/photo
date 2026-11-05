@@ -179,8 +179,16 @@ class BootstrapDatabase(EligibleDatabase):
                 raise Excluded("profile_excluded")
             self.assert_media_allowed(None)
             if status == "new":
-                self.rows("INSERT INTO creators (id,handle,name,avatar_url,is_hidden) VALUES (%s,%s,%s,'',1)",
-                          (self.bootstrap_id, self.handle, self.handle), write=True)
+                creator = self.rows(
+                    "INSERT INTO creators (id,handle,name,avatar_url,is_hidden) VALUES (%s,%s,%s,'',1)",
+                    (self.bootstrap_id, self.handle, self.handle), write=True,
+                )
+                cap = self.rows(
+                    "INSERT INTO creator_import_caps (creator_id) VALUES (%s)",
+                    (self.bootstrap_id,), write=True,
+                )
+                if creator != 1 or cap != 1:
+                    raise BootstrapError("quota_reservation_failed")
 
     def staged(self, *, locked=False):
         if not locked:
@@ -196,6 +204,12 @@ class BootstrapDatabase(EligibleDatabase):
                 or source_id is None or registered is None or str(source_id) != str(registered)
                 for _, source_id, hidden, removed, kind, registered in rows):
             raise BootstrapError("invalid_staged_media")
+        cap = self.rows(
+            "SELECT admitted FROM creator_import_caps WHERE creator_id=%s" + (" FOR UPDATE" if locked else ""),
+            (self.bootstrap_id,),
+        )
+        if cap != [(len(rows),)]:
+            raise BootstrapError("invalid_staged_quota")
         return [(photo_id, source_id) for photo_id, source_id, *_ in rows]
 
     def before_photo_commit(self, photo_id, creator_id):

@@ -37,6 +37,29 @@ class BootstrapTest(unittest.TestCase):
             with patch.object(db, "rows", return_value=[row]):
                 self.assertEqual(db.inspect(), "known")
 
+    def test_reservation_records_quota_in_same_transaction(self):
+        original = Mock()
+        db = bootstrap.BootstrapDatabase(original, "new-one", ())
+        with patch.object(db, "inspect", return_value="new"), patch.object(db, "assert_media_allowed"), \
+                patch.object(db, "rows", return_value=1) as write:
+            db.reserve()
+        self.assertEqual(write.call_count, 2)
+        self.assertIn("INSERT INTO creators", write.call_args_list[0].args[0])
+        self.assertIn("INSERT INTO creator_import_caps", write.call_args_list[1].args[0])
+        self.assertEqual(write.call_args_list[1].args[1], (db.bootstrap_id,))
+        original.conn.start_transaction.assert_called_once()
+        original.conn.commit.assert_called_once()
+
+    def test_quota_reservation_failure_rolls_back_creator(self):
+        original = Mock()
+        db = bootstrap.BootstrapDatabase(original, "new-one", ())
+        with patch.object(db, "inspect", return_value="new"), patch.object(db, "assert_media_allowed"), \
+                patch.object(db, "rows", side_effect=[1, RuntimeError("quota")]):
+            with self.assertRaises(RuntimeError):
+                db.reserve()
+        original.conn.rollback.assert_called_once()
+        original.conn.commit.assert_not_called()
+
     def test_exact_source_identity_is_required(self):
         db = bootstrap.BootstrapDatabase(None, "new-one", ("old-one",))
         db.assert_source_identity({"id": 5, "profile": {"username": "New-One", "old_usernames": "Old-One"}})
@@ -49,13 +72,21 @@ class BootstrapTest(unittest.TestCase):
     def test_staged_rows_require_registry_match_and_never_exceed_fifteen(self):
         db = bootstrap.BootstrapDatabase(Mock(), "new-one", ())
         staged = [("photo-" + str(i), str(i), 1, None, "video", i) for i in range(1, 16)]
-        with patch.object(db, "rows", return_value=staged):
+        with patch.object(db, "rows", side_effect=[staged, [(15,)]]):
             self.assertEqual(len(db.staged()), 15)
         for rows in ([*staged, ("photo-16", "16", 1, None, "photo", 16)],
                      [("photo-1", "1", 0, None, "video", 1)],
                      [("photo-1", "1", 1, "removed", "video", 1)],
                      [("photo-1", "1", 1, None, "video", None)]):
             with self.subTest(count=len(rows)), patch.object(db, "rows", return_value=rows):
+                with self.assertRaises(bootstrap.BootstrapError):
+                    db.staged()
+
+    def test_missing_or_inconsistent_durable_quota_cannot_resume(self):
+        db = bootstrap.BootstrapDatabase(Mock(), "new-one", ())
+        staged = [("photo-1", "1", 1, None, "video", 1)]
+        for cap in ([], [(0,)], [(2,)]):
+            with self.subTest(cap=cap), patch.object(db, "rows", side_effect=[staged, cap]):
                 with self.assertRaises(bootstrap.BootstrapError):
                     db.staged()
 

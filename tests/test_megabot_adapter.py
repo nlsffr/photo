@@ -20,15 +20,18 @@ def _legacy_lock_process(directory, acquired, release):
 
 
 def source_fixture(pages=None, details=None, *, active=True, stored=0, fail_media=False, remove_before_publish=False,
-                   notice_before_publish=False):
+                   notice_before_publish=False, capped=False, cap_before_insert=False):
     state = SimpleNamespace(active=active, stored=stored, inserted=set(), requests=[],
                             checkpoints=[], closed=False, commits=0, rollbacks=0,
                             transaction=False, statements=[], processing=0, notices=[], publication_checks=0,
-                            processed_details=[])
+                            processed_details=[], capped=capped)
     class Cursor:
         def execute(self, sql, params=()):
+            self.sql = sql
             state.statements.append((sql, params))
         def fetchone(self):
+            if state.capped and "creator_import_caps" in self.sql:
+                return None
             return ("creator-id",) if state.active else None
         def close(self):
             pass
@@ -105,6 +108,8 @@ def source_fixture(pages=None, details=None, *, active=True, stored=0, fail_medi
                 state.notices = [{'urls': 'https://leakfanhub.com/allowed/' + source_id}]
             try:
                 creator_id = self.db.upsert_creator(owner)
+                if cap_before_insert:
+                    state.capped = True
                 self.db.insert_photo('photo-id', creator_id, source_id, 'title', 'image-url', None, 'photo',
                                      [], 0, 0, 8, 8, None, False, 1, owner, 'image-key')
             except Exception:
@@ -146,6 +151,23 @@ class AdapterTest(unittest.TestCase):
         self.assertEqual(state.commits, 1)
         self.assertTrue(state.closed)
         self.assertFalse(any('INSERT INTO creators' in sql for sql, _ in state.statements))
+
+    def test_ordinary_worker_skips_capped_profile_without_fetching(self):
+        source, state = source_fixture(capped=True)
+        with self.assertRaises(adapter.Excluded):
+            self.run_fixture(source, state)
+        self.assertEqual(state.requests, [])
+        self.assertEqual(state.checkpoints, [])
+
+    def test_ordinary_worker_rechecks_cap_under_insert_lock(self):
+        source, state = source_fixture({1: [{'id': '1', 'handle': 'allowed'}]}, cap_before_insert=True)
+        with self.assertRaises(adapter.Excluded):
+            self.run_fixture(source, state)
+        self.assertFalse(state.inserted)
+        self.assertEqual(state.commits, 0)
+        self.assertEqual(state.rollbacks, 1)
+        self.assertTrue(any('creator_import_caps' in sql and sql.endswith('FOR UPDATE')
+                            for sql, _ in state.statements))
 
     def test_already_imported_media_skip_a_busy_stripe_without_new_io(self):
         source, state = source_fixture({1: [{'id': '1', 'handle': 'allowed'}]})

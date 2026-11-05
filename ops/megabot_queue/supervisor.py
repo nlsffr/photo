@@ -232,7 +232,10 @@ def load_catalogue(config):
         try:
             cur.execute('SET SESSION max_statement_time=8')
             db.start_transaction(readonly=True)
-            cur.execute('SELECT handle FROM creators WHERE is_hidden=0 AND removed_from_index_at IS NULL ORDER BY handle')
+            cur.execute('SELECT c.handle FROM creators c '
+                        'LEFT JOIN creator_import_caps cap ON cap.creator_id=c.id '
+                        'WHERE c.is_hidden=0 AND c.removed_from_index_at IS NULL AND cap.creator_id IS NULL '
+                        'ORDER BY c.handle')
             return [row[0] for row in cur.fetchall()]
         finally:
             cur.close()
