@@ -146,28 +146,21 @@ class TelegramPremiumWorkerTests(unittest.TestCase):
             with self.subTest(status=status):
                 self.assertFalse(worker_module.is_claimable_order_status(status))
 
-    def test_store_rejects_a_replayed_claimed_token_without_mutating_the_order(self):
+    def test_store_rejects_replays_and_expires_only_unclaimed_orders(self):
         class Cursor:
-            def __init__(self):
+            def __init__(self, order):
+                self.order = order
                 self.queries = []
 
             def execute(self, query, params):
                 self.queries.append((query, params))
 
             def fetchone(self):
-                return {
-                    "id": ORDER_ID,
-                    "plan": "week",
-                    "stars_amount": 550,
-                    "status": "claimed",
-                    "launch_expires_at": self_now + timedelta(minutes=20),
-                    "telegram_user_id": 1234,
-                    "invoice_payload": PAYLOAD,
-                }
+                return self.order
 
         class Connection:
-            def __init__(self):
-                self.db_cursor = Cursor()
+            def __init__(self, order):
+                self.db_cursor = Cursor(order)
 
             def start_transaction(self):
                 pass
@@ -184,19 +177,38 @@ class TelegramPremiumWorkerTests(unittest.TestCase):
             def close(self):
                 pass
 
-        self_now = self.now
-        connection = Connection()
-        store = MariaPaymentStore(
-            "mysql://user:pass@mariadb:3306/lumengallery",
-            connection_factory=lambda **_kwargs: connection,
-        )
+        for status, minutes_remaining, should_expire in (
+            ("claimed", 20, False),
+            ("claimed", 0, False),
+            ("invoice_sent", -1, False),
+            ("pending", 0, True),
+        ):
+            with self.subTest(status=status, minutes_remaining=minutes_remaining):
+                connection = Connection({
+                    "id": ORDER_ID,
+                    "plan": "week",
+                    "stars_amount": 550,
+                    "status": status,
+                    "launch_expires_at": self.now + timedelta(minutes=minutes_remaining),
+                    "telegram_user_id": None if status == "pending" else 1234,
+                    "invoice_payload": None if status == "pending" else PAYLOAD,
+                })
+                store = MariaPaymentStore(
+                    "mysql://user:pass@mariadb:3306/lumengallery",
+                    connection_factory=lambda **_kwargs: connection,
+                )
 
-        claimed = store.claim_launch_token("hash", 1234, 5678, self.now)
-
-        self.assertIsNone(claimed)
-        self.assertFalse(
-            any(query.lstrip().startswith("UPDATE") for query, _ in connection.db_cursor.queries)
-        )
+                self.assertIsNone(store.claim_launch_token("hash", 1234, 5678, self.now))
+                updates = [
+                    query for query, _ in connection.db_cursor.queries
+                    if query.lstrip().startswith("UPDATE")
+                ]
+                if should_expire:
+                    self.assertEqual(len(updates), 1)
+                    self.assertIn("SET status='expired'", updates[0])
+                else:
+                    # A confirmed charge can still arrive for an in-flight invoice.
+                    self.assertEqual(updates, [])
 
     def test_precheckout_is_approved_only_for_exact_bound_order(self):
         query = {

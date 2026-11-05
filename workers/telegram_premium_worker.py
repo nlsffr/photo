@@ -252,18 +252,18 @@ class MariaPaymentStore:
                 (token_hash,),
             )
             row = cursor.fetchone()
-            if not row:
+            # Only an unclaimed link expires here. A claimed order may still
+            # receive a successful payment after the link's deadline.
+            if not row or not is_claimable_order_status(str(row["status"])):
                 connection.commit()
                 return None
             expires_at = aware_utc(row["launch_expires_at"])
             if expires_at <= aware_utc(now):
                 cursor.execute(
-                    "UPDATE premium_orders SET status='expired', failure_code='launch_expired' WHERE id=%s AND status NOT IN ('paid','refunded')",
+                    """UPDATE premium_orders SET status='expired', failure_code='launch_expired'
+                       WHERE id=%s AND status='pending'""",
                     (row["id"],),
                 )
-                connection.commit()
-                return None
-            if not is_claimable_order_status(str(row["status"])):
                 connection.commit()
                 return None
             bound_user = row.get("telegram_user_id")
