@@ -9,37 +9,18 @@ export async function isUserPremium(userId: string): Promise<boolean> {
   const db = getPool();
   if (!db) throw new Error("premium_status_unavailable");
   try {
+    // Read the flag and active period together. Status reads cannot undo a concurrent renewal.
     const [rows] = await db.execute<RowDataPacket[]>(
-      `SELECT is_premium FROM users WHERE id = ? LIMIT 1`,
+      `SELECT u.is_premium,
+        (SELECT MAX(s.current_period_end) FROM subscriptions s
+         WHERE s.user_id = u.id AND s.status = 'active') AS period_end
+       FROM users u WHERE u.id = ? LIMIT 1`,
       [userId],
     );
-    const u = rows[0] as { is_premium: number } | undefined;
-    if (!u) return false;
-    if (u.is_premium !== 0 && u.is_premium !== 1) throw new Error("premium_status_unavailable");
-    if (u.is_premium === 1) {
-      const [subs] = await db.execute<RowDataPacket[]>(
-        `SELECT current_period_end FROM subscriptions
-         WHERE user_id = ? AND status = 'active'
-         ORDER BY current_period_end DESC LIMIT 1`,
-        [userId],
-      );
-      const sub = subs[0] as { current_period_end: Date | string | null } | undefined;
-      const entitlement = premiumEntitlementState({
-        isPremium: true,
-        periodEnd: sub?.current_period_end,
-      });
-      if (entitlement === "active") return true;
-
-      await db.execute(`UPDATE users SET is_premium = 0 WHERE id = ?`, [userId]);
-      await db.execute(
-        `UPDATE subscriptions SET status = 'canceled'
-         WHERE user_id = ? AND status = 'active'
-           AND (current_period_end IS NULL OR current_period_end <= NOW())`,
-        [userId],
-      );
-      return false;
-    }
-    return false;
+    const user = rows[0] as { is_premium: number; period_end: Date | string | null } | undefined;
+    if (!user) return false;
+    if (user.is_premium !== 0 && user.is_premium !== 1) throw new Error("premium_status_unavailable");
+    return premiumEntitlementState({ isPremium: user.is_premium === 1, periodEnd: user.period_end }) === "active";
   } catch {
     throw new Error("premium_status_unavailable");
   }

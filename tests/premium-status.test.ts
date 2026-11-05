@@ -9,9 +9,8 @@ function entitlement(options: Options = {}) {
   const pool = { execute: async (sql: string) => {
     queries.push(sql);
     if (options.dbError) throw new Error("private database connection detail");
-    if (sql.startsWith("SELECT is_premium")) return [options.row === null ? [] : [options.row ?? { is_premium: 0 }]];
-    if (sql.startsWith("SELECT current_period_end")) return [options.periodEnd === undefined ? [] : [{ current_period_end: options.periodEnd }]];
-    return [{ affectedRows: 1 }];
+    if (!sql.startsWith("SELECT")) assert.fail("a status read must never modify the subscription");
+    return [options.row === null ? [] : [{ ...(options.row ?? { is_premium: 0 }), period_end: options.periodEnd }]];
   } };
   return {
     ...loadAppModule<{ isUserPremium: (id: string) => Promise<boolean> }>("src/lib/premium-db.ts", {
@@ -30,7 +29,7 @@ test("missing Premium storage and failed DB reads remain unavailable rather than
 test("only a valid active flag and a future active subscription grant Premium", async () => {
   const active = entitlement({ row: { is_premium: 1 }, periodEnd: "2999-01-01T00:00:00.000Z" });
   assert.equal(await active.isUserPremium("member"), true);
-  assert.equal(active.queries.length, 2);
+  assert.equal(active.queries.length, 1);
   assert.ok(active.queries.every(sql => sql.startsWith("SELECT")));
   for (const row of [null, { is_premium: 0 }]) {
     const inactive = entitlement({ row }); assert.equal(await inactive.isUserPremium("member"), false);
@@ -46,12 +45,12 @@ test("malformed database flags cannot accidentally grant Premium or revoke an un
   }
 });
 
-test("expired and missing subscriptions retain the existing expiry behavior", async () => {
+test("expired and missing subscriptions grant no entitlement and leave storage untouched", async () => {
   for (const periodEnd of ["2000-01-01T00:00:00.000Z", null, undefined]) {
     const expired = entitlement({ row: { is_premium: 1 }, periodEnd });
     assert.equal(await expired.isUserPremium("member"), false);
-    assert.match(expired.queries[2], /^UPDATE users SET is_premium = 0/);
-    assert.match(expired.queries[3], /^UPDATE subscriptions SET status = 'canceled'/);
+    assert.equal(expired.queries.length, 1);
+    assert.match(expired.queries[0], /^SELECT/);
   }
 });
 
@@ -92,4 +91,32 @@ test("anonymous and absent sessions cannot receive a false-positive Premium flag
     assert.deepEqual(await response.json(), { isPremium: false, user: null });
     assert.match(response.headers.get("Cache-Control") ?? "", /no-store/);
   }
+});
+
+test("reading an expired subscription cannot undo a renewal committed during the status read", async () => {
+  let isPremium = 1;
+  let periodEnd = "2000-01-01T00:00:00.000Z";
+  const renewalEnd = "2999-01-01T00:00:00.000Z";
+  const pool = { execute: async (sql: string) => {
+    if (sql.startsWith("SELECT") && sql.includes("AS period_end")) {
+      const snapshot = { is_premium: isPremium, period_end: periodEnd };
+      periodEnd = renewalEnd;
+      return [[snapshot]];
+    }
+    if (sql.startsWith("SELECT is_premium")) return [[{ is_premium: isPremium }]];
+    if (sql.startsWith("SELECT current_period_end")) {
+      const oldPeriod = periodEnd;
+      periodEnd = renewalEnd;
+      return [[{ current_period_end: oldPeriod }]];
+    }
+    if (sql.startsWith("UPDATE users")) isPremium = 0;
+    return [{ affectedRows: 1 }];
+  } };
+  const { isUserPremium } = loadAppModule<{ isUserPremium: (id: string) => Promise<boolean> }>("src/lib/premium-db.ts", {
+    "server-only": {}, "./db-pool": { getDbPool: () => pool },
+  });
+
+  assert.equal(await isUserPremium("member"), false, "the first snapshot was expired");
+  assert.equal(isPremium, 1, "the read must leave the concurrently renewed account enabled");
+  assert.equal(await isUserPremium("member"), true, "the next read sees the renewed entitlement");
 });
