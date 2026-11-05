@@ -1,4 +1,5 @@
 import multiprocessing
+from contextlib import contextmanager
 from pathlib import Path
 import queue
 import tempfile
@@ -143,6 +144,51 @@ class AdapterTest(unittest.TestCase):
         self.assertEqual(state.commits, 1)
         self.assertTrue(state.closed)
         self.assertFalse(any('INSERT INTO creators' in sql for sql, _ in state.statements))
+
+    def test_already_imported_media_skip_a_busy_stripe_without_new_io(self):
+        source, state = source_fixture({1: [{'id': '1', 'handle': 'allowed'}]})
+        state.inserted.add('1')
+        with patch.object(adapter, 'media_lock', side_effect=AssertionError('known media must not wait')):
+            result = self.run_fixture(source, state, max_pages=1)
+        self.assertEqual((result['new'], result['skipped']), (0, 1))
+        self.assertEqual(state.checkpoints, [(2, 0)])
+        self.assertEqual(state.processing, 0)
+        self.assertEqual(state.commits, 0)
+        self.assertFalse(any('/media/' in url for url in state.requests))
+
+    def test_media_published_while_waiting_for_lock_is_rechecked(self):
+        source, state = source_fixture({1: [{'id': '1', 'handle': 'allowed'}]})
+        real_lock = adapter.media_lock
+
+        @contextmanager
+        def published_before_lock(directory, source_id):
+            state.inserted.add(source_id)
+            with real_lock(directory, source_id):
+                yield
+
+        with patch.object(adapter, 'media_lock', new=published_before_lock):
+            result = self.run_fixture(source, state, max_pages=1)
+        self.assertEqual((result['new'], result['skipped']), (0, 1))
+        self.assertEqual(state.checkpoints, [(2, 0)])
+        self.assertEqual(state.processing, 0)
+        self.assertEqual(state.commits, 0)
+        self.assertFalse(any('/media/' in url for url in state.requests))
+
+    def test_already_imported_media_still_requires_eligible_profile(self):
+        source, state = source_fixture({1: [{'id': '1', 'handle': 'allowed'}]})
+        state.inserted.add('1')
+        real_check = adapter.EligibleDatabase.eligible_id
+
+        def withdraw_after_page_fetch(database, **kwargs):
+            if state.requests:
+                state.active = False
+            return real_check(database, **kwargs)
+
+        with patch.object(adapter.EligibleDatabase, 'eligible_id', new=withdraw_after_page_fetch):
+            with self.assertRaisesRegex(adapter.Excluded, 'profile_excluded'):
+                self.run_fixture(source, state, max_pages=1)
+        self.assertEqual(state.checkpoints, [])
+        self.assertEqual(state.commits, 0)
 
     def test_network_status_and_malformed_responses_are_not_empty_pages(self):
         for value in [TimeoutError('secret-url'), 403, 429, 503, {'error': 'unavailable'}, ['not-a-post']]:

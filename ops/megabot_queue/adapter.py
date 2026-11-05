@@ -312,6 +312,11 @@ def run_profile(handle, next_page=1, empty_streak=0, checkpoint=None, *,
             source_id = str(post.get("id") or post.get("media_id") or "")
             if not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", source_id):
                 raise RetryableError("invalid_media_id")
+            # A known media only needs a read. Recheck misses under the lock before publishing.
+            if self.db.already_ingested(source_id):
+                self.db.eligible_id()
+                self.total_skipped += 1
+                return
             with media_lock(lock_dir, source_id):
                 self.db.eligible_id()
                 if self.db.already_ingested(source_id):
