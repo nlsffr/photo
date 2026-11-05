@@ -22,6 +22,7 @@ MAX_IMPORTS_PER_CYCLE = 3
 PROBE_COOLDOWN = 3600
 EMPTY_COOLDOWN = 86400
 SOURCE_COOLDOWN = 900
+SCAN_COOLDOWN = 120
 TERMINAL = ("published", "known", "excluded", "review")
 
 
@@ -99,15 +100,27 @@ class PendingQueue:
                                 "ON CONFLICT(handle) DO UPDATE SET available_at=excluded.available_at",
                                 [(handle, now + PROBE_COOLDOWN) for handle in handles])
 
-    def source_ready(self, now):
-        row = self.db.execute("SELECT value FROM runner_meta WHERE name='source_available_at'").fetchone()
+    def _ready(self, name, now):
+        row = self.db.execute("SELECT value FROM runner_meta WHERE name=?", (name,)).fetchone()
         return row is None or row[0] <= now
 
-    def pause_source(self, now):
+    def _defer(self, name, available_at):
         with self.db:
-            self.db.execute("INSERT INTO runner_meta(name,value) VALUES('source_available_at',?) "
+            self.db.execute("INSERT INTO runner_meta(name,value) VALUES(?,?) "
                             "ON CONFLICT(name) DO UPDATE SET value=MAX(value,excluded.value)",
-                            (now + SOURCE_COOLDOWN,))
+                            (name, available_at))
+
+    def source_ready(self, now):
+        return self._ready("source_available_at", now)
+
+    def pause_source(self, now):
+        self._defer("source_available_at", now + SOURCE_COOLDOWN)
+
+    def scan_ready(self, now):
+        return self._ready("scan_available_at", now)
+
+    def defer_scan(self, now):
+        self._defer("scan_available_at", now + SCAN_COOLDOWN)
 
     def ready(self, now, limit):
         rows = self.db.execute("SELECT handle,aliases,attempts FROM candidates "
@@ -187,7 +200,8 @@ def run_cycle(queue, fetch, read_snapshot, import_one, *, pages, profile_limit, 
     if not queue.source_ready(int(now())):
         return report("source_cooldown")
     ready = queue.ready(int(now()), imports_per_cycle)
-    if len(ready) < imports_per_cycle:
+    if len(ready) < imports_per_cycle and queue.scan_ready(int(now())):
+        queue.defer_scan(int(now()))
         known, notices = read_snapshot()
         checked = set()
         try:
@@ -197,6 +211,8 @@ def run_cycle(queue, fetch, read_snapshot, import_one, *, pages, profile_limit, 
             queue.defer_probes(checked, int(now()))
             queue.pause_source(int(now()))
             return report("source_deferred")
+        finally:
+            queue.defer_scan(int(now()))
         counts.update({f"scan_{key}": value for key, value in manifest["counts"].items()})
 
         discovered = {}
@@ -291,6 +307,7 @@ def main(argv=None):
 
         with bootstrap_lock(state), PendingQueue(state / "creator-scale.sqlite3") as queue, requests.Session() as session:
             check_queue_pause(state)
+            check_staging_space(state)
             session.trust_env = False
             session.headers["Accept"] = "application/json"
             proxies = [part.strip() for part in env.get("MEGABOT_PROXIES", "").split(",") if part.strip()]

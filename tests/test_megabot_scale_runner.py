@@ -75,9 +75,31 @@ class ScaleRunnerTests(unittest.TestCase):
         imported = []
         with PendingQueue(self.path) as queue:
             self.cycle(queue, responses, lambda handle, _: imported.append(handle) or published(), profile_limit=1)
-            self.now += 60
+            self.now += 120
             self.cycle(queue, responses, lambda handle, _: imported.append(handle) or published(), profile_limit=1)
         self.assertEqual(imported, ["later"])
+
+    def test_catalogue_cooldown_survives_restart_and_leaves_ready_imports_running(self):
+        def scan(path, **_):
+            self.assertEqual(path, "/popular/newest-profiles/1")
+            self.now += 45
+            return []
+
+        with PendingQueue(self.path) as queue:
+            run_cycle(queue, scan, lambda: (set(), []), lambda *_: self.fail("empty catalogue"),
+                      pages=1, profile_limit=1, imports_per_cycle=2, now=lambda: self.now)
+
+        with PendingQueue(self.path) as queue:
+            self.now += 30
+            attempted = []
+            self.cycle(queue, {}, lambda handle, _: attempted.append(handle) or published(),
+                       seeds={"ready": ()})
+            self.assertEqual(attempted, ["ready"])
+            self.now += 89
+            self.cycle(queue, {}, lambda *_: self.fail("no ready candidates"))
+            self.now += 1
+            report = self.cycle(queue, fixtures("next"), lambda *_: published())
+            self.assertEqual(report["counts"]["published"], 1)
 
     def test_storage_failure_keeps_remaining_candidates_and_stops_cycle(self):
         attempted = []
