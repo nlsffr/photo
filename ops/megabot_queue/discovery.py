@@ -105,7 +105,7 @@ def notice_excludes(handles, source_id, notices):
                for handle in handles for notice in notices)
 
 
-def discover(fetch, known_handles, notices, *, pages, profile_limit):
+def discover(fetch, known_handles, notices, *, pages, profile_limit, on_profile_check=None):
     if type(pages) is not int or not 1 <= pages <= MAX_PAGES or (
             type(profile_limit) is not int or not 1 <= profile_limit <= MAX_PROFILE_CHECKS):
         raise DiscoveryError("invalid_discovery_limit")
@@ -139,6 +139,8 @@ def discover(fetch, known_handles, notices, *, pages, profile_limit):
         if counts["profileChecks"] >= profile_limit:
             break
         counts["profileChecks"] += 1
+        if on_profile_check is not None:
+            on_profile_check(handle)
         profile_page = fetch(f"/profile/{original}/1", params={"type": "All", "sort": "MostRecent"})
         media = [] if unavailable(profile_page) else profile_page.get("medias")
         if not isinstance(media, list) or len(media) > 500:
