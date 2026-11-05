@@ -192,6 +192,42 @@ class AdapterTest(unittest.TestCase):
         self.assertEqual(state.checkpoints, [])
         self.assertEqual(state.commits, 0)
 
+    def test_cap_counts_successes_and_leaves_partial_page_uncheckpointed(self):
+        source, state = source_fixture({
+            1: [{'id': str(i), 'handle': 'allowed'} for i in range(1, 5)],
+        })
+        state.inserted.add('1')
+        result = self.run_fixture(source, state, max_new=2)
+        self.assertEqual((result['status'], result['new'], result['skipped']), ('capped', 2, 1))
+        self.assertEqual((result['next_page'], result['empty_streak']), (1, 0))
+        self.assertEqual(state.checkpoints, [])
+        self.assertEqual(state.inserted, {'1', '2', '3'})
+        self.assertEqual(state.commits, 2)
+        self.assertFalse(any('/media/4' in url for url in state.requests))
+
+    def test_factory_wraps_original_database_and_cap_preserves_finished_page(self):
+        source, state = source_fixture({
+            1: [{'id': '1', 'handle': 'allowed'}],
+            2: [{'id': '2', 'handle': 'allowed'}],
+        })
+        factory = Mock(side_effect=adapter.EligibleDatabase)
+        result = self.run_fixture(source, state, max_new=2, database_factory=factory)
+        self.assertEqual(result['status'], 'capped')
+        self.assertEqual(state.checkpoints, [(2, 0)])
+        factory.assert_called_once()
+        original, handle, storage = factory.call_args.args
+        self.assertEqual(handle, 'allowed')
+        self.assertIsInstance(storage, adapter.integrity.VerifiedStorage)
+        self.assertTrue(original.already_ingested('2'))
+
+    def test_invalid_cap_or_factory_fails_before_loading_source(self):
+        for options in ({'max_new': 0}, {'max_new': -1}, {'max_new': True},
+                        {'max_new': 1.5}, {'database_factory': object()}):
+            with self.subTest(options=options), patch.object(adapter, 'load_source') as load_source:
+                with self.assertRaises(ValueError):
+                    adapter.run_profile('allowed', checkpoint=lambda *_: None, **options)
+                load_source.assert_not_called()
+
     def test_network_status_and_malformed_responses_are_not_empty_pages(self):
         for value in [TimeoutError('secret-url'), 403, 429, 503, {'error': 'unavailable'}, ['not-a-post']]:
             with self.subTest(value=type(value).__name__):

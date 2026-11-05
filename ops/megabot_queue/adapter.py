@@ -175,6 +175,7 @@ class EligibleDatabase:
         self.media_excluded = False
         self.storage = storage
         self.creator_id = None
+        self.notice_handles = (handle,)
 
     def __getattr__(self, name):
         return getattr(self.original, name)
@@ -219,17 +220,24 @@ class EligibleDatabase:
         return creator_id
 
     def assert_media_allowed(self, source_id, *, photo_id=None, creator_id=None):
-        row = {'id': photo_id, 'source_id': source_id, 'handle': self.handle,
-               'creator_id': creator_id or self.creator_id}
+        rows = [{'id': photo_id, 'source_id': source_id, 'handle': handle,
+                 'creator_id': creator_id or self.creator_id}
+                for handle in self.notice_handles]
         cur = self.original.conn.cursor(dictionary=True)
         try:
             for table, fields in [('dmca_notices', 'urls'), ('dmca_mail_events', 'urls,targets')]:
                 cur.execute('SELECT ' + fields + ' FROM ' + table)
-                if any(notices.notice_matches(row, notice) for notice in cur.fetchall()):
+                if any(notices.notice_matches(row, notice) for notice in cur.fetchall() for row in rows):
                     self.media_excluded = True
                     raise MediaExcluded('notice_excluded')
         finally:
             cur.close()
+
+    def assert_source_identity(self, details):
+        """An explicitly configured importer may require stronger identity evidence."""
+
+    def before_photo_commit(self, photo_id, creator_id):
+        """Run importer-specific checks while the same creator remains locked."""
 
     def insert_photo(self, photo_id, creator_id, *args, **kwargs):
         if self.storage is not None:
@@ -258,6 +266,7 @@ class EligibleDatabase:
             # Reconnecting inside this transaction would silently lose its lock.
             self.original._ensure = ensure_transaction
             result = self.original.insert_photo(photo_id, creator_id, *args, **kwargs)
+            self.before_photo_commit(photo_id, creator_id)
             connection.commit()
             return result
         except BaseException:
@@ -269,12 +278,15 @@ class EligibleDatabase:
 
 def run_profile(handle, next_page=1, empty_streak=0, checkpoint=None, *,
                 source_path="/opt/megabot/megabot.py", download_dir=None,
-                lock_dir="/var/lib/megabot-queue/media-locks", max_pages=10):
+                lock_dir="/var/lib/megabot-queue/media-locks", max_pages=10,
+                max_new=None, database_factory=None):
     """Process at most ten pages; checkpoint only entirely successful pages.
 
     checkpoint(next_page, empty_streak) must durably save under the job owner.
     Network errors and partial page failures raise RetryableError. The caller
     should delay retrying the same checkpoint, rather than mark it completed.
+    An explicit max_new counts committed items and leaves its last page
+    uncheckpointed. A retry must recalculate its remaining budget.
     """
     if not isinstance(handle, str) or not handle or not callable(checkpoint):
         raise ValueError("handle and a durable checkpoint callback are required")
@@ -282,6 +294,10 @@ def run_profile(handle, next_page=1, empty_streak=0, checkpoint=None, *,
         raise ValueError("invalid pagination checkpoint")
     if not isinstance(max_pages, int) or not 1 <= max_pages <= 10:
         raise ValueError("max_pages must be between 1 and 10")
+    if max_new is not None and (type(max_new) is not int or max_new < 1):
+        raise ValueError("max_new must be a positive integer")
+    if database_factory is not None and not callable(database_factory):
+        raise ValueError("database_factory must be callable")
     if next_page > 200 and empty_streak < 2:
         raise RetryableError("pagination_limit")
     source = load_source(str(source_path))
@@ -346,6 +362,7 @@ def run_profile(handle, next_page=1, empty_streak=0, checkpoint=None, *,
                 reported_id = details.get('id') if details.get('id') is not None else details.get('media_id')
                 if reported_id is None or str(reported_id) != source_id:
                     raise RetryableError('details_identity_mismatch')
+                self.db.assert_source_identity(details)
                 if source.extract_handle(details).casefold() != handle.casefold():
                     self.foreign_skipped += 1
                     self.total_skipped += 1
@@ -381,7 +398,8 @@ def run_profile(handle, next_page=1, empty_streak=0, checkpoint=None, *,
         bot.r2 = integrity.VerifiedStorage(original_store.client, original_store.bucket,
                                           source.Config.PUBLIC_MEDIA_BASE,
                                           before_write=lambda: bot.db.assert_media_allowed(bot.current_media[0]))
-        bot.db = EligibleDatabase(bot.db, handle, bot.r2)
+        factory = EligibleDatabase if database_factory is None else database_factory
+        bot.db = factory(bot.db, handle, bot.r2)
         bot.current_media = None
         bot.detail_cache = {}
         bot.foreign_skipped = 0
@@ -390,6 +408,7 @@ def run_profile(handle, next_page=1, empty_streak=0, checkpoint=None, *,
         bot.db.eligible_id()
         if bot.db.total_storage_bytes() >= source.Config.MAX_STORAGE_TB * 1024**4:
             raise StorageFull("storage_limit_reached")
+        status = "continue"
         for _ in range(max_pages):
             if empty_streak >= 2:
                 break
@@ -404,6 +423,12 @@ def run_profile(handle, next_page=1, empty_streak=0, checkpoint=None, *,
                         bot.process_post(post)
                     except MediaLockBusy:
                         busy = True
+                        continue
+                    if max_new is not None and bot.total_new >= max_new:
+                        status = "capped"
+                        break
+                if status == "capped":
+                    break
                 if busy:
                     raise MediaLockBusy("media_lock_busy")
                 empty_streak = 0
@@ -413,7 +438,7 @@ def run_profile(handle, next_page=1, empty_streak=0, checkpoint=None, *,
             checkpoint(next_page, empty_streak)
             if empty_streak < 2:
                 time.sleep(random.uniform(source.Config.DELAY_MIN, source.Config.DELAY_MAX))
-        return {"status": "done" if empty_streak >= 2 else "continue",
+        return {"status": "done" if empty_streak >= 2 else status,
                 "next_page": next_page, "empty_streak": empty_streak,
                 "new": bot.total_new, "skipped": bot.total_skipped,
                 "errors": bot.total_errors, "foreign_skipped": bot.foreign_skipped,
