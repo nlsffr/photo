@@ -71,7 +71,7 @@ def make_poster(video, destination):
 
 
 class VerifiedStorage:
-    def __init__(self, client, bucket, public_base, before_write=lambda: None):
+    def __init__(self, client, bucket, public_base, before_write=lambda _key: None):
         self.client, self.bucket, self.public_base = client, bucket, public_base.rstrip('/')
         self.before_write = before_write
         self.uploaded = {}
@@ -93,7 +93,7 @@ class VerifiedStorage:
     def upload(self, local_path, key):
         mime = validate_file(local_path)
         size = Path(local_path).stat().st_size
-        self.before_write()
+        self.before_write(key)
         current = self.head(key)
         if current is None:
             try:

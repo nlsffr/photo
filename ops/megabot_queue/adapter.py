@@ -247,6 +247,9 @@ class EligibleDatabase:
     def before_photo_commit(self, photo_id, creator_id):
         """Run importer-specific checks while the same creator remains locked."""
 
+    def before_storage_write(self, source_id, key):
+        self.assert_media_allowed(source_id)
+
     def insert_photo(self, photo_id, creator_id, *args, **kwargs):
         if self.storage is not None:
             names = ('source_id', 'title', 'image_url', 'video_url', 'media_type', 'tags',
@@ -405,7 +408,7 @@ def run_profile(handle, next_page=1, empty_streak=0, checkpoint=None, *,
         original_store = bot.r2
         bot.r2 = integrity.VerifiedStorage(original_store.client, original_store.bucket,
                                           source.Config.PUBLIC_MEDIA_BASE,
-                                          before_write=lambda: bot.db.assert_media_allowed(bot.current_media[0]))
+                                          before_write=lambda key: bot.db.before_storage_write(bot.current_media[0], key))
         factory = EligibleDatabase if database_factory is None else database_factory
         bot.db = factory(bot.db, handle, bot.r2)
         bot.current_media = None

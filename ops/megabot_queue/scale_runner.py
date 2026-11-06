@@ -23,6 +23,7 @@ PROBE_COOLDOWN = 3600
 EMPTY_COOLDOWN = 86400
 SOURCE_COOLDOWN = 900
 SCAN_COOLDOWN = 120
+EDGE_STAGE_POLL = 30
 TERMINAL = ("published", "known", "excluded", "review")
 
 
@@ -143,6 +144,9 @@ class PendingQueue:
         with self.db:
             if outcome == "empty":
                 self.db.execute("UPDATE candidates SET available_at=? WHERE handle=?", (now + EMPTY_COOLDOWN, handle))
+            elif outcome == "stage_pending":
+                self.db.execute("UPDATE candidates SET attempts=MAX(attempts-1,0), available_at=? WHERE handle=?",
+                                (now + EDGE_STAGE_POLL, handle))
             elif outcome in TERMINAL:
                 self.db.execute("UPDATE candidates SET status=? WHERE handle=?", (outcome, handle))
 
@@ -178,7 +182,7 @@ def outcome_of(result):
     if len(outcomes) != 1:
         raise BootstrapError("invalid_bootstrap_result")
     outcome, count = outcomes[0]
-    if outcome not in ("published", "known", "excluded", "empty") or type(count) is not int or count != 1:
+    if outcome not in ("published", "known", "excluded", "empty", "stage_pending") or type(count) is not int or count != 1:
         raise BootstrapError("invalid_bootstrap_result")
     media = counts.get("media", 0)
     if type(media) is not int or (not 1 <= media <= MAX_MEDIA if outcome == "published" else media != 0):
@@ -255,6 +259,8 @@ def run_cycle(queue, fetch, read_snapshot, import_one, *, pages, profile_limit, 
             return report("stopped")
         else:
             queue.finish(handle, outcome, int(now()))
+            if outcome == "stage_pending":
+                counts["attempted"] -= 1
             counts[outcome] += 1
             counts["media"] += media
     return report("completed")

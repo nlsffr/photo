@@ -2,8 +2,10 @@
 
 import argparse
 from collections import Counter
-from contextlib import contextmanager, redirect_stderr, redirect_stdout
+from contextlib import closing, contextmanager, redirect_stderr, redirect_stdout
 import fcntl
+from hashlib import sha256
+from http.client import HTTPConnection, HTTPException
 import json
 import os
 from pathlib import Path
@@ -21,12 +23,56 @@ MAX_MEDIA = 15
 MIN_STAGING_FREE = 12 * 1024**3  # Four queue slots, one bootstrap, and 2 GiB headroom.
 NAMESPACE = UUID("21e80f4e-09b2-4f4b-960a-b9f9626b048a")
 SOURCE_ORIGIN = "https://api.leakgallery.com"
+PUBLIC_MEDIA_BASE = "https://leakfanhub.com/media"
+EDGE_MAP = Path("/opt/photo/infra/nginx/generated/removed-media-maps.conf")
 HANDLE = re.compile(r"[a-z0-9](?:[a-z0-9._-]{0,98}[a-z0-9])?")
 UNAVAILABLE = ("removed", "is_removed", "is_hidden", "removed_at", "removed_from_index_at")
 
 
 class BootstrapError(RuntimeError):
     """The approved import cannot continue safely."""
+
+
+def _read_edge_file(path, maximum):
+    with os.fdopen(os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK), "rb") as stream:
+        info = os.fstat(stream.fileno())
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022 or info.st_size > maximum:
+            raise OSError("untrusted_edge_map")
+        body = stream.read(maximum + 1)
+        if len(body) > maximum:
+            raise OSError("edge_map_too_large")
+        return body
+
+
+def edge_stage_ready(handle):
+    if not handle or canonical(handle) != handle:
+        raise BootstrapError("invalid_edge_stage_handle")
+    try:
+        raw = _read_edge_file(EDGE_MAP, 16 * 1024**2)
+        checksum = _read_edge_file(EDGE_MAP.with_suffix(".conf.sha256"), 128)
+        if sha256(raw).hexdigest().encode("ascii") != checksum.strip():
+            return False
+
+        entry = f'  "{handle}" 1;'.encode("ascii")
+        def in_creator_map(name):
+            header = b"\nmap $media_creator_path_handle $media_" + name + b"_creator {\n"
+            _, start, tail = raw.partition(header)
+            body, end, _ = tail.partition(b"\n}\n")
+            return bool(start and end and entry in body.splitlines())
+
+        if in_creator_map(b"removed"):
+            raise BootstrapError("edge_creator_already_tombstoned")
+        if not in_creator_map(b"staged"):
+            return False
+        with closing(HTTPConnection("127.0.0.1", 80, timeout=2)) as edge:
+            edge.request("HEAD", f"/media/creators/{handle}/.lfh-bootstrap-stage-probe",
+                         headers={"Host": "leakfanhub.com", "Cache-Control": "no-cache"})
+            with closing(edge.getresponse()) as response:
+                return (response.status == 410
+                        and "no-store" in response.getheader("Cache-Control", "").lower()
+                        and "noindex" in response.getheader("X-Robots-Tag", "").lower())
+    except (OSError, HTTPException):
+        return False
 
 
 def canonical(value):
@@ -229,6 +275,15 @@ class BootstrapDatabase(EligibleDatabase):
             raise BootstrapError("staging_failed")
         self.staged(locked=True)
 
+    def before_storage_write(self, source_id, key):
+        prefix = f"creators/{self.handle}/"
+        tail = key.removeprefix(prefix) if isinstance(key, str) else ""
+        if (self.storage.public_base != PUBLIC_MEDIA_BASE or tail == key or tail in (".", "..")
+                or not re.fullmatch(r"[A-Za-z0-9._-]+", tail)):
+            raise Excluded("edge_asset_scope_mismatch")
+        self.eligible_id()
+        super().before_storage_write(source_id, key)
+
     def activate(self):
         with self.transaction():
             self.eligible_id(locked=True)
@@ -272,6 +327,8 @@ def run_candidate(database, *, source_path, state_dir, apply=False):
         return {"status": state}
     check_queue_pause(state_dir)
     database.reserve()
+    if not edge_stage_ready(database.handle):
+        return {"status": "stage_pending"}
     page, empty = 1, 0
     state_dir = Path(state_dir)
     # A restart deliberately scans from page one. Committed source IDs are

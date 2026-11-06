@@ -101,6 +101,15 @@ class ScaleRunnerTests(unittest.TestCase):
             report = self.cycle(queue, fixtures("next"), lambda *_: published())
             self.assertEqual(report["counts"]["published"], 1)
 
+    def test_edge_wait_is_retried_after_one_tick_without_consuming_attempts(self):
+        pending = {"status": "completed", "counts": {"stage_pending": 1, "media": 0}}
+        with PendingQueue(self.path) as queue:
+            report = self.cycle(queue, {}, lambda *_: pending, seeds={"one": (), "two": ()})
+            self.assertEqual(report["counts"]["stage_pending"], 2)
+            self.assertEqual(report["counts"]["attempted"], 0)
+            self.assertEqual(queue.ready(self.now + 29, 2), [])
+            self.assertEqual(queue.ready(self.now + 30, 2), [("one", (), 0), ("two", (), 0)])
+
     def test_storage_failure_keeps_remaining_candidates_and_stops_cycle(self):
         attempted = []
 

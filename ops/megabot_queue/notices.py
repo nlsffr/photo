@@ -34,14 +34,21 @@ def notice_matches(row, notice):
         return True
     profile = re.compile(re.escape(row['handle']) + r'(?:-v[1-9][0-9]*)?', re.I)
     media = re.compile(re.escape(str(row['source_id'])) + r'(?:-v[1-9][0-9]*)?(?:\.[a-zA-Z0-9]+)?')
+    asset = re.compile(re.escape(str(row['source_id'])) + r'(?:-v[1-9][0-9]*)?(?:_thumb)?\.[a-zA-Z0-9]+')
     for text in strings:
         if row.get('id') and str(row['id']) in unquote(text):
             return True
-        for url in re.findall(r'https?://[^\s"<>\\\]\[}]+', text):
+        urls = re.findall(r'https?://[^\s"<>\\\]\[}]+', text)
+        if re.fullmatch(r'/media/creators/[^\s"<>\\\]\[}]+', text.strip()):
+            urls.append(text.strip())
+        for url in urls:
             parsed = urlsplit(url)
-            if parsed.hostname not in ('leakfanhub.com', 'www.leakfanhub.com'):
+            if (parsed.scheme or parsed.netloc) and parsed.hostname not in ('leakfanhub.com', 'www.leakfanhub.com'):
                 continue
             parts = unquote(parsed.path).strip('/').split('/')
+            if (row['source_id'] is not None and len(parts) == 4 and parts[:2] == ['media', 'creators']
+                    and profile.fullmatch(parts[2]) and asset.fullmatch(parts[3])):
+                return True
             if parts[0] in ('fr', 'en', 'es', 'de', 'it', 'pt', 'nl', 'ru', 'zh', 'ja', 'hi', 'th'):
                 parts = parts[1:]
             if parts and profile.fullmatch(parts[0]) and (

@@ -1,8 +1,9 @@
 from types import SimpleNamespace
+from hashlib import sha256
 import unittest
 from unittest.mock import Mock, patch
 
-from ops.megabot_queue import adapter, bootstrap
+from ops.megabot_queue import adapter, bootstrap, notices
 
 
 class BootstrapTest(unittest.TestCase):
@@ -127,10 +128,78 @@ class BootstrapTest(unittest.TestCase):
         db = SimpleNamespace(handle="new-one", inspect=lambda: "pending",
                              reserve=lambda: None, staged=lambda: list(range(14)),
                              activate=lambda: 15)
-        with patch.object(bootstrap, "run_profile", return_value={"status": "capped"}) as run:
+        with patch.object(bootstrap, "edge_stage_ready", return_value=True), \
+                patch.object(bootstrap, "run_profile", return_value={"status": "capped"}) as run:
             result = bootstrap.run_candidate(db, source_path="fixture", state_dir="fixture", apply=True)
         self.assertEqual(result, {"status": "published", "media": 15})
         self.assertEqual(run.call_args.kwargs["max_new"], 1)
+
+    def test_unconfirmed_edge_does_not_start_ingestion(self):
+        db = Mock(handle="new-one")
+        db.inspect.return_value = "new"
+        with patch.object(bootstrap, "check_queue_pause"), \
+                patch.object(bootstrap, "edge_stage_ready", return_value=False), \
+                patch.object(bootstrap, "run_profile") as run:
+            self.assertEqual(bootstrap.run_candidate(db, source_path="fixture", state_dir="fixture", apply=True),
+                             {"status": "stage_pending"})
+        db.reserve.assert_called_once()
+        db.staged.assert_not_called()
+        run.assert_not_called()
+
+    def test_edge_probe_requires_confirmed_exact_stage_and_no_store_410(self):
+        durable = b'\nmap $media_creator_path_handle $media_removed_creator {\n  default 0;\n%s}\n'
+        transient = b'\nmap $media_creator_path_handle $media_staged_creator {\n  default 0;\n%s}\n'
+        good = (durable % b'' + transient % b'  "new-one" 1;\n')
+        response = Mock(status=410)
+        response.getheader.side_effect = lambda name, default: {
+            "Cache-Control": "no-store, max-age=0", "X-Robots-Tag": "noindex, noarchive",
+        }.get(name, default)
+        for data, checksum, status, expected in (
+            (good, sha256(good).hexdigest().encode(), 410, True),
+            (good, b'wrong-digest', 410, False),
+            (good, sha256(good).hexdigest().encode(), 404, False),
+            (durable % b'', sha256(durable % b'').hexdigest().encode(), 410, False),
+        ):
+            with self.subTest(status=status, expected=expected), \
+                    patch.object(bootstrap, "_read_edge_file", side_effect=[data, checksum]), \
+                    patch.object(bootstrap, "HTTPConnection") as client:
+                response.status = status
+                client.return_value.getresponse.return_value = response
+                self.assertEqual(bootstrap.edge_stage_ready("new-one"), expected)
+                if expected:
+                    client.assert_called_once_with("127.0.0.1", 80, timeout=2)
+                    client.return_value.request.assert_called_once_with(
+                        "HEAD", "/media/creators/new-one/.lfh-bootstrap-stage-probe",
+                        headers={"Host": "leakfanhub.com", "Cache-Control": "no-cache"})
+
+        blocked = durable % b'  "new-one" 1;\n' + transient % b'  "new-one" 1;\n'
+        with patch.object(bootstrap, "_read_edge_file", side_effect=[blocked, sha256(blocked).hexdigest().encode()]), \
+                patch.object(bootstrap, "HTTPConnection") as client:
+            with self.assertRaisesRegex(bootstrap.BootstrapError, "edge_creator_already_tombstoned"):
+                bootstrap.edge_stage_ready("new-one")
+            client.assert_not_called()
+
+    def test_storage_write_rechecks_live_stage_and_withdrawal_before_upload(self):
+        db = bootstrap.BootstrapDatabase(Mock(), "new-one", (), storage=Mock(public_base="https://leakfanhub.com/media"))
+        with patch.object(db, "eligible_id") as eligible, patch.object(db, "assert_media_allowed") as notice:
+            with self.assertRaisesRegex(adapter.Excluded, "edge_asset_scope_mismatch"):
+                db.before_storage_write("5", "creators/other/5.mp4")
+            eligible.assert_not_called()
+            notice.assert_not_called()
+            db.before_storage_write("5", "creators/new-one/5.mp4")
+            eligible.assert_called_once()
+            notice.assert_called_once_with("5")
+
+    def test_notice_also_matches_an_exact_public_storage_asset_and_poster(self):
+        row = {"handle": "new-one", "source_id": "123"}
+        for url in ("https://leakfanhub.com/media/creators/new-one/123.mp4",
+                    "https://www.leakfanhub.com/media/creators/NEW-ONE/123_thumb.webp",
+                    "/media/creators/new-one/123.webp?ref=1"):
+            self.assertTrue(notices.notice_matches(row, {"targets": [{"url": url}]}), url)
+        for url in ("https://evil.test/media/creators/new-one/123.mp4",
+                    "https://leakfanhub.com/media/creators/other/123.mp4",
+                    "https://leakfanhub.com/media/creators/new-one/1234.mp4"):
+            self.assertFalse(notices.notice_matches(row, {"targets": [{"url": url}]}), url)
 
     def test_dry_run_and_known_skip_do_not_call_ingestion(self):
         db = SimpleNamespace(handle="new-one", inspect=lambda: "new")
