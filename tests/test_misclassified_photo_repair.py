@@ -1,7 +1,9 @@
 """Photo classification repair, isolated from production and real media."""
+import base64
 import copy
 import importlib.util
 from pathlib import Path
+import shutil
 import tempfile
 import types
 import unittest
@@ -9,6 +11,10 @@ from unittest.mock import patch
 
 spec=importlib.util.spec_from_file_location('photo_repair',Path(__file__).resolve().parents[1]/'ops/repair-misclassified-photo.py')
 r=importlib.util.module_from_spec(spec);spec.loader.exec_module(r)
+
+WEBP = base64.b64decode(
+    'UklGRjwAAABXRUJQVlA4IDAAAADQAQCdASoQABAAAUAmJaACdLoB+AADsAD+8ut//NgVzXPv9//S4P0uD9Lg/9KQAAA='
+)
 
 class StorageError(Exception):
     def __init__(self,status):self.response={'ResponseMetadata':{'HTTPStatusCode':status}}
@@ -195,5 +201,86 @@ class PhotoRepairTests(unittest.TestCase):
         def convert(command,**kwargs):calls.append(command);target.write_bytes(b'\xff\xd8\xffneutral')
         with patch.object(r.subprocess,'run',side_effect=convert):r.reencode_image(self.root/'source',target,'.jpg')
         self.assertNotIn('-vf',calls[0]);self.assertNotIn('-s',calls[0]);self.assertNotIn('scale',str(calls[0]))
+
+    def prepare_legacy(self, body=WEBP):
+        self.runtime.source=self.source
+        observations=[]
+        reads=[]
+        metadata={'ContentType':'binary/octet-stream','ContentLength':len(body),'ETag':'"legacy-etag"'}
+        self.runtime.s3.head_object=lambda **_:metadata.copy()
+        response_body=types.SimpleNamespace(iter_chunks=lambda **_:[body], close=lambda:None)
+
+        def get(**options):
+            reads.append(options)
+            return {**metadata, 'Body':response_body, 'ResponseMetadata':{'HTTPStatusCode':200}}
+
+        def read_details(row):
+            observations.append(row['source_id'])
+            return self.details.copy()
+
+        self.runtime.s3.get_object=get
+        self.runtime.photo_details=read_details
+        self.runtime.photo_source=r.Repair.photo_source.__get__(self.runtime)
+        return metadata, observations, reads
+
+    @unittest.skipUnless(shutil.which('ffmpeg'), 'requires the repair worker FFmpeg decoder')
+    def test_legacy_webp_dry_run_apply_and_replay_preserve_object_and_urls(self):
+        metadata, observations, reads=self.prepare_legacy()
+        expected=copy.deepcopy(self.row)
+        result=self.runtime.repair_legacy_webp(expected)
+        self.assertEqual(result['status'],'would_reclassify')
+        self.assertFalse(self.runtime.journal.exists())
+        self.assertEqual(self.updates,[])
+        self.assertEqual(self.runtime.repair_legacy_webp(expected,True)['status'],'photo_restored')
+        self.assertEqual(self.runtime.repair_legacy_webp(expected,True)['status'],'already_present')
+        self.assertEqual(self.row,{**expected,'type':'photo','file_size':len(WEBP)})
+        self.assertEqual(len(self.updates),1)
+        self.assertEqual(observations,[12]*6)
+        self.assertEqual(reads,[{'Bucket':'fixture','Key':expected['minio_key'],'IfMatch':metadata['ETag']}]*3)
+        self.assertEqual(self.runtime.s3.puts,[])
+
+    @unittest.skipUnless(shutil.which('ffmpeg'), 'requires the repair worker FFmpeg decoder')
+    def test_legacy_webp_signature_alone_does_not_pass_full_decode(self):
+        malformed = WEBP[:12] + bytes(len(WEBP)-12)
+        self.prepare_legacy(malformed)
+        with self.assertRaisesRegex(r.RepairError,'stored_webp_decode_failed'):
+            self.runtime.repair_legacy_webp(copy.deepcopy(self.row),True)
+        self.assertEqual((self.updates,self.runtime.s3.puts),([],[]))
+
+    def test_legacy_webp_requires_legacy_header_and_refuses_changed_source_path(self):
+        metadata, observations, reads=self.prepare_legacy()
+        metadata['ContentType']='application/octet-stream'
+        with self.assertRaisesRegex(r.RepairError,'legacy_webp_metadata_rejected'):
+            self.runtime.repair_legacy_webp(copy.deepcopy(self.row),True)
+        self.assertEqual((observations,reads),([],[]))
+
+        metadata['ContentType']='binary/octet-stream'
+        expected=copy.deepcopy(self.row)
+        expected.pop('source_api')
+        details=iter([self.details,{**self.details,'file_path':'content/person/changed.jpg'}])
+        self.runtime.photo_details=lambda _:next(details)
+        with patch.object(r,'verify_stored_webp'), self.assertRaisesRegex(r.RepairError,'source_photo_changed'):
+            self.runtime.repair_legacy_webp(expected,True)
+        self.assertEqual((self.updates,self.runtime.s3.puts),([],[]))
+
+    def test_legacy_webp_refuses_storage_change_and_new_withdrawal(self):
+        metadata, _, _=self.prepare_legacy()
+        expected=copy.deepcopy(self.row)
+        def change(*_):
+            metadata['ETag']='"replaced"'
+        with patch.object(r,'verify_stored_webp',side_effect=change):
+            with self.assertRaisesRegex(r.RepairError,'legacy_webp_metadata_changed'):
+                self.runtime.repair_legacy_webp(expected,True)
+
+        rows=iter([expected,expected])
+        def candidate(_):
+            row=next(rows,None)
+            if row is None:
+                raise r.RepairError('notice_excluded')
+            return row
+        self.runtime.candidate=candidate
+        with patch.object(r,'verify_stored_webp'), self.assertRaisesRegex(r.RepairError,'notice_excluded'):
+            self.runtime.repair_legacy_webp(expected,True)
+        self.assertEqual((self.updates,self.runtime.s3.puts),([],[]))
 
 if __name__=='__main__':unittest.main()
