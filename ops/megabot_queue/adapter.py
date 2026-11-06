@@ -4,7 +4,7 @@ One adapter invocation per OS process: the legacy module's Config is global.
 The supervisor must pin source_path's digest and keep legacy workers separate.
 """
 
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 import fcntl
 import hashlib
 import importlib.util
@@ -114,20 +114,26 @@ def load_source(path):
 
 @contextmanager
 def media_lock(directory, source_id):
-    """Try the existing shared stripe without waiting behind another transfer."""
+    """Exclude the same source ID without waiting behind another transfer."""
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
-    stripe = int.from_bytes(hashlib.sha256(source_id.encode()).digest()[:2], "big") % 64
+    digest = int.from_bytes(hashlib.sha256(source_id.encode()).digest()[:2], "big")
+    stripe = digest % 64
+    sub_stripe = (digest // 64) % 64
     flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
-    fd = os.open(directory / f"media-{stripe:02d}.lock", flags, 0o600)
-    try:
-        try:
-            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            raise MediaLockBusy("media_lock_busy") from None
+    # Older workers take the original stripe exclusively, including after rollback.
+    with ExitStack() as descriptors:
+        for name, mode in (
+            (f"media-{stripe:02d}.lock", fcntl.LOCK_SH),
+            (f"media-{stripe:02d}-{sub_stripe:02d}.lock", fcntl.LOCK_EX),
+        ):
+            fd = os.open(directory / name, flags, 0o600)
+            descriptors.callback(os.close, fd)
+            try:
+                fcntl.flock(fd, mode | fcntl.LOCK_NB)
+            except BlockingIOError:
+                raise MediaLockBusy("media_lock_busy") from None
         yield
-    finally:
-        os.close(fd)
 
 
 def request_json(bot, url, *, profile=False):

@@ -19,6 +19,12 @@ def _legacy_lock_process(directory, acquired, release):
         release.wait(15)
 
 
+def _current_lock_process(directory, acquired, release):
+    with adapter.media_lock(directory, 'same-id'):
+        acquired.set()
+        release.wait(15)
+
+
 def source_fixture(pages=None, details=None, *, active=True, stored=0, fail_media=False, remove_before_publish=False,
                    notice_before_publish=False, capped=False, cap_before_insert=False):
     state = SimpleNamespace(active=active, stored=stored, inserted=set(), requests=[],
@@ -507,6 +513,10 @@ class AdapterTest(unittest.TestCase):
             with self.assertRaisesRegex(adapter.MediaLockBusy, 'media_lock_busy'):
                 with adapter.media_lock(self.directory.name, 'same-id'):
                     self.fail('entered the held legacy stripe')
+            # These different IDs both use legacy stripe 11.
+            with self.assertRaisesRegex(adapter.MediaLockBusy, 'media_lock_busy'):
+                with adapter.media_lock(self.directory.name, 'fixture-34'):
+                    self.fail('entered the held legacy stripe with another ID')
             self.assertTrue(holder.is_alive())
             with adapter.media_lock(self.directory.name, 'different-id'):
                 pass
@@ -515,6 +525,31 @@ class AdapterTest(unittest.TestCase):
             self.assertEqual(holder.exitcode, 0)
             with adapter.media_lock(self.directory.name, 'same-id'):
                 pass
+        finally:
+            if holder.is_alive():
+                holder.terminate()
+                holder.join(5)
+
+    def test_current_workers_exclude_same_id_but_share_legacy_stripe(self):
+        context = multiprocessing.get_context('spawn')
+        acquired, release = context.Event(), context.Event()
+        holder = context.Process(target=_current_lock_process, args=(self.directory.name, acquired, release))
+        holder.start()
+        try:
+            self.assertTrue(acquired.wait(5))
+            with self.assertRaisesRegex(adapter.MediaLockBusy, 'media_lock_busy'):
+                with adapter.media_lock(self.directory.name, 'same-id'):
+                    self.fail('entered a held media lock')
+            with adapter.media_lock(self.directory.name, 'fixture-34'):
+                self.assertTrue(holder.is_alive())
+            # An old process and a rollback still open the original path exclusively.
+            with (Path(self.directory.name) / 'media-11.lock').open('a+b') as legacy_lock:
+                with self.assertRaises(BlockingIOError):
+                    fcntl.flock(legacy_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                release.set()
+                holder.join(5)
+                self.assertEqual(holder.exitcode, 0)
+                fcntl.flock(legacy_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         finally:
             if holder.is_alive():
                 holder.terminate()
