@@ -17,11 +17,33 @@ repair=importlib.util.module_from_spec(spec);spec.loader.exec_module(repair)
 class StoreError(Exception):
     def __init__(self,status):self.response={'ResponseMetadata':{'HTTPStatusCode':status}}
 
+class StoredBody:
+    def __init__(self, payload):
+        self.payload = payload
+        self.closed = False
+
+    def iter_chunks(self, chunk_size):
+        for start in range(0, len(self.payload), chunk_size):
+            yield self.payload[start:start + chunk_size]
+
+    def close(self):
+        self.closed = True
+
 class Store:
-    def __init__(self):self.objects={};self.puts=[]
+    def __init__(self):self.objects={};self.puts=[];self.gets=[];self.bodies=[]
     def head_object(self,Bucket,Key):
         if Key not in self.objects:raise StoreError(404)
-        return {'ContentLength':len(self.objects[Key]),'ContentType':'image/webp' if Key.endswith('.webp') else 'video/mp4'}
+        payload = self.objects[Key]
+        return {'ContentLength':len(payload),'ContentType':'image/webp' if Key.endswith('.webp') else 'video/mp4',
+                'ETag': '"' + hashlib.md5(payload).hexdigest() + '"'}
+    def get_object(self, Bucket, Key, IfMatch):
+        self.gets.append((Bucket, Key, IfMatch))
+        metadata = self.head_object(Bucket, Key)
+        if metadata['ETag'] != IfMatch:
+            raise StoreError(412)
+        body = StoredBody(self.objects[Key])
+        self.bodies.append(body)
+        return {**metadata, 'Body':body, 'ResponseMetadata':{'HTTPStatusCode':200}}
     def put_object(self,**kwargs):
         self.puts.append({k:v for k,v in kwargs.items() if k!='Body'})
         assert kwargs['IfNoneMatch']=='*'
@@ -247,6 +269,73 @@ class RepairTests(unittest.TestCase):
         self.assertEqual(self.runtime.s3.objects[key],b'existing-valid-file')
         self.assertEqual([x['Key'] for x in self.runtime.s3.puts],['creators/person/12_thumb.webp'])
         self.assertEqual(self.runtime.downloads,['https://cdn.leakgallery.com/thumb.jpg'])
+
+    def test_missing_source_poster_uses_conditionally_read_stored_video(self):
+        key = self.row['minio_key']
+        payload = b'\0\0\0\x18ftypisomstored-video'
+        self.runtime.s3.objects[key] = payload
+        etag = self.runtime.s3.head_object('fixture', key)['ETag']
+        self.runtime.details = Mock(return_value={'video':'https://cdn.leakgallery.com/file.mp4','poster':''})
+        self.runtime.download = Mock(side_effect=AssertionError('source download not required'))
+
+        def poster(input_path, output_path, extension):
+            self.assertEqual(input_path.read_bytes(), payload)
+            output_path.write_bytes(b'RIFF0000WEBPfixture')
+
+        with patch.object(repair, 'probe_video') as probe, patch.object(repair, 'make_poster', side_effect=poster):
+            result = self.runtime.run(copy.deepcopy(self.row), True)
+        self.assertEqual(result['status'], 'restored')
+        probe.assert_called_once()
+        self.runtime.details.assert_called_once()
+        self.runtime.download.assert_not_called()
+        self.assertEqual(self.runtime.s3.gets, [('fixture', key, etag)])
+        self.assertTrue(self.runtime.s3.bodies[0].closed)
+        self.assertEqual(self.runtime.s3.objects[key], payload)
+        self.assertEqual([put['Key'] for put in self.runtime.s3.puts], ['creators/person/12_thumb.webp'])
+        poster_event = next(row for row in map(json.loads, self.runtime.journal.read_text().splitlines())
+                            if row['status'] == 'poster_uploaded')
+        self.assertEqual(poster_event['source'], 'stored_video')
+
+    def test_undecodable_stored_video_falls_back_to_source_without_overwrite(self):
+        key = self.row['minio_key']
+        payload = b'\0\0\0\x18ftypisominvalid-video'
+        self.runtime.s3.objects[key] = payload
+        self.runtime.details = lambda row: {'video':'https://cdn.leakgallery.com/file.mp4','poster':''}
+
+        def poster(input_path, output_path, extension):
+            self.assertTrue(input_path.read_bytes().endswith(b'fixture-video'))
+            output_path.write_bytes(b'RIFF0000WEBPfixture')
+
+        with patch.object(repair, 'probe_video', side_effect=[repair.RepairError('invalid_video'), {}]), \
+                patch.object(repair, 'make_poster', side_effect=poster):
+            self.runtime.run(copy.deepcopy(self.row), True)
+        self.assertEqual(self.runtime.downloads, ['https://cdn.leakgallery.com/file.mp4'])
+        self.assertEqual(self.runtime.s3.objects[key], payload)
+        self.assertEqual([put['Key'] for put in self.runtime.s3.puts], ['creators/person/12_thumb.webp'])
+
+    def test_stored_video_replaced_before_poster_upload_is_retried(self):
+        key = self.row['minio_key']
+        self.runtime.s3.objects[key] = b'\0\0\0\x18ftypisomfirst'
+        self.runtime.details = lambda row: {'video':'https://cdn.leakgallery.com/file.mp4','poster':''}
+
+        def poster(input_path, output_path, extension):
+            self.runtime.s3.objects[key] = b'\0\0\0\x18ftypisomother'
+            output_path.write_bytes(b'RIFF0000WEBPfixture')
+
+        with patch.object(repair, 'probe_video'), patch.object(repair, 'make_poster', side_effect=poster):
+            with self.assertRaisesRegex(repair.RepairError, 'stored_video_metadata_changed'):
+                self.runtime.run(copy.deepcopy(self.row), True)
+        self.assertEqual(self.runtime.s3.puts, [])
+        self.assertEqual(self.runtime.downloads, [])
+
+    def test_withdrawn_source_does_not_read_stored_original(self):
+        key = self.row['minio_key']
+        self.runtime.s3.objects[key] = b'\0\0\0\x18ftypisomfirst'
+        self.runtime.details = Mock(side_effect=repair.RepairError('source_excluded'))
+        with self.assertRaisesRegex(repair.RepairError, 'source_excluded'):
+            self.runtime.run(copy.deepcopy(self.row), True)
+        self.assertEqual(self.runtime.s3.gets, [])
+        self.assertEqual(self.runtime.s3.puts, [])
 
     def test_withdrawal_during_download_prevents_both_uploads(self):
         calls=[]

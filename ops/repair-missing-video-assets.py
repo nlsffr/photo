@@ -8,7 +8,7 @@ The existing source and credentials are loaded from the pinned queue config.
 from __future__ import annotations
 
 import argparse
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 import hashlib
 import html
 import importlib.util
@@ -24,6 +24,7 @@ from urllib.parse import unquote, urljoin, urlsplit
 
 MAX_BYTES = 2 * 1024**3
 MAX_IMAGE_BYTES = 25 * 1024**2
+STORED_VIDEO_READ_SECONDS = 120
 
 _cache_spec = importlib.util.spec_from_file_location('repair_local_media_cache', Path(__file__).with_name('local-media-cache.py'))
 local_cache = importlib.util.module_from_spec(_cache_spec)
@@ -160,16 +161,23 @@ def source_url(value):
 def response_download(response, destination, limit, image=False):
     if response.status_code != 200:
         raise RepairError('source_http_' + str(response.status_code))
-    mime = response.headers.get('Content-Type', '').split(';', 1)[0].lower()
-    allowed = mime.startswith('image/') if image else mime.startswith('video/')
-    if not allowed and mime not in ('application/octet-stream', 'binary/octet-stream'):
-        raise RepairError('download_mime_rejected')
     length = response.headers.get('Content-Length')
     if length and (not length.isdigit() or int(length) > limit):
         raise RepairError('download_too_large')
+    return stream_download(response.iter_content(1024 * 1024), destination, limit,
+                           response.headers.get('Content-Type', ''), int(length) if length else None, image)
+
+
+def stream_download(chunks, destination, limit, content_type, length, image=False, deadline=None):
+    mime = content_type.split(';', 1)[0].lower()
+    allowed = mime.startswith('image/' if image else 'video/')
+    if not allowed and mime not in ('application/octet-stream', 'binary/octet-stream'):
+        raise RepairError('download_mime_rejected')
     digest, size, first = hashlib.sha256(), 0, b''
     with Path(destination).open('xb') as out:
-        for block in response.iter_content(1024 * 1024):
+        for block in chunks:
+            if deadline is not None and time.monotonic() >= deadline:
+                raise RepairError('stored_video_read_timeout')
             if not block:
                 continue
             if not first:
@@ -184,8 +192,10 @@ def response_download(response, destination, limit, image=False):
             size += len(block)
             if size > limit:
                 raise RepairError('download_too_large')
+            if length is not None and size > length:
+                raise RepairError('download_incomplete')
             out.write(block); digest.update(block)
-    if size <= 0 or (length and size != int(length)):
+    if size <= 0 or (length is not None and size != length):
         raise RepairError('download_incomplete')
     return {'bytes': size, 'sha256': digest.hexdigest()}
 
@@ -334,6 +344,26 @@ class Repair:
         info.update(probe_video(destination))
         return info
 
+    def download_stored_video(self, key, metadata, destination):
+        size, etag = metadata.get('ContentLength'), metadata.get('ETag')
+        if type(size) is not int or not 0 < size <= MAX_BYTES or not isinstance(etag, str) or not etag:
+            raise RepairError('stored_video_metadata_invalid')
+        deadline = time.monotonic() + STORED_VIDEO_READ_SECONDS
+        try:
+            response = self.s3.get_object(Bucket=self.bucket, Key=key, IfMatch=etag)
+            with closing(response['Body']) as body:
+                if (response.get('ETag') != etag or response.get('ContentLength') != size
+                        or response.get('ResponseMetadata', {}).get('HTTPStatusCode') != 200):
+                    raise RepairError('stored_video_metadata_changed')
+                stream_download(body.iter_chunks(chunk_size=1024 * 1024), destination, size,
+                                response.get('ContentType', ''), size, deadline=deadline)
+        except RepairError:
+            raise
+        except Exception:
+            raise RepairError('stored_video_read_failed') from None
+        probe_video(destination)
+        return etag
+
     def update_size(self, row, size):
         cur = self.db.cursor()
         try:
@@ -400,6 +430,7 @@ class Repair:
             folder = Path(folder); video = folder/'source.video'; poster_ext = Path(poster_key).suffix.lower(); poster = folder/('poster'+poster_ext)
             video_info = None
             video_mime = None
+            poster_video_etag = None
             if video_head is None:
                 video_info = self.download_video(row, video_key, details['video'], video)
             if poster_head is None:
@@ -411,9 +442,19 @@ class Repair:
                     self.download(details['poster'], image, True)
                     make_poster(image, poster, poster_ext)
                 except Exception:
-                    if not video.exists():
-                        self.download_video(row, video_key, details['video'], video)
-                    make_poster(video, poster, poster_ext)
+                    poster.unlink(missing_ok=True)
+                    if video_head is not None:
+                        try:
+                            etag = self.download_stored_video(video_key, video_head, video)
+                            make_poster(video, poster, poster_ext)
+                            poster_video_etag = etag
+                        except RepairError:
+                            video.unlink(missing_ok=True)
+                            poster.unlink(missing_ok=True)
+                    if poster_video_etag is None:
+                        if not video.exists():
+                            self.download_video(row, video_key, details['video'], video)
+                        make_poster(video, poster, poster_ext)
             # Re-check withdrawals and immutable URL identity after network work.
             self.candidate(expected)
             if video_head is None:
@@ -422,10 +463,15 @@ class Repair:
                 self.log({'id':row['id'],'status':'video_uploaded' if written else 'video_race_preserved','key':video_key,**video_info})
             self.candidate(expected)
             if poster_head is None:
+                if poster_video_etag is not None:
+                    current_video = head(self.s3, self.bucket, video_key)
+                    if not current_video or current_video.get('ETag') != poster_video_etag:
+                        raise RepairError('stored_video_metadata_changed')
                 mime = {'.webp':'image/webp','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg'}[poster_ext]
                 written = put_missing(self.s3,self.bucket,poster_key,poster,mime)
                 self.log({'id':row['id'],'status':'poster_uploaded' if written else 'poster_race_preserved','key':poster_key,
-                          'bytes':poster.stat().st_size,'sha256':hashlib.sha256(poster.read_bytes()).hexdigest()})
+                          'bytes':poster.stat().st_size,'sha256':hashlib.sha256(poster.read_bytes()).hexdigest(),
+                          **({'source':'stored_video'} if poster_video_etag is not None else {})})
             actual = head(self.s3,self.bucket,video_key); actual_poster = head(self.s3,self.bucket,poster_key)
             if (not actual or actual.get('ContentLength',0) <= 0 or not actual_poster
                     or (derived_poster and (actual_poster.get('ContentType','').split(';',1)[0].lower() != 'image/webp'
