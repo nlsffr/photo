@@ -31,7 +31,7 @@ class RecoveryTests(unittest.TestCase):
                     'url_version':1, 'type':'video', 'file_size':6}
         self.runtime = repair.Repair.__new__(repair.Repair)
         self.runtime.s3 = Store()
-        self.runtime.s3.objects[ORIGINAL_KEY] = b'original-object'
+        self.runtime.s3.objects[ORIGINAL_KEY] = IMAGE
         self.runtime.bucket = 'fixture'
         self.runtime.journal = self.root / 'journal.jsonl'
         self.runtime.candidate = Mock(side_effect=lambda expected: copy.deepcopy(self.row))
@@ -40,6 +40,7 @@ class RecoveryTests(unittest.TestCase):
         self.runtime.update_links = Mock()
         self.probe = self.enterContext(patch.object(repair.base, 'probe_video', return_value={'format':'mov,mp4'}))
         self.poster = self.enterContext(patch.object(repair.base, 'make_poster', side_effect=self.make_poster))
+        self.decode_image = self.enterContext(patch.object(repair.subprocess, 'run'))
 
     @staticmethod
     def download(url, path):
@@ -52,26 +53,37 @@ class RecoveryTests(unittest.TestCase):
             raise AssertionError('unexpected main bytes')
         path.write_bytes(IMAGE)
 
-    def test_video_with_image_registry_gets_new_verified_assets_and_preserves_original(self):
+    def test_video_with_image_registry_gets_verified_main_and_preserves_original_image(self):
         result = self.runtime.run(copy.deepcopy(self.row), apply=True)
         self.assertEqual(result['status'], 'restored')
         self.assertEqual(self.runtime.video_source.call_count, 2)
-        self.assertEqual(self.runtime.s3.objects[ORIGINAL_KEY], b'original-object')
+        self.assertEqual(self.runtime.s3.objects[ORIGINAL_KEY], IMAGE)
         self.assertEqual(self.runtime.s3.objects[VIDEO_KEY], VIDEO)
         _, video_key, poster_key, size = self.runtime.update_links.call_args.args
         self.assertEqual((video_key, size), (VIDEO_KEY, len(VIDEO)))
-        self.assertEqual(self.runtime.s3.objects[poster_key], IMAGE)
-        self.assertEqual([p['Key'] for p in self.runtime.s3.puts], [VIDEO_KEY, poster_key])
+        self.assertEqual(poster_key, ORIGINAL_KEY)
+        self.assertEqual([p['Key'] for p in self.runtime.s3.puts], [VIDEO_KEY])
         self.assertTrue(all(p['IfNoneMatch'] == '*' for p in self.runtime.s3.puts))
+        self.decode_image.assert_called_once()
+        self.poster.assert_not_called()
 
     def test_video_registry_and_stored_main_are_reused(self):
         self.row['minio_key'] = VIDEO_KEY
+        self.row['image_url'] = None
         self.runtime.s3.objects[VIDEO_KEY] = VIDEO
         self.runtime.run(copy.deepcopy(self.row), apply=True)
         self.runtime.download.assert_not_called()
         self.assertEqual([get[1] for get in self.runtime.s3.gets], [VIDEO_KEY])
         self.assertEqual(len(self.runtime.s3.puts), 1)
         self.assertEqual(self.runtime.s3.objects[VIDEO_KEY], VIDEO)
+
+    def test_invalid_original_image_leaves_objects_and_references_untouched(self):
+        self.runtime.s3.objects[ORIGINAL_KEY] = b'garbage'
+        with self.assertRaises(repair.RepairError):
+            self.runtime.run(copy.deepcopy(self.row), apply=True)
+        self.runtime.download.assert_not_called()
+        self.runtime.update_links.assert_not_called()
+        self.assertEqual(self.runtime.s3.puts, [])
 
     def test_conflicting_existing_video_is_preserved_and_unlinked(self):
         conflicting = b'x' * len(VIDEO)
@@ -111,6 +123,7 @@ class RecoveryTests(unittest.TestCase):
             repair.Repair.update_links(self.runtime, self.row, VIDEO_KEY, 'poster.webp', len(VIDEO))
         self.runtime._candidate.assert_called_once_with(cursor, self.row, lock=True)
         self.assertEqual(cursor.execute.call_count, 2)
+        self.assertEqual(cursor.execute.call_args_list[0].args[1][1], self.row['image_url'])
         db.rollback.assert_called_once()
         db.commit.assert_not_called()
 

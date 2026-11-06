@@ -9,6 +9,7 @@ import importlib.util
 import json
 from pathlib import Path
 import re
+import subprocess
 import tempfile
 import time
 from urllib.parse import urlsplit
@@ -20,7 +21,7 @@ base = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(base)
 RepairError = base.RepairError
 VIDEO_TYPES = {'.mp4':'video/mp4', '.m4v':'video/mp4', '.mov':'video/quicktime', '.webm':'video/webm'}
-IMAGE_EXTENSIONS = {'.jpeg', '.jpg', '.png', '.webp'}
+IMAGE_TYPES = {'.jpeg':'image/jpeg', '.jpg':'image/jpeg', '.png':'image/png', '.webp':'image/webp'}
 IDENTITY = ('id', 'creator_id', 'handle', 'photo_source_id', 'url_version', 'video_url',
             'image_url', 'preview_url', 'minio_key')
 
@@ -48,9 +49,9 @@ def validate_candidate(expected, actual):
     stem = f'creators/{handle}/{sid}'
     suffix = Path(key).suffix
     extension = suffix.lower()
-    if key != stem + suffix or extension not in VIDEO_TYPES.keys() | IMAGE_EXTENSIONS:
+    if key != stem + suffix or extension not in VIDEO_TYPES.keys() | IMAGE_TYPES.keys():
         raise RepairError('registry_key_changed')
-    if extension in IMAGE_EXTENSIONS and base.object_key(actual['image_url']) != key:
+    if extension in IMAGE_TYPES and base.object_key(actual['image_url']) != key:
         raise RepairError('registry_key_changed')
     return stem, extension
 
@@ -116,10 +117,12 @@ class Repair(base.Repair):
             row = self._candidate(cursor, expected, lock=True)
             if row['file_size'] != expected['file_size']:
                 raise RepairError('metadata_changed')
+            # The removal map tracks this reference. Preserve it byte-for-byte.
+            image_url = row['image_url'] or '/media/' + poster_key
             cursor.execute('''UPDATE photos SET video_url=%s,image_url=%s,file_size=%s
                 WHERE id=%s AND type='video' AND video_url <=> %s AND image_url <=> %s
                 AND file_size <=> %s AND is_hidden=0 AND removed_from_index_at IS NULL''',
-                ('/media/' + video_key, '/media/' + poster_key, size, row['id'], row['video_url'],
+                ('/media/' + video_key, image_url, size, row['id'], row['video_url'],
                  row['image_url'], row['file_size']))
             if cursor.rowcount != 1:
                 raise RepairError('metadata_changed')
@@ -142,6 +145,36 @@ class Repair(base.Repair):
                 or metadata.get('ContentType', '').split(';', 1)[0].lower() != mime):
             raise RepairError('verification_failed')
         return metadata
+
+    def existing_poster(self, row, stem):
+        key = base.object_key(row['image_url'])
+        suffix = Path(key).suffix
+        mime = IMAGE_TYPES.get(suffix.lower())
+        if not mime or key not in (stem + suffix, stem + '_thumb' + suffix):
+            raise RepairError('existing_poster_unverified')
+        metadata = base.head(self.s3, self.bucket, key)
+        size = metadata.get('ContentLength') if metadata else None
+        if (type(size) is not int or not 0 < size <= base.MAX_IMAGE_BYTES or not metadata.get('ETag')
+                or metadata.get('ContentType', '').split(';', 1)[0].lower() != mime):
+            raise RepairError('existing_poster_unverified')
+        return key, mime, size, metadata['ETag']
+
+    def validate_stored_poster(self, key, mime, size, etag, destination):
+        deadline = time.monotonic() + base.STORED_VIDEO_READ_SECONDS
+        response = self.s3.get_object(Bucket=self.bucket, Key=key, IfMatch=etag)
+        with closing(response['Body']) as body:
+            if (response.get('ContentLength') != size or response.get('ETag') != etag
+                    or response.get('ContentType', '').split(';', 1)[0].lower() != mime
+                    or response.get('ResponseMetadata', {}).get('HTTPStatusCode') != 200):
+                raise RepairError('stored_object_changed')
+            base.stream_download(body.iter_chunks(chunk_size=1024 * 1024), destination, size,
+                                 response.get('ContentType', ''), size, image=True, deadline=deadline)
+        try:
+            subprocess.run(['ffmpeg', '-nostdin', '-v', 'error', '-xerror', '-threads', '1',
+                            '-max_alloc', '67108864', '-i', str(destination), '-map', '0:v:0',
+                            '-frames:v', '1', '-f', 'null', '-'], capture_output=True, timeout=45, check=True)
+        except (OSError, subprocess.SubprocessError):
+            raise RepairError('existing_poster_unverified') from None
 
     def put_or_verify(self, key, path, mime, info):
         written = base.put_missing(self.s3, self.bucket, key, path, mime)
@@ -178,14 +211,19 @@ class Repair(base.Repair):
             video_key = stem + extension
         mime = VIDEO_TYPES[extension]
         stored = base.head(self.s3, self.bucket, video_key)
+        existing_poster = self.existing_poster(row, stem) if row['image_url'] else None
         if not apply:
-            return {'status':'would_restore', 'stored_main':stored is not None}
+            return {'status':'would_restore', 'stored_main':stored is not None,
+                    'preserves_existing_image':existing_poster is not None}
         self.journal.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         backup = self.journal.parent / (row['id'] + '-' + str(time.time_ns()) + '.before.json')
         base.private_json(backup, row)
         with tempfile.TemporaryDirectory(prefix='video-url-repair-', dir=self.journal.parent) as directory:
             video = Path(directory) / 'main.video'
             poster = Path(directory) / 'poster.webp'
+            if existing_poster:
+                poster_key, poster_mime, poster_size, poster_etag = existing_poster
+                self.validate_stored_poster(*existing_poster, poster)
             if stored and video_key == row['minio_key']:
                 self.object_metadata(video_key, stored.get('ContentLength'), mime)
                 video_etag = self.download_stored_video(video_key, stored, video)
@@ -196,22 +234,25 @@ class Repair(base.Repair):
             formats = probe['format'].split(',')
             if not (('webm' in formats) if extension == '.webm' else ('mp4' in formats or 'mov' in formats)):
                 raise RepairError('source_video_format_changed')
-            base.make_poster(video, poster, '.webp')
-            poster_bytes = poster.read_bytes()
-            if not (poster_bytes.startswith(b'RIFF') and poster_bytes[8:12] == b'WEBP'):
-                raise RepairError('poster_generation_failed')
-            poster_digest = hashlib.sha256(poster_bytes).hexdigest()
-            poster_key = stem + '_repair_' + poster_digest[:24] + '_thumb.webp'
+            if not existing_poster:
+                base.make_poster(video, poster, '.webp')
+                poster_bytes = poster.read_bytes()
+                if not (poster_bytes.startswith(b'RIFF') and poster_bytes[8:12] == b'WEBP'):
+                    raise RepairError('poster_generation_failed')
+                poster_digest = hashlib.sha256(poster_bytes).hexdigest()
+                poster_key = stem + '_repair_' + poster_digest[:24] + '_thumb.webp'
+                poster_mime, poster_size = 'image/webp', len(poster_bytes)
             if self.video_source(expected, row) != approved:
                 raise RepairError('source_video_changed')
             self.candidate(expected)
             if not (stored and video_key == row['minio_key']):
                 video_etag, _ = self.put_or_verify(video_key, video, mime, info)
-            self.candidate(expected)
-            poster_etag, _ = self.put_or_verify(poster_key, poster, 'image/webp',
-                                               {'bytes':len(poster_bytes), 'sha256':poster_digest})
+            if not existing_poster:
+                self.candidate(expected)
+                poster_etag, _ = self.put_or_verify(poster_key, poster, poster_mime,
+                                                   {'bytes':poster_size, 'sha256':poster_digest})
             if (self.object_metadata(video_key, info['bytes'], mime)['ETag'] != video_etag
-                    or self.object_metadata(poster_key, len(poster_bytes), 'image/webp')['ETag'] != poster_etag):
+                    or self.object_metadata(poster_key, poster_size, poster_mime)['ETag'] != poster_etag):
                 raise RepairError('stored_object_changed')
             self.update_links(expected, video_key, poster_key, info['bytes'])
         self.log({'id':row['id'], 'status':'video_url_restored', 'metadata_backup':str(backup)})
