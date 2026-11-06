@@ -27,20 +27,29 @@ SAFE_HANDLE = re.compile(r"^[A-Za-z0-9_.-]{1,100}$")
 SAFE_DATABASE = re.compile(r"^[A-Za-z0-9_]{1,64}$")
 CREATOR_QUERY = """
 SET STATEMENT max_statement_time=20 FOR
-SELECT 'creator', c.handle, COALESCE(c.avatar_url, ''),
+SELECT IF(c.removed_from_index_at IS NULL AND s.creator_id IS NOT NULL,
+          'staging_creator', 'creator'), c.handle, COALESCE(c.avatar_url, ''),
        COALESCE(c.cover_url, '')
 FROM creators c
+LEFT JOIN creator_bootstrap_staging s ON s.creator_id = c.id
 WHERE c.removed_from_index_at IS NOT NULL OR c.is_hidden = 1
 UNION ALL
-SELECT 'photo', '', COALESCE(p.image_url, ''),
+SELECT IF(p.removed_from_index_at IS NULL AND c.removed_from_index_at IS NULL
+          AND c.is_hidden = 1 AND m.photo_id IS NOT NULL, 'staging_photo', 'photo'),
+       '', COALESCE(p.image_url, ''),
        COALESCE(p.video_url, '')
 FROM photos p
+LEFT JOIN creator_bootstrap_staged_media m ON m.photo_id = p.id AND m.creator_id = p.creator_id
+LEFT JOIN creators c ON c.id = m.creator_id
 WHERE p.removed_from_index_at IS NOT NULL OR p.is_hidden = 1
 UNION ALL
-SELECT 'photo', '', COALESCE(p.image_url, ''),
+SELECT IF(c.removed_from_index_at IS NULL AND p.is_hidden = 1
+          AND m.photo_id IS NOT NULL, 'staging_photo', 'photo'),
+       '', COALESCE(p.image_url, ''),
        COALESCE(p.video_url, '')
 FROM creators c
 STRAIGHT_JOIN photos p ON p.creator_id = c.id
+LEFT JOIN creator_bootstrap_staged_media m ON m.photo_id = p.id AND m.creator_id = c.id
 WHERE (c.removed_from_index_at IS NOT NULL OR c.is_hidden = 1)
   AND p.removed_from_index_at IS NULL
 """.strip()
@@ -109,7 +118,7 @@ def _database_tombstones(
     database_host: str,
     database_port: int | None,
     allowed_hosts: set[str],
-) -> tuple[set[str], set[str]]:
+) -> tuple[set[str], set[str], set[str], set[str]]:
     try:
         import mysql.connector  # type: ignore[import-untyped]
     except ImportError as error:
@@ -161,8 +170,13 @@ def _database_tombstones(
             except Exception:
                 pass
 
-    handles: set[str] = set()
-    paths: set[str] = set()
+    return _split_tombstones(rows, allowed_hosts)
+
+
+def _split_tombstones(
+    rows: Iterable[tuple[Any, ...]], allowed_hosts: set[str]
+) -> tuple[set[str], set[str], set[str], set[str]]:
+    handles, paths, staged_handles, staged_paths = set(), set(), set(), set()
     for row in rows:
         if len(row) != 4:
             raise RuntimeError("unexpected database response shape")
@@ -175,12 +189,16 @@ def _database_tombstones(
             raise RuntimeError("invalid database response encoding") from error
         if not all(isinstance(value, str) for value in (kind, handle, first, second)):
             raise RuntimeError("unexpected database response type")
-        if kind == "creator" and SAFE_HANDLE.fullmatch(handle):
-            handles.add(handle.lower())
-        paths.update(_media_paths(first, allowed_hosts))
-        paths.update(_media_paths(second, allowed_hosts))
+        if kind not in ("creator", "photo", "staging_creator", "staging_photo"):
+            raise RuntimeError("unexpected database response kind")
+        staging = kind.startswith("staging_")
+        if kind in ("creator", "staging_creator") and SAFE_HANDLE.fullmatch(handle):
+            (staged_handles if staging else handles).add(handle.lower())
+        target = staged_paths if staging else paths
+        target.update(_media_paths(first, allowed_hosts))
+        target.update(_media_paths(second, allowed_hosts))
 
-    return handles, paths
+    return handles, paths, staged_handles, staged_paths
 
 
 def _container_database_host(docker_bin: str, container: str) -> str:
@@ -251,17 +269,30 @@ def _nginx_string(value: str) -> str:
     return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-def render_map(handles: Iterable[str], paths: Iterable[str]) -> str:
-    creator_entries = "\n".join(
-        f"  {_nginx_string(handle)} 1;" for handle in sorted(set(handles))
-    )
-    object_entries = "\n".join(
-        f"  {_nginx_string(path)} 1;" for path in sorted(set(paths))
-    )
-    if creator_entries:
-        creator_entries += "\n"
-    if object_entries:
-        object_entries += "\n"
+def render_map(
+    handles: Iterable[str], paths: Iterable[str],
+    staged_handles: Iterable[str] = (), staged_paths: Iterable[str] = (),
+) -> str:
+    def entries(values: Iterable[str]) -> str:
+        return "".join(f"  {_nginx_string(value)} 1;\n" for value in sorted(set(values)))
+
+    creator_entries, object_entries = entries(handles), entries(paths)
+    staged_creator_entries, staged_object_entries = entries(staged_handles), entries(staged_paths)
+    state_key = "$media_removed_creator:$media_removed_object"
+    state_rules = "  ~^1: removed;\n  ~:1$ removed;"
+    staging_maps = ""
+    if staged_creator_entries or staged_object_entries:
+        staging_maps = f"""map $media_creator_path_handle $media_staged_creator {{
+  default 0;
+{staged_creator_entries}}}
+
+map $uri $media_staged_object {{
+  default 0;
+{staged_object_entries}}}
+
+"""
+        state_key += ":$media_staged_creator:$media_staged_object"
+        state_rules = "  ~(^|:)1(:|$) removed;"
 
     return f"""# Generated by ops/refresh-removed-media-map.py. Do not edit.
 # Loaded in nginx's http context; every media request stays DB-free.
@@ -281,10 +312,9 @@ map $uri $media_removed_object {{
   default 0;
 {object_entries}}}
 
-map "$media_removed_creator:$media_removed_object" $media_tombstone_state {{
+{staging_maps}map "{state_key}" $media_tombstone_state {{
   default active;
-  ~^1: removed;
-  ~:1$ removed;
+{state_rules}
 }}
 
 map $media_tombstone_state $media_tombstoned {{
@@ -397,6 +427,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.fixture:
             payload = json.loads(args.fixture.read_text("utf-8"))
             handles, paths = _fixture_tombstones(payload, allowed_hosts)
+            staged_handles, staged_paths = set(), set()
         else:
             database_url = os.environ.get("DATABASE_URL", "")
             if not database_url:
@@ -407,7 +438,7 @@ def main(argv: list[str] | None = None) -> int:
                     database_port = int(os.environ["MEDIA_TOMBSTONE_DB_PORT"])
                 except ValueError as error:
                     raise RuntimeError("MEDIA_TOMBSTONE_DB_PORT is invalid") from error
-            handles, paths = _database_tombstones(
+            handles, paths, staged_handles, staged_paths = _database_tombstones(
                 database_url,
                 _container_database_host(args.docker_bin, args.database_container)
                 if args.database_container else args.database_host,
@@ -419,7 +450,7 @@ def main(argv: list[str] | None = None) -> int:
             handles.update(preserved[0])
             paths.update(preserved[1])
 
-        candidate = render_map(handles, paths).encode("utf-8")
+        candidate = render_map(handles, paths, staged_handles, staged_paths).encode("utf-8")
         digest = hashlib.sha256(candidate).hexdigest()
         previous_mode = (
             args.output.stat().st_mode & 0o777 if args.output.exists() else 0o640
@@ -439,7 +470,8 @@ def main(argv: list[str] | None = None) -> int:
             raise
 
         _atomic_write(state_file, f"{digest}\n".encode("ascii"), 0o640)
-        print(f"activated {len(handles)} creator and {len(paths)} object tombstones")
+        print(f"activated {len(handles)} creator and {len(paths)} object tombstones "
+              f"with {len(staged_handles)} staged creators and {len(staged_paths)} staged objects")
     return 0
 
 

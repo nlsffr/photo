@@ -111,11 +111,12 @@ class BootstrapDatabase(EligibleDatabase):
         placeholders = ",".join(["%s"] * len(self.notice_handles))
         lock = " FOR UPDATE" if locked else ""
         creators = self.rows(
-            "SELECT id,handle,is_hidden,removed_from_index_at FROM creators "
-            f"WHERE handle IN ({placeholders}) OR id=%s" + lock,
+            "SELECT c.id,c.handle,c.is_hidden,c.removed_from_index_at,s.creator_id FROM creators c "
+            "LEFT JOIN creator_bootstrap_staging s ON s.creator_id=c.id "
+            f"WHERE c.handle IN ({placeholders}) OR c.id=%s" + lock,
             (*self.notice_handles, self.bootstrap_id),
         )
-        if creators and creators != [(self.bootstrap_id, self.handle, 1, None)]:
+        if creators and creators != [(self.bootstrap_id, self.handle, 1, None, self.bootstrap_id)]:
             return "known"
         history = self.rows(
             "SELECT b.source_id FROM bot_ingested b LEFT JOIN photos p ON p.id=b.photo_id "
@@ -187,22 +188,28 @@ class BootstrapDatabase(EligibleDatabase):
                     "INSERT INTO creator_import_caps (creator_id) VALUES (%s)",
                     (self.bootstrap_id,), write=True,
                 )
-                if creator != 1 or cap != 1:
+                stage = self.rows(
+                    "INSERT INTO creator_bootstrap_staging (creator_id) VALUES (%s)",
+                    (self.bootstrap_id,), write=True,
+                )
+                if creator != 1 or cap != 1 or stage != 1:
                     raise BootstrapError("quota_reservation_failed")
 
     def staged(self, *, locked=False):
         if not locked:
             self.original._ensure()
         rows = self.rows(
-            "SELECT p.id,p.source_id,p.is_hidden,p.removed_from_index_at,p.type,b.source_id "
+            "SELECT p.id,p.source_id,p.is_hidden,p.removed_from_index_at,p.type,b.source_id,s.photo_id "
             "FROM photos p LEFT JOIN bot_ingested b ON b.photo_id=p.id AND b.source_id=p.source_id "
-            "AND b.creator_handle=%s WHERE p.creator_id=%s LIMIT 16" + (" FOR UPDATE" if locked else ""),
+            "AND b.creator_handle=%s LEFT JOIN creator_bootstrap_staged_media s "
+            "ON s.photo_id=p.id AND s.creator_id=p.creator_id WHERE p.creator_id=%s LIMIT 16"
+            + (" FOR UPDATE" if locked else ""),
             (self.handle, self.bootstrap_id),
         )
         if len(rows) > MAX_MEDIA or any(
                 hidden != 1 or removed is not None or kind not in ("photo", "video")
-                or source_id is None or registered is None or str(source_id) != str(registered)
-                for _, source_id, hidden, removed, kind, registered in rows):
+                or source_id is None or registered is None or str(source_id) != str(registered) or marker != photo_id
+                for photo_id, source_id, hidden, removed, kind, registered, marker in rows):
             raise BootstrapError("invalid_staged_media")
         cap = self.rows(
             "SELECT admitted FROM creator_import_caps WHERE creator_id=%s" + (" FOR UPDATE" if locked else ""),
@@ -216,6 +223,9 @@ class BootstrapDatabase(EligibleDatabase):
         changed = self.rows("UPDATE photos SET is_hidden=1 WHERE id=%s AND creator_id=%s AND is_hidden=0 "
                             "AND removed_from_index_at IS NULL", (photo_id, creator_id), write=True)
         if changed != 1:
+            raise BootstrapError("staging_failed")
+        if self.rows("INSERT INTO creator_bootstrap_staged_media (photo_id,creator_id) VALUES (%s,%s)",
+                     (photo_id, creator_id), write=True) != 1:
             raise BootstrapError("staging_failed")
         self.staged(locked=True)
 
@@ -235,6 +245,10 @@ class BootstrapDatabase(EligibleDatabase):
                          "AND removed_from_index_at IS NULL", (self.bootstrap_id,), write=True) != 1:
                 raise BootstrapError("activation_changed")
             return len(photos)
+
+    def abort(self):
+        with self.transaction():
+            self.rows("DELETE FROM creator_bootstrap_staging WHERE creator_id=%s", (self.bootstrap_id,), write=True)
 
 
 def check_queue_pause(state_dir):
@@ -293,7 +307,13 @@ def run_approved(original, candidates, alias_map, config, *, apply=False):
         try:
             result = run_candidate(database, source_path=config["source_path"], state_dir=config["state_dir"], apply=apply)
         except (Excluded, MediaExcluded):
+            if apply:
+                database.abort()
             result = {"status": "excluded"}
+        except (BootstrapError, RetryableError) as error:
+            if apply and (isinstance(error, BootstrapError) or error.args == ("bootstrap_identity_changed",)):
+                database.abort()
+            raise
         counts[result["status"]] += 1
         counts["media"] += result.get("media", 0)
     return {"status": "completed" if apply else "preview", "counts": dict(counts)}

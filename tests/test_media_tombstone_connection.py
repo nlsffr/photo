@@ -14,6 +14,36 @@ spec.loader.exec_module(guard)
 
 
 class ConnectionTests(unittest.TestCase):
+    def test_staging_blocks_now_and_does_not_survive_the_preserved_map(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = root/'map.conf'
+            args = ['--preserve-existing', '--output', str(output), '--lock-file', str(root/'guard.lock')]
+            staging = ({'legal'}, {'/media/removed.jpg'}, {'stage'}, {'/media/staged.jpg'})
+            with patch.dict(guard.os.environ, {'DATABASE_URL': 'mysql://name:secret@mariadb/database'}), \
+                 patch.object(guard, '_database_tombstones', side_effect=[staging, (set(), set(), set(), set())]), \
+                 patch.object(guard, '_run_nginx'):
+                self.assertEqual(guard.main(args), 0)
+                original = output.read_bytes()
+                self.assertIn(b'$media_staged_creator', original)
+                self.assertIn(b'$media_staged_object', original)
+                self.assertIn(b'"stage" 1;', original)
+                self.assertIn(b'"/media/staged.jpg" 1;', original)
+                self.assertEqual(guard._existing_tombstones(original), staging[:2])
+                self.assertEqual(guard.main(args), 0)
+                self.assertEqual(output.read_bytes(), guard.render_map(*staging[:2]).encode())
+
+    def test_database_classification_keeps_only_explicit_stage_rows_transient(self):
+        rows = [('creator', 'removed', '/media/removed.webp', ''),
+                ('photo', '', '/media/removal-photo.webp', ''),
+                ('staging_creator', 'working', '', ''),
+                ('staging_photo', '', '/media/working.webp', '/media/working.mp4')]
+        self.assertEqual(guard._split_tombstones(rows, set()),
+                         ({'removed'}, {'/media/removed.webp', '/media/removal-photo.webp'},
+                          {'working'}, {'/media/working.webp', '/media/working.mp4'}))
+        with self.assertRaisesRegex(RuntimeError, 'unexpected database response kind'):
+            guard._split_tombstones([('unknown', '', '/media/unclassified.jpg', '')], set())
+
     def test_resolves_current_container_ip_without_inspecting_credentials(self):
         result = SimpleNamespace(returncode=0, stdout=json.dumps({'internal': {'IPAddress': '172.20.0.3'}}))
         with patch.object(guard.subprocess, 'run', return_value=result) as run:
@@ -40,7 +70,8 @@ class ConnectionTests(unittest.TestCase):
             root = Path(directory)
             with patch.dict(guard.os.environ, {'DATABASE_URL': 'mysql://name:secret@mariadb/database'}), \
                  patch.object(guard, '_container_database_host', return_value='172.20.0.7'), \
-                 patch.object(guard, '_database_tombstones', return_value=({'removed'}, {'/media/removed.jpg'})) as query, \
+                 patch.object(guard, '_database_tombstones', return_value=(
+                     {'removed'}, {'/media/removed.jpg'}, set(), set())) as query, \
                  patch.object(guard, '_run_nginx'):
                 result = guard.main(['--database-container', 'photo-mariadb-1', '--output', str(root/'map.conf'),
                                      '--lock-file', str(root/'guard.lock')])
@@ -75,7 +106,7 @@ class ConnectionTests(unittest.TestCase):
                 root = Path(directory); output = root/'map.conf'
                 output.write_text(guard.render_map({'removed-owner'}, {'/media/old-removal.jpg'}))
                 with patch.dict(guard.os.environ, {'DATABASE_URL': 'mysql://name:secret@mariadb/database'}), \
-                     patch.object(guard, '_database_tombstones', return_value=(set(), added)), \
+                     patch.object(guard, '_database_tombstones', return_value=(set(), added, set(), set())), \
                      patch.object(guard, '_run_nginx'):
                     self.assertEqual(guard.main(['--preserve-existing', '--output', str(output),
                                                 '--lock-file', str(root/'guard.lock')]), 0)

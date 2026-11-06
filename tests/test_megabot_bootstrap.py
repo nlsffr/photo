@@ -30,10 +30,11 @@ class BootstrapTest(unittest.TestCase):
 
     def test_owned_pending_profile_resumes_but_withdrawn_profile_does_not(self):
         db = bootstrap.BootstrapDatabase(Mock(), "new-one", ("old-one",))
-        pending = (db.bootstrap_id, "new-one", 1, None)
+        pending = (db.bootstrap_id, "new-one", 1, None, db.bootstrap_id)
         with patch.object(db, "rows", side_effect=[[pending], []]):
             self.assertEqual(db.inspect(), "pending")
-        for row in ((db.bootstrap_id, "new-one", 0, None), (*pending[:3], "removed")):
+        for row in ((db.bootstrap_id, "new-one", 0, None, None),
+                    (*pending[:3], "removed", db.bootstrap_id), (*pending[:4], None)):
             with patch.object(db, "rows", return_value=[row]):
                 self.assertEqual(db.inspect(), "known")
 
@@ -43,10 +44,11 @@ class BootstrapTest(unittest.TestCase):
         with patch.object(db, "inspect", return_value="new"), patch.object(db, "assert_media_allowed"), \
                 patch.object(db, "rows", return_value=1) as write:
             db.reserve()
-        self.assertEqual(write.call_count, 2)
+        self.assertEqual(write.call_count, 3)
         self.assertIn("INSERT INTO creators", write.call_args_list[0].args[0])
         self.assertIn("INSERT INTO creator_import_caps", write.call_args_list[1].args[0])
         self.assertEqual(write.call_args_list[1].args[1], (db.bootstrap_id,))
+        self.assertIn("INSERT INTO creator_bootstrap_staging", write.call_args_list[2].args[0])
         original.conn.start_transaction.assert_called_once()
         original.conn.commit.assert_called_once()
 
@@ -71,20 +73,21 @@ class BootstrapTest(unittest.TestCase):
 
     def test_staged_rows_require_registry_match_and_never_exceed_fifteen(self):
         db = bootstrap.BootstrapDatabase(Mock(), "new-one", ())
-        staged = [("photo-" + str(i), str(i), 1, None, "video", i) for i in range(1, 16)]
+        staged = [(f"photo-{i}", str(i), 1, None, "video", i, f"photo-{i}") for i in range(1, 16)]
         with patch.object(db, "rows", side_effect=[staged, [(15,)]]):
             self.assertEqual(len(db.staged()), 15)
-        for rows in ([*staged, ("photo-16", "16", 1, None, "photo", 16)],
-                     [("photo-1", "1", 0, None, "video", 1)],
-                     [("photo-1", "1", 1, "removed", "video", 1)],
-                     [("photo-1", "1", 1, None, "video", None)]):
+        for rows in ([*staged, ("photo-16", "16", 1, None, "photo", 16, "photo-16")],
+                     [("photo-1", "1", 0, None, "video", 1, "photo-1")],
+                     [("photo-1", "1", 1, "removed", "video", 1, "photo-1")],
+                     [("photo-1", "1", 1, None, "video", None, "photo-1")],
+                     [("photo-1", "1", 1, None, "video", 1, None)]):
             with self.subTest(count=len(rows)), patch.object(db, "rows", return_value=rows):
                 with self.assertRaises(bootstrap.BootstrapError):
                     db.staged()
 
     def test_missing_or_inconsistent_durable_quota_cannot_resume(self):
         db = bootstrap.BootstrapDatabase(Mock(), "new-one", ())
-        staged = [("photo-1", "1", 1, None, "video", 1)]
+        staged = [("photo-1", "1", 1, None, "video", 1, "photo-1")]
         for cap in ([], [(0,)], [(2,)]):
             with self.subTest(cap=cap), patch.object(db, "rows", side_effect=[staged, cap]):
                 with self.assertRaises(bootstrap.BootstrapError):
@@ -93,9 +96,9 @@ class BootstrapTest(unittest.TestCase):
     def test_sixteenth_insert_is_rolled_back_inside_existing_transaction(self):
         original = Mock()
         db = bootstrap.BootstrapDatabase(original, "new-one", ())
-        over_cap = [("photo-" + str(i), str(i), 1, None, "video", i) for i in range(1, 17)]
+        over_cap = [(f"photo-{i}", str(i), 1, None, "video", i, f"photo-{i}") for i in range(1, 17)]
         with patch.object(db, "eligible_id", return_value=db.bootstrap_id), \
-                patch.object(db, "rows", side_effect=[1, over_cap]) as rows:
+                patch.object(db, "rows", side_effect=[1, 1, over_cap]) as rows:
             with self.assertRaises(bootstrap.BootstrapError):
                 db.insert_photo("photo-16", db.bootstrap_id, "16")
         original.insert_photo.assert_called_once()
@@ -103,6 +106,7 @@ class BootstrapTest(unittest.TestCase):
         original.conn.rollback.assert_called_once()
         original.conn.commit.assert_not_called()
         self.assertIn("SET is_hidden=1", rows.call_args_list[0].args[0])
+        self.assertIn("INSERT INTO creator_bootstrap_staged_media", rows.call_args_list[1].args[0])
 
     def test_notice_during_activation_rolls_back_all_visibility_changes(self):
         original = Mock()
@@ -147,6 +151,22 @@ class BootstrapTest(unittest.TestCase):
             with self.assertRaises(adapter.RetryableError):
                 bootstrap.run_approved(Mock(), candidates, {}, config, apply=True)
         self.assertEqual([call.args[0].handle for call in run.call_args_list], ["first", "second"])
+
+    def test_terminal_exclusion_and_identity_review_clear_stage_but_network_retry_does_not(self):
+        candidates = {"first": ()}
+        config = {"source_path": "fixture", "state_dir": "fixture"}
+        for error, clear in ((adapter.MediaExcluded("notice_excluded"), True),
+                             (adapter.RetryableError("bootstrap_identity_changed"), True),
+                             (adapter.RetryableError("http_429"), False)):
+            with self.subTest(error=error), patch.object(bootstrap, "run_candidate", side_effect=error), \
+                    patch.object(bootstrap.BootstrapDatabase, "abort") as abort:
+                if isinstance(error, adapter.MediaExcluded):
+                    self.assertEqual(bootstrap.run_approved(Mock(), candidates, {}, config, apply=True),
+                                     {"status": "completed", "counts": {"excluded": 1, "media": 0}})
+                else:
+                    with self.assertRaises(adapter.RetryableError):
+                        bootstrap.run_approved(Mock(), candidates, {}, config, apply=True)
+                self.assertEqual(abort.call_count, int(clear))
 
     def test_existing_queue_pause_prevents_reserving_or_ingesting(self):
         for kind, error in (("network", adapter.RetryableError), ("storage", adapter.StorageFull)):
