@@ -296,6 +296,7 @@ class Repair:
 
     def request(self, url, stream=False):
         url = source_url(url)
+        seen = {url}
         for _ in range(4):
             # The public CDN can be reached directly; keep API validation on its
             # configured route. Never retry a CDN refusal through another route.
@@ -303,8 +304,15 @@ class Repair:
             r = self.bot.session.get(url, stream=stream, timeout=(10,60),
                                      proxies=None if direct else self.bot.get_proxy(), allow_redirects=False)
             if r.status_code in (301,302,303,307,308):
-                location = r.headers.get('Location'); r.close()
-                url = source_url(urljoin(url, location or '')); continue
+                location = r.headers.get('Location')
+                r.close()
+                if not location or not location.strip():
+                    break
+                url = source_url(urljoin(url, location))
+                if url in seen:
+                    break
+                seen.add(url)
+                continue
             return r
         raise RepairError('source_redirect_limit')
 

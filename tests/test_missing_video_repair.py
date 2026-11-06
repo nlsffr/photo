@@ -403,6 +403,68 @@ class RepairTests(unittest.TestCase):
         self.assertEqual(self.runtime.bot.session.get.call_count, 1)
         self.runtime.bot.get_proxy.assert_not_called()
 
+    def test_redirect_without_a_destination_stops_after_one_request(self):
+        for headers in ({}, {'Location': ''}, {'Location': '  '}):
+            with self.subTest(headers=headers):
+                redirect = Mock(status_code=301, headers=headers)
+                session = Mock()
+                session.get.return_value = redirect
+                self.runtime.bot = types.SimpleNamespace(session=session, get_proxy=Mock())
+                with self.assertRaisesRegex(repair.RepairError, '^source_redirect_limit$'):
+                    self.runtime.request('https://api.leakgallery.com/media/12')
+                self.assertEqual(session.get.call_count, 1)
+                redirect.close.assert_called_once_with()
+
+    def test_redirect_to_an_exact_seen_url_does_not_request_it_again(self):
+        first = Mock(status_code=302, headers={'Location': '/media/34'})
+        repeat = Mock(status_code=301, headers={'Location': 'https://api.leakgallery.com/media/12'})
+        session = Mock()
+        session.get.side_effect = [first, repeat]
+        self.runtime.bot = types.SimpleNamespace(session=session, get_proxy=Mock())
+        with self.assertRaisesRegex(repair.RepairError, '^source_redirect_limit$'):
+            self.runtime.request('https://api.leakgallery.com/media/12')
+        self.assertEqual([call.args[0] for call in session.get.call_args_list],
+                         ['https://api.leakgallery.com/media/12', 'https://api.leakgallery.com/media/34'])
+        first.close.assert_called_once_with()
+        repeat.close.assert_called_once_with()
+
+    def test_redirect_follows_an_allowed_destination_without_changing_route_rules(self):
+        redirect = Mock(status_code=307, headers={'Location': 'https://cdn.leakgallery.com/file.mp4'})
+        terminal = Mock(status_code=200)
+        session = Mock()
+        session.get.side_effect = [redirect, terminal]
+        route = {'https': 'fixture-existing-route'}
+        self.runtime.bot = types.SimpleNamespace(session=session, get_proxy=lambda: route)
+        self.runtime.direct_cdn = True
+        self.assertIs(self.runtime.request('https://api.leakgallery.com/media/12', stream=True), terminal)
+        self.assertEqual([call.kwargs['proxies'] for call in session.get.call_args_list], [route, None])
+        self.assertTrue(all(call.kwargs['allow_redirects'] is False for call in session.get.call_args_list))
+        redirect.close.assert_called_once_with()
+        terminal.close.assert_not_called()
+
+    def test_redirect_rejects_an_external_or_non_https_destination(self):
+        for location in ('https://leakgallery.com.attacker.test/file', 'http://cdn.leakgallery.com/file'):
+            with self.subTest(location=location):
+                redirect = Mock(status_code=302, headers={'Location': location})
+                session = Mock()
+                session.get.return_value = redirect
+                self.runtime.bot = types.SimpleNamespace(session=session, get_proxy=Mock())
+                with self.assertRaisesRegex(repair.RepairError, '^invalid_source_host$'):
+                    self.runtime.request('https://api.leakgallery.com/media/12')
+                self.assertEqual(session.get.call_count, 1)
+                redirect.close.assert_called_once_with()
+
+    def test_redirect_budget_still_allows_at_most_four_requests(self):
+        redirects = [Mock(status_code=308, headers={'Location': f'/media/{number}'}) for number in (2, 3, 4, 5)]
+        session = Mock()
+        session.get.side_effect = redirects
+        self.runtime.bot = types.SimpleNamespace(session=session, get_proxy=Mock())
+        with self.assertRaisesRegex(repair.RepairError, '^source_redirect_limit$'):
+            self.runtime.request('https://api.leakgallery.com/media/1')
+        self.assertEqual(session.get.call_count, 4)
+        for response in redirects:
+            response.close.assert_called_once_with()
+
 class RepairReuseTests(unittest.TestCase):
     """Reuse verifies fresh private configuration/source without real clients."""
     def setUp(self):
