@@ -3,7 +3,7 @@ from hashlib import sha256
 import unittest
 from unittest.mock import Mock, patch
 
-from ops.megabot_queue import adapter, bootstrap, notices
+from ops.megabot_queue import adapter, bootstrap, integrity, notices
 
 
 class BootstrapTest(unittest.TestCase):
@@ -187,6 +187,53 @@ class BootstrapTest(unittest.TestCase):
             eligible.assert_not_called()
             notice.assert_not_called()
             db.before_storage_write("5", "creators/new-one/5.mp4")
+            eligible.assert_called_once()
+            notice.assert_called_once_with("5")
+
+    def test_storage_write_accepts_only_local_relative_or_canonical_media_base(self):
+        for base in ("/media", "https://leakfanhub.com/media"):
+            with self.subTest(base=base):
+                db = bootstrap.BootstrapDatabase(Mock(), "new-one", (), storage=Mock(public_base=base))
+                with patch.object(db, "eligible_id") as eligible, patch.object(db, "assert_media_allowed") as notice:
+                    db.before_storage_write("5", "creators/new-one/5.mp4")
+                    eligible.assert_called_once()
+                    notice.assert_called_once_with("5")
+        for base in ("//leakfanhub.com/media", "/media/../other", "/media?redirect=other",
+                     "http://leakfanhub.com/media", "https://leakfanhub.com.evil/media",
+                     "https://other@leakfanhub.com/media", "https://leakfanhub.com/other"):
+            with self.subTest(base=base):
+                db = bootstrap.BootstrapDatabase(Mock(), "new-one", (), storage=Mock(public_base=base))
+                with patch.object(db, "eligible_id") as eligible, patch.object(db, "assert_media_allowed") as notice:
+                    with self.assertRaisesRegex(adapter.Excluded, "edge_asset_scope_mismatch"):
+                        db.before_storage_write("5", "creators/new-one/5.mp4")
+                    eligible.assert_not_called()
+                    notice.assert_not_called()
+
+    def test_legacy_relative_base_upload_reaches_storage_and_publication_verification(self):
+        from pathlib import Path
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as directory:
+            photo = Path(directory)/"5.jpg"
+            photo.write_bytes(b"neutral-fixture")
+            client = Mock()
+            missing = RuntimeError("not found")
+            missing.response = {"ResponseMetadata": {"HTTPStatusCode": 404}}
+            client.head_object.side_effect = [missing, {"ContentLength": photo.stat().st_size, "ContentType": "image/jpeg"},
+                                              {"ContentLength": photo.stat().st_size, "ContentType": "image/jpeg"},
+                                              {"ContentLength": photo.stat().st_size, "ContentType": "image/jpeg"}]
+            db = bootstrap.BootstrapDatabase(Mock(), "new-one", ())
+            # The pinned legacy Config.PUBLIC_MEDIA_BASE uses this relative value.
+            store = integrity.VerifiedStorage(client, "fixture", "/media",
+                                              before_write=lambda key: db.before_storage_write("5", key))
+            db.storage = store
+            with patch.object(db, "eligible_id") as eligible, patch.object(db, "assert_media_allowed") as notice, \
+                    patch.object(integrity, "validate_file", return_value="image/jpeg"):
+                url = store.upload(str(photo), "creators/new-one/5.jpg")
+                store.verify_publication("5", url, None, "photo", photo.stat().st_size,
+                                         "new-one", "creators/new-one/5.jpg")
+            self.assertEqual(url, "/media/creators/new-one/5.jpg")
+            client.put_object.assert_called_once()
             eligible.assert_called_once()
             notice.assert_called_once_with("5")
 

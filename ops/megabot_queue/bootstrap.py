@@ -278,7 +278,7 @@ class BootstrapDatabase(EligibleDatabase):
     def before_storage_write(self, source_id, key):
         prefix = f"creators/{self.handle}/"
         tail = key.removeprefix(prefix) if isinstance(key, str) else ""
-        if (self.storage.public_base != PUBLIC_MEDIA_BASE or tail == key or tail in (".", "..")
+        if (self.storage.public_base not in ("/media", PUBLIC_MEDIA_BASE) or tail == key or tail in (".", "..")
                 or not re.fullmatch(r"[A-Za-z0-9._-]+", tail)):
             raise Excluded("edge_asset_scope_mismatch")
         self.eligible_id()
